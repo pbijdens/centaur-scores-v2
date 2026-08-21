@@ -1,19 +1,34 @@
 {
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "CentaurScores.Api (HTTP 5080)",
+            "name": ".NET Core Launch (web)",
             "type": "coreclr",
             "request": "launch",
-            "program": "${workspaceFolder}/CentaurScores.Api/bin/Debug/net10.0/CentaurScores.Api",
+            "preLaunchTask": "build",
+            "program": "${workspaceFolder}/CentaurScores.Api/bin/Debug/net10.0/CentaurScores.Api.dll",
+            "args": [],
             "cwd": "${workspaceFolder}/CentaurScores.Api",
+            "stopAtEntry": false,
+            "serverReadyAction": {
+                "action": "openExternally",
+                "pattern": "\\bNow listening on:\\s+(https?://\\S+)"
+            },
             "env": {
                 "ASPNETCORE_ENVIRONMENT": "Development",
                 "ASPNETCORE_URLS": "http://localhost:5080"
             },
-            "stopAtEntry": false,
-            "launchBrowser": true,
-            "launchUrl": "swagger"
+            "sourceFileMap": {
+                "/Views": "${workspaceFolder}/Views"
+            }
+        },
+        {
+            "name": ".NET Core Attach",
+            "type": "coreclr",
+            "request": "attach"
         }
     ]
 }

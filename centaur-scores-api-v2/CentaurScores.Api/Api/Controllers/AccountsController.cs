@@ -47,7 +47,7 @@ public sealed class AccountsController(ApplicationDbContext db, ITenantContext t
         account.Username = request.Username;
         account.DisplayName = request.DisplayName;
         account.Email = request.Email;
-        account.Authorization = Enum.Parse<AuthorizationProfile>(request.Authorization, true);
+        if (!string.IsNullOrWhiteSpace(request.Authorization)) account.Authorization = Enum.Parse<AuthorizationProfile>(request.Authorization, true);
         if (!string.IsNullOrWhiteSpace(request.Password)) account.PasswordHash = Passwords.Hash(request.Password);
         await db.SaveChangesAsync(cancellationToken);
         return Ok(new { account.Id, account.Username, account.DisplayName, account.Email, Authorization = account.Authorization.ToString() });

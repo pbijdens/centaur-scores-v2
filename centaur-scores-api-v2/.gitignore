@@ -22,8 +22,7 @@
 
 # Local configuration and secrets
 appsettings.Local.json
-appsettings.*.Local.json
-appSettings.*.Local.json
+appsettings.*.json
 
 secrets.json
 *.pfx

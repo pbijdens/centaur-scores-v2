@@ -61,13 +61,14 @@ JWTs are returned by `POST /api/auth/login` and contain the account and active t
 | `GET` | `/api/categories` | user | List categories and their values alphabetically. |
 | `POST` | `/api/categories` | manager | Create a category. |
 | `POST` | `/api/categories/{categoryId}/values` | manager | Add a `{ valueId, name }` category value. |
+| `PUT` | `/api/categories/{categoryId}/values/{valueId}` | manager | Rename a category value with `{ name }`. |
 | `DELETE` | `/api/categories/{categoryId}/values/{valueId}` | manager | Remove a category value. |
 | `DELETE` | `/api/categories/{categoryId}` | admin | Delete an unused category; used categories return `409`. |
 | `GET` | `/api/participant-lists?includeInactive=true` | user | List participant lists, including members. |
 | `POST` | `/api/participant-lists` | manager | Create a participant list. |
 | `PUT` | `/api/participant-lists/{listId}` | manager | Update list name and active state. |
-| `POST` | `/api/participant-lists/{listId}/members` | manager | Add a participant with category values. |
-| `PUT` | `/api/participant-lists/{listId}/members/{memberId}` | manager | Update participant metadata and categories. |
+| `POST` | `/api/participant-lists/{listId}/members` | manager | Add a participant with `{ lastName, fullName, federationNumber?, categories, isActive? }` (`isActive` defaults to `true`). |
+| `PUT` | `/api/participant-lists/{listId}/members/{memberId}` | manager | Update participant metadata, categories, and `isActive`. |
 | `DELETE` | `/api/participant-lists/{listId}/members/{memberId}` | manager | Remove a participant from a list. |
 
 ## Match templates

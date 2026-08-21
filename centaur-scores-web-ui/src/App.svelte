@@ -5,17 +5,22 @@
   import { translationsFor } from './lib/i18n'
   import { managementItems } from './lib/managementData'
   import { navigateTo, resolveRoute } from './lib/router'
-  import type { Account, Competition, Language, Match, NamedItem, Profile, Tenant, View } from './lib/types'
+  import type { Account, Category, Competition, Language, Match, NamedItem, ParticipantList, Profile, Tenant, View } from './lib/types'
   import { isManagementView } from './lib/types'
   import AccountEditView from './lib/AccountEditView.svelte'
   import AccountsView from './lib/AccountsView.svelte'
   import AppHeader from './lib/AppHeader.svelte'
+  import CategoriesView from './lib/CategoriesView.svelte'
+  import CategoryDetailView from './lib/CategoryDetailView.svelte'
   import CompetitionsView from './lib/CompetitionsView.svelte'
   import HomeView from './lib/HomeView.svelte'
   import LoginView from './lib/LoginView.svelte'
   import ManagementView from './lib/ManagementView.svelte'
   import MatchDetailView from './lib/MatchDetailView.svelte'
   import MatchesView from './lib/MatchesView.svelte'
+  import ParticipantListDetailView from './lib/ParticipantListDetailView.svelte'
+  import ParticipantListsView from './lib/ParticipantListsView.svelte'
+  import ParticipantMemberView from './lib/ParticipantMemberView.svelte'
   import ProfileView from './lib/ProfileView.svelte'
   import TenantEditView from './lib/TenantEditView.svelte'
   import TenantsView from './lib/TenantsView.svelte'
@@ -42,6 +47,11 @@
   let selectedTenantId: string | null = null
   let accounts: Account[] = []
   let selectedAccountId: string | null = null
+  let categories: Category[] = []
+  let selectedCategoryId: string | null = null
+  let participantLists: ParticipantList[] = []
+  let selectedListId: string | null = null
+  let selectedMemberId: string | null = null
 
   $: t = translationsFor(language)
   $: managementView = isManagementView(view) ? view : null
@@ -50,6 +60,9 @@
   $: homeQuickLinks = (
     [['participants', t.participants], ['categories', t.categories], ['templates', t.templates]] as [string, string][]
   ).concat(isAdmin ? [['accounts', t.accounts], ['tenants', t.tenants]] : [])
+  $: selectedCategory = categories.find((category) => category.id === selectedCategoryId) ?? null
+  $: selectedList = participantLists.find((list) => list.id === selectedListId) ?? null
+  $: selectedMember = selectedMemberId && selectedMemberId !== 'new' ? selectedList?.members.find((member) => member.id === selectedMemberId) ?? null : null
 
   const api = new ApiClient(() => token, signOut)
 
@@ -73,6 +86,8 @@
       competitions = await api.fetchCompetitions()
       profile = await api.fetchProfile()
       currentTenant = await api.fetchCurrentTenant()
+      categories = await api.fetchCategories()
+      participantLists = await api.fetchParticipantLists()
       applyRoute()
     } catch { matches = []; competitions = [] } finally { loading = false }
   }
@@ -125,6 +140,36 @@
     accounts = await api.fetchAccounts()
   }
 
+  function openCategory(category: Category) { navigate(`/categories/${category.id}`) }
+
+  async function refreshCategories() {
+    categories = await api.fetchCategories()
+  }
+
+  function onCategoryDeleted() {
+    navigate('/categories')
+    refreshCategories()
+  }
+
+  function openList(list: ParticipantList) { navigate(`/participants/${list.id}`) }
+
+  async function refreshParticipantLists() {
+    participantLists = await api.fetchParticipantLists()
+  }
+
+  function openMember(memberId: string) {
+    if (selectedListId) navigate(`/participants/${selectedListId}/members/${memberId}`)
+  }
+
+  function addMember() {
+    if (selectedListId) navigate(`/participants/${selectedListId}/members/new`)
+  }
+
+  function onMemberSaved() {
+    if (selectedListId) navigate(`/participants/${selectedListId}`)
+    refreshParticipantLists()
+  }
+
   function navigate(path: string, replace = false) {
     const route = navigateTo(path, replace)
     applyRouteResult(route)
@@ -142,6 +187,9 @@
     if (route.view === 'tenants') loadChildTenants()
     selectedAccountId = route.view === 'account' ? route.accountId ?? null : null
     if (route.view === 'accounts') loadAccounts()
+    selectedCategoryId = route.view === 'category' ? route.categoryId ?? null : null
+    selectedListId = route.view === 'participant-list' || route.view === 'participant' ? route.listId ?? null : null
+    selectedMemberId = route.view === 'participant' ? route.memberId ?? null : null
   }
 
   onMount(() => {
@@ -178,6 +226,16 @@
         <AccountsView {api} {accounts} labels={t} onOpenAccount={openAccount} onBack={() => navigate('/')} />
       {:else if view === 'account' && selectedAccountId && isAdmin}
         <AccountEditView {api} accountId={selectedAccountId} currentAccountId={profile?.id ?? null} labels={t} onBack={() => navigate('/accounts')} />
+      {:else if view === 'categories'}
+        <CategoriesView {api} {categories} labels={t} onOpenCategory={openCategory} onChanged={refreshCategories} onBack={() => navigate('/')} />
+      {:else if view === 'category' && selectedCategory}
+        <CategoryDetailView {api} category={selectedCategory} labels={t} onChanged={refreshCategories} onDeleted={onCategoryDeleted} onBack={() => navigate('/categories')} />
+      {:else if view === 'participants'}
+        <ParticipantListsView {api} lists={participantLists} labels={t} onOpenList={openList} onChanged={refreshParticipantLists} onBack={() => navigate('/')} />
+      {:else if view === 'participant-list' && selectedList}
+        <ParticipantListDetailView {api} list={selectedList} {categories} labels={t} onOpenMember={openMember} onAddMember={addMember} onChanged={refreshParticipantLists} onBack={() => navigate('/participants')} />
+      {:else if view === 'participant' && selectedListId}
+        <ParticipantMemberView {api} listId={selectedListId} member={selectedMember} {categories} labels={t} onBack={() => navigate(`/participants/${selectedListId}`)} onSaved={onMemberSaved} onDeleted={onMemberSaved} />
       {:else if managementView}
         <section class="management-view">
           <button class="back-link" on:click={() => navigate('/')}>← {t.home}</button>

@@ -16,3 +16,4 @@ Specification: [DESIGN.md](../documentation/DESIGN.md)
 - Add concise code comments for non-obvious logic and important design choices.
 - Backend tests are in `CentaurScores.Api.Tests`.
 - Client-actionable error responses (login, change-password, account creation) return a coded `ApiError { code, message }` body instead of a plain message, so the frontend can map `code` to a translated string. `message` is developer-facing only. See `Contracts.ApiError` and `API_ENDPOINTS.md` for the known codes; extend this pattern for new endpoints whose failures the UI needs to react to specifically.
+- `ParticipantListMember` has an `IsActive` flag (default `true`); `CreateParticipantRequest.IsActive` defaults to `true` when omitted. Added via the `AddParticipantMemberIsActive` migration.

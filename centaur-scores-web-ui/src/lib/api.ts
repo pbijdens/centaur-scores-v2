@@ -1,4 +1,4 @@
-import type { Account, Competition, Match, Profile, Tenant } from './types'
+import type { Account, Category, Competition, Match, ParticipantList, Profile, Tenant } from './types'
 
 export const apiBase = import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:5080'
 
@@ -106,6 +106,54 @@ export class ApiClient {
 
   deleteChildTenant(id: string) {
     return this.request(`/api/tenants/${id}`, { method: 'DELETE' })
+  }
+
+  fetchCategories(): Promise<Category[]> {
+    return this.request('/api/categories')
+  }
+
+  createCategory(name: string): Promise<Category> {
+    return this.request('/api/categories', { method: 'POST', body: JSON.stringify({ name }) })
+  }
+
+  addCategoryValue(categoryId: string, valueId: number, name: string) {
+    return this.request(`/api/categories/${categoryId}/values`, { method: 'POST', body: JSON.stringify({ valueId, name }) })
+  }
+
+  updateCategoryValue(categoryId: string, valueId: number, name: string) {
+    return this.request(`/api/categories/${categoryId}/values/${valueId}`, { method: 'PUT', body: JSON.stringify({ name }) })
+  }
+
+  deleteCategoryValue(categoryId: string, valueId: number) {
+    return this.request(`/api/categories/${categoryId}/values/${valueId}`, { method: 'DELETE' })
+  }
+
+  deleteCategory(categoryId: string) {
+    return this.request(`/api/categories/${categoryId}`, { method: 'DELETE' })
+  }
+
+  fetchParticipantLists(): Promise<ParticipantList[]> {
+    return this.request('/api/participant-lists?includeInactive=true')
+  }
+
+  createParticipantList(body: { name: string; isActive: boolean }): Promise<ParticipantList> {
+    return this.request('/api/participant-lists', { method: 'POST', body: JSON.stringify(body) })
+  }
+
+  updateParticipantList(id: string, body: { name: string; isActive: boolean }): Promise<ParticipantList> {
+    return this.request(`/api/participant-lists/${id}`, { method: 'PUT', body: JSON.stringify(body) })
+  }
+
+  addParticipantMember(listId: string, body: { lastName: string; fullName: string; federationNumber?: string | null; categories: Record<string, number>; isActive: boolean }) {
+    return this.request(`/api/participant-lists/${listId}/members`, { method: 'POST', body: JSON.stringify(body) })
+  }
+
+  updateParticipantMember(listId: string, memberId: string, body: { lastName: string; fullName: string; federationNumber?: string | null; categories: Record<string, number>; isActive: boolean }) {
+    return this.request(`/api/participant-lists/${listId}/members/${memberId}`, { method: 'PUT', body: JSON.stringify(body) })
+  }
+
+  deleteParticipantMember(listId: string, memberId: string) {
+    return this.request(`/api/participant-lists/${listId}/members/${memberId}`, { method: 'DELETE' })
   }
 }
 

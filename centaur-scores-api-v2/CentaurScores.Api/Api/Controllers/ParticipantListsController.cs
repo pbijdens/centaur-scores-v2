@@ -33,7 +33,7 @@ public sealed class ParticipantListsController(ApplicationDbContext db, ITenantC
     {
         if (!CanManage) return Forbid();
         if (!await db.ParticipantLists.AnyAsync(item => item.Id == listId && item.TenantId == TenantId, cancellationToken)) return NotFound();
-        var member = new ParticipantListMember { Id = Guid.NewGuid(), TenantId = TenantId, ParticipantListId = listId, LastName = request.LastName, FullName = request.FullName, FederationNumber = request.FederationNumber, Categories = request.Categories };
+        var member = new ParticipantListMember { Id = Guid.NewGuid(), TenantId = TenantId, ParticipantListId = listId, LastName = request.LastName, FullName = request.FullName, FederationNumber = request.FederationNumber, Categories = request.Categories, IsActive = request.IsActive };
         db.ParticipantListMembers.Add(member);
         await db.SaveChangesAsync(cancellationToken);
         return Created($"api/participant-lists/{listId}/members/{member.Id}", member);
@@ -61,6 +61,7 @@ public sealed class ParticipantListsController(ApplicationDbContext db, ITenantC
         member.FullName = request.FullName;
         member.FederationNumber = request.FederationNumber;
         member.Categories = request.Categories;
+        member.IsActive = request.IsActive;
         await db.SaveChangesAsync(cancellationToken);
         return Ok(member);
     }

@@ -35,6 +35,17 @@ public sealed class CategoriesController(ApplicationDbContext db, ITenantContext
         return Ok(value);
     }
 
+    [HttpPut("{categoryId:guid}/values/{valueId:int}")]
+    public async Task<IActionResult> UpdateValue(Guid categoryId, int valueId, UpdateCategoryValueRequest request, CancellationToken cancellationToken)
+    {
+        if (!CanManage) return Forbid();
+        var value = await db.CategoryValues.SingleOrDefaultAsync(item => item.CategoryId == categoryId && item.ValueId == valueId && item.TenantId == TenantId, cancellationToken);
+        if (value is null) return NotFound();
+        value.Name = request.Name;
+        await db.SaveChangesAsync(cancellationToken);
+        return Ok(value);
+    }
+
     [HttpDelete("{categoryId:guid}")]
     public async Task<IActionResult> Delete(Guid categoryId, CancellationToken cancellationToken)
     {

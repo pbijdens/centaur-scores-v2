@@ -53,6 +53,7 @@ public sealed class ParticipantListMember : TenantOwnedEntity
     public string FullName { get; set; } = "";
     public string? FederationNumber { get; set; }
     public Dictionary<Guid, int> Categories { get; set; } = [];
+    public bool IsActive { get; set; } = true;
 }
 
 public sealed class MatchTemplate : TenantOwnedEntity

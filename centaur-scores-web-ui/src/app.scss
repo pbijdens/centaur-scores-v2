@@ -152,6 +152,21 @@ select {
   outline: none;
 }
 
+input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  min-height: 0;
+  padding: 0;
+  accent-color: var(--green);
+}
+
+label.checkbox-label {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
 input:focus,
 select:focus {
   border-color: var(--green);
@@ -374,6 +389,32 @@ nav button.active:after {
   color: var(--muted);
   font-size: 12px;
   margin-top: 4px;
+}
+
+.value-name {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  color: var(--ink);
+  padding: 0;
+  flex: 1;
+}
+
+.icon-button {
+  margin-left: auto;
+  border: 0;
+  background: transparent;
+  font-size: 17px;
+  line-height: 1;
+  padding: 4px;
+  color: var(--muted);
+}
+
+.icon-button:hover {
+  color: $color-danger-text;
 }
 
 .arrow {

@@ -63,13 +63,18 @@ As a user I can see and manage tenant data from the tenant home screen. On the t
 
 #### UC5 Category management
 
-As a user, when Iam logged in and have sufficient rights, from the Tenant Home screen I can select a function to manage categories this takes me to the category list. That list is ordered alphabeticcally by default.
+As a user, when Iam logged in and have sufficient rights, from the Tenant Home screen I can select a function to manage categories this takes me to the category list.
+That list is ordered alphabetically by default. There is a button above the list that allows me to add a category.
+
 Opening any category allows me to Add/Remove values or even delete the category if it's not used.
-Once an category is used by a match it can't be deleted anymore.
+
+Once an category is used by a match it can't be deleted anymore, otherwise there is a "Delete this category" button.
 
 #### UC6 - User wants to set up a match template
 
 As a user, from the Home screen I can select a function to manage match templates.
+
+This will take me to a page that lists all match templates I have created for my tenant. These are listed in alphabetical order, and on the list I see the template name, the participant mode and the participant list's name if set.
 
 This will take me to a page where I can then set up a match template. I can:
 - Set a name for the template (e.g. CLubcompetitie 18 meter 3 pijl)
@@ -88,17 +93,18 @@ This will take me to a page where I can then set up a match template. I can:
 
 #### UC7 - Managing lists of participants
 
-As a user the participant list screen allows me to CRUD lists of participants. Participant lists have as metadata a name and an indication of whether they are still active.
+As a user I can navigate ot the participans list management screen by pressing the button on the tenant homepage. As a user the participant list screen allows me to CRUD lists of participants.
 
-Inactive participant lists are only shown in the full list we see when we click the function button or when we go via "Show all". The list is sorted so active lists are on the top, next by name.
+Participant lists have as metadata a name and an indication of whether they are still active.
 
-Inactive participant lists are rendered visually different, but are clickable nonetheless, opening their details.
+Inactive participant lists are only shown in the full list we see when we click the function button or when we go via "Show all". The list is sorted so active lists are on the top, next by name. Inactive participant lists are rendered visually different, but are clickable nonetheless, opening their details and are later in the display order than the rest.
 
-Participant list details consist of a metadata editor, and a list members editor. Users with sufficient rights can edit and save the metadata. The participants list shows all participants in the list, ordered by last name. Participant lists in context of matches always show all relevant category values also, where the relevant values are the ones identified in the match definition, in the order identified there. So we could have Pieter-Bas IJdens (Recurve/Klasse C) in the participant list when I need to select an archer.
+Clicking a list takes me to the details screen that allows me to edit the list's metadata and to manage the participants on the list. Participant list details consist of a metadata editor, and a list members editor. Users with sufficient rights can edit and save the metadata. The participants list shows all participants in the list, ordered by last name. Participant lists in context of matches always show all relevant category values also, where the relevant values are the ones identified in the match definition, in the order identified there. So we could have Pieter-Bas IJdens (Recurve/Klasse C) in the participant list when I need to select an archer.
 
 Clicking (or touching) a participant shows a screen with:
 - Their metadata as defined in the model, editable when the user has sufficient privileges
-- The current value for each category, with the possibility to change it if the user has the rights
+- The current value for each category, with the possibility to change it if the user has the rights.
+- Whether they are still active or not (inactive participant list members are not shown in selection lists, they are shown in results and other lists)
 
 In order to save, all values should be filled in.
 
@@ -110,7 +116,7 @@ Selecting that function, or selecting show all will take the user to the list of
 
 The list shows for each match the name, date and number of participants currently assigned.
 
-The list will be sorted such that the currently active matches are always on top, rendered visually different (active)
+The list will be ordered such that the currently active matches are always on top, rendered visually different (active)
 
 Next are all current and future matches not shown yet, ordered by date, ascending.
 
@@ -118,7 +124,9 @@ Next are all past matches; visually different ordered by date, ascending.
 
 Above the list there is a toolbar with options to add a match and a filter to filter the list on "Only future matches" or "Only past matches". There is a text field that can be used to filter the list (on name)
 
-Clicking or touching the match navigates to the matches homescreen. On this screen the user can, given sufficient privilege:
+Clicking or touching the match navigates to the matches homescreen.
+
+On this screen the user can, given sufficient privilege:
 - Activate or de-activate the match
 - Open a printable screen with QR codes encoding the URLs for all scoring devices, with LARGE QR codes placed in a bordered block with in that block the name of the match plus the name of the scoring device the code is for. At most 4 codes should fit on an A4.
 - See the match metadata and update it.
@@ -224,3 +232,10 @@ The page has the regular navigation for returning to the list or from the list t
 At the top of the list, consistent with the other lists in the system there is an Add Account button, which asks for an account name and then creates the unprivileged account opening the account editor on that single account. If creating the account fails, show an error and keep the add-screen open.
 
 Note that errors from the UI should be coded, and the code should determine which text is shown so the UI can display an appropriate error message. This should also be done for login and documented in our memory both on this side as well as on the API side.
+
+
+### Advanced use cases, future work
+
+#### UCA1
+
+To the participants list, when editing a member add to the view a list with all matches that the participant parttook in, including their score and average for that match.
