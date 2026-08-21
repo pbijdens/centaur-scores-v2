@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { ApiClient } from './api'
+  import { labelForError } from './errors'
   import type { Profile } from './types'
 
   export let api: ApiClient
@@ -43,8 +44,8 @@
       await api.changePassword(currentPassword, newPassword)
       currentPassword = ''; newPassword = ''; confirmPassword = ''
       passwordMessage = labels.passwordSaved
-    } catch {
-      passwordError = labels.currentPasswordWrong
+    } catch (error) {
+      passwordError = labelForError(error, labels, 'currentPasswordWrong')
     }
   }
 </script>

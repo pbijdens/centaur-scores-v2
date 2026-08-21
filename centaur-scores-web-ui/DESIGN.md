@@ -222,3 +222,5 @@ Only when the password field is non-empty it's used to set a new password for th
 The page has the regular navigation for returning to the list or from the list to overview.
 
 At the top of the list, consistent with the other lists in the system there is an Add Account button, which asks for an account name and then creates the unprivileged account opening the account editor on that single account. If creating the account fails, show an error and keep the add-screen open.
+
+Note that errors from the UI should be coded, and the code should determine which text is shown so the UI can display an appropriate error message. This should also be done for login and documented in our memory both on this side as well as on the API side.

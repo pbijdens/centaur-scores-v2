@@ -1,11 +1,14 @@
 <script lang="ts">
   import { onMount } from 'svelte'
   import { ApiClient, fetchTenants, login } from './lib/api'
+  import { labelForError } from './lib/errors'
   import { translationsFor } from './lib/i18n'
   import { managementItems } from './lib/managementData'
   import { navigateTo, resolveRoute } from './lib/router'
-  import type { Competition, Language, Match, NamedItem, Profile, Tenant, View } from './lib/types'
+  import type { Account, Competition, Language, Match, NamedItem, Profile, Tenant, View } from './lib/types'
   import { isManagementView } from './lib/types'
+  import AccountEditView from './lib/AccountEditView.svelte'
+  import AccountsView from './lib/AccountsView.svelte'
   import AppHeader from './lib/AppHeader.svelte'
   import CompetitionsView from './lib/CompetitionsView.svelte'
   import HomeView from './lib/HomeView.svelte'
@@ -37,14 +40,16 @@
   let currentTenant: Tenant | null = null
   let childTenants: Tenant[] = []
   let selectedTenantId: string | null = null
+  let accounts: Account[] = []
+  let selectedAccountId: string | null = null
 
   $: t = translationsFor(language)
   $: managementView = isManagementView(view) ? view : null
   $: namedItems = managementView ? managementItems(managementView) : ([] as NamedItem[])
   $: isAdmin = profile?.authorization === 'Administrator'
   $: homeQuickLinks = (
-    [['participants', t.participants], ['categories', t.categories], ['templates', t.templates], ['accounts', t.accounts]] as [string, string][]
-  ).concat(isAdmin ? [['tenants', t.tenants]] : [])
+    [['participants', t.participants], ['categories', t.categories], ['templates', t.templates]] as [string, string][]
+  ).concat(isAdmin ? [['accounts', t.accounts], ['tenants', t.tenants]] : [])
 
   const api = new ApiClient(() => token, signOut)
 
@@ -78,7 +83,7 @@
       token = result.token; loggedIn = true; loginError = ''
       localStorage.setItem('centaur-token', token); localStorage.setItem('centaur-tenant', tenant); await loadData()
       navigate('/')
-    } catch { loginError = t.signInError }
+    } catch (error) { loginError = labelForError(error, t, 'signInError') }
   }
 
   function signOut() {
@@ -114,6 +119,12 @@
     loadChildTenants()
   }
 
+  function openAccount(account: Account) { navigate(`/accounts/${account.id}`) }
+
+  async function loadAccounts() {
+    accounts = await api.fetchAccounts()
+  }
+
   function navigate(path: string, replace = false) {
     const route = navigateTo(path, replace)
     applyRouteResult(route)
@@ -129,6 +140,8 @@
     selectedMatch = route.view === 'match' ? matches.find((match) => match.id === route.matchId) ?? selectedMatch : null
     selectedTenantId = route.view === 'tenant' ? route.tenantId ?? null : null
     if (route.view === 'tenants') loadChildTenants()
+    selectedAccountId = route.view === 'account' ? route.accountId ?? null : null
+    if (route.view === 'accounts') loadAccounts()
   }
 
   onMount(() => {
@@ -161,6 +174,10 @@
         <TenantsView tenants={childTenants} labels={t} onOpenTenant={openTenant} onCreateTenant={createChildTenant} onBack={() => navigate('/')} />
       {:else if view === 'tenant' && selectedTenantId && isAdmin}
         <TenantEditView {api} tenantId={selectedTenantId} labels={t} onBack={() => navigate('/tenants')} onDeleted={onTenantDeleted} />
+      {:else if view === 'accounts' && isAdmin}
+        <AccountsView {api} {accounts} labels={t} onOpenAccount={openAccount} onBack={() => navigate('/')} />
+      {:else if view === 'account' && selectedAccountId && isAdmin}
+        <AccountEditView {api} accountId={selectedAccountId} currentAccountId={profile?.id ?? null} labels={t} onBack={() => navigate('/accounts')} />
       {:else if managementView}
         <section class="management-view">
           <button class="back-link" on:click={() => navigate('/')}>← {t.home}</button>

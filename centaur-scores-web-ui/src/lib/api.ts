@@ -1,6 +1,27 @@
-import type { Competition, Match, Profile, Tenant } from './types'
+import type { Account, Competition, Match, Profile, Tenant } from './types'
 
 export const apiBase = import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:5080'
+
+// Carries the API's stable error `code` so callers can map it to a translated message instead of showing server text.
+export class ApiRequestError extends Error {
+  code?: string
+  constructor(message: string, code?: string) {
+    super(message)
+    this.code = code
+  }
+}
+
+async function readApiError(response: Response): Promise<ApiRequestError> {
+  const text = await response.text()
+  let message = text
+  let code: string | undefined
+  try {
+    const body = JSON.parse(text)
+    if (typeof body?.code === 'string') code = body.code
+    if (typeof body?.message === 'string') message = body.message
+  } catch { /* response body was not JSON */ }
+  return new ApiRequestError(message, code)
+}
 
 export class ApiClient {
   constructor(
@@ -15,15 +36,7 @@ export class ApiClient {
   async request(path: string, options: RequestInit = {}) {
     const response = await fetch(`${apiBase}${path}`, { ...options, headers: { ...this.headers(), ...(options.headers ?? {}) } })
     if (response.status === 401) this.onUnauthorized()
-    if (!response.ok) {
-      const text = await response.text()
-      let message = text
-      try {
-        const body = JSON.parse(text)
-        if (typeof body?.message === 'string') message = body.message
-      } catch { /* response body was not JSON */ }
-      throw new Error(message)
-    }
+    if (!response.ok) throw await readApiError(response)
     return response.status === 204 ? null : response.json()
   }
 
@@ -75,6 +88,22 @@ export class ApiClient {
     return this.request(`/api/tenants/children/${id}`, { method: 'PUT', body: JSON.stringify(body) })
   }
 
+  fetchAccounts(): Promise<Account[]> {
+    return this.request('/api/accounts')
+  }
+
+  createAccount(body: { username: string }): Promise<Account> {
+    return this.request('/api/accounts', { method: 'POST', body: JSON.stringify(body) })
+  }
+
+  fetchAccount(id: string): Promise<Account> {
+    return this.request(`/api/accounts/${id}`)
+  }
+
+  updateAccount(id: string, body: { username: string; password?: string; displayName?: string | null; email?: string | null; authorization: string }): Promise<Account> {
+    return this.request(`/api/accounts/${id}`, { method: 'PUT', body: JSON.stringify(body) })
+  }
+
   deleteChildTenant(id: string) {
     return this.request(`/api/tenants/${id}`, { method: 'DELETE' })
   }
@@ -88,6 +117,6 @@ export async function fetchTenants(): Promise<Tenant[]> {
 
 export async function login(username: string, password: string, tenantId: string): Promise<{ token: string }> {
   const response = await fetch(`${apiBase}/api/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password, tenantId }) })
-  if (!response.ok) throw new Error('login failed')
+  if (!response.ok) throw await readApiError(response)
   return response.json()
 }
