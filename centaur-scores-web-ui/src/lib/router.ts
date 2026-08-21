@@ -1,7 +1,6 @@
 import type { View } from './types'
-import { isManagementView } from './types'
 
-export type Route = { view: View; matchId?: string; tenantId?: string; accountId?: string; categoryId?: string; listId?: string; memberId?: string; invalid?: boolean }
+export type Route = { view: View; matchId?: string; tenantId?: string; accountId?: string; categoryId?: string; listId?: string; memberId?: string; templateId?: string; invalid?: boolean }
 
 export function navigateTo(path: string, replace = false) {
   const normalizedPath = path || '/'
@@ -33,6 +32,8 @@ export function resolveRoute(path = location.pathname): Route {
     if (segments[2] === 'members' && segments[3]) return { view: 'participant', listId: segments[1], memberId: segments[3] }
     return { view: 'participant-list', listId: segments[1] }
   }
-  if (isManagementView(section as View)) return { view: section as View }
+  if (section === 'templates') {
+    return segments[1] ? { view: 'template', templateId: segments[1] } : { view: 'templates' }
+  }
   return { view: 'home', invalid: true }
 }

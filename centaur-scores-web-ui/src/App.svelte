@@ -3,10 +3,8 @@
   import { ApiClient, fetchTenants, login } from './lib/api'
   import { labelForError } from './lib/errors'
   import { translationsFor } from './lib/i18n'
-  import { managementItems } from './lib/managementData'
   import { navigateTo, resolveRoute } from './lib/router'
-  import type { Account, Category, Competition, Language, Match, NamedItem, ParticipantList, Profile, Tenant, View } from './lib/types'
-  import { isManagementView } from './lib/types'
+  import type { Account, Category, Competition, Language, Match, MatchTemplate, ParticipantList, Profile, Tenant, View } from './lib/types'
   import AccountEditView from './lib/AccountEditView.svelte'
   import AccountsView from './lib/AccountsView.svelte'
   import AppHeader from './lib/AppHeader.svelte'
@@ -15,13 +13,14 @@
   import CompetitionsView from './lib/CompetitionsView.svelte'
   import HomeView from './lib/HomeView.svelte'
   import LoginView from './lib/LoginView.svelte'
-  import ManagementView from './lib/ManagementView.svelte'
   import MatchDetailView from './lib/MatchDetailView.svelte'
   import MatchesView from './lib/MatchesView.svelte'
   import ParticipantListDetailView from './lib/ParticipantListDetailView.svelte'
   import ParticipantListsView from './lib/ParticipantListsView.svelte'
   import ParticipantMemberView from './lib/ParticipantMemberView.svelte'
   import ProfileView from './lib/ProfileView.svelte'
+  import TemplateEditView from './lib/TemplateEditView.svelte'
+  import TemplatesView from './lib/TemplatesView.svelte'
   import TenantEditView from './lib/TenantEditView.svelte'
   import TenantsView from './lib/TenantsView.svelte'
 
@@ -52,10 +51,10 @@
   let participantLists: ParticipantList[] = []
   let selectedListId: string | null = null
   let selectedMemberId: string | null = null
+  let templates: MatchTemplate[] = []
+  let selectedTemplateId: string | null = null
 
   $: t = translationsFor(language)
-  $: managementView = isManagementView(view) ? view : null
-  $: namedItems = managementView ? managementItems(managementView) : ([] as NamedItem[])
   $: isAdmin = profile?.authorization === 'Administrator'
   $: homeQuickLinks = (
     [['participants', t.participants], ['categories', t.categories], ['templates', t.templates]] as [string, string][]
@@ -63,6 +62,7 @@
   $: selectedCategory = categories.find((category) => category.id === selectedCategoryId) ?? null
   $: selectedList = participantLists.find((list) => list.id === selectedListId) ?? null
   $: selectedMember = selectedMemberId && selectedMemberId !== 'new' ? selectedList?.members.find((member) => member.id === selectedMemberId) ?? null : null
+  $: selectedTemplate = templates.find((template) => template.id === selectedTemplateId) ?? null
 
   const api = new ApiClient(() => token, signOut)
 
@@ -88,6 +88,7 @@
       currentTenant = await api.fetchCurrentTenant()
       categories = await api.fetchCategories()
       participantLists = await api.fetchParticipantLists()
+      templates = await api.fetchTemplates()
       applyRoute()
     } catch { matches = []; competitions = [] } finally { loading = false }
   }
@@ -170,6 +171,17 @@
     refreshParticipantLists()
   }
 
+  function openTemplate(template: MatchTemplate) { navigate(`/templates/${template.id}`) }
+
+  async function refreshTemplates() {
+    templates = await api.fetchTemplates()
+  }
+
+  function onTemplateDeleted() {
+    navigate('/templates')
+    refreshTemplates()
+  }
+
   function navigate(path: string, replace = false) {
     const route = navigateTo(path, replace)
     applyRouteResult(route)
@@ -190,6 +202,7 @@
     selectedCategoryId = route.view === 'category' ? route.categoryId ?? null : null
     selectedListId = route.view === 'participant-list' || route.view === 'participant' ? route.listId ?? null : null
     selectedMemberId = route.view === 'participant' ? route.memberId ?? null : null
+    selectedTemplateId = route.view === 'template' ? route.templateId ?? null : null
   }
 
   onMount(() => {
@@ -236,11 +249,10 @@
         <ParticipantListDetailView {api} list={selectedList} {categories} labels={t} onOpenMember={openMember} onAddMember={addMember} onChanged={refreshParticipantLists} onBack={() => navigate('/participants')} />
       {:else if view === 'participant' && selectedListId}
         <ParticipantMemberView {api} listId={selectedListId} member={selectedMember} {categories} labels={t} onBack={() => navigate(`/participants/${selectedListId}`)} onSaved={onMemberSaved} onDeleted={onMemberSaved} />
-      {:else if managementView}
-        <section class="management-view">
-          <button class="back-link" on:click={() => navigate('/')}>← {t.home}</button>
-          <ManagementView eyebrow={t.eyebrowTenantConfig} title={t[managementView]} description={t.manageDataDescription} action={`+ ${t.add}`} items={namedItems} labels={t} />
-        </section>
+      {:else if view === 'templates'}
+        <TemplatesView {api} {templates} {participantLists} labels={t} onOpenTemplate={openTemplate} onChanged={refreshTemplates} onBack={() => navigate('/')} />
+      {:else if view === 'template' && selectedTemplate}
+        <TemplateEditView {api} template={selectedTemplate} {categories} {participantLists} labels={t} onBack={() => navigate('/templates')} onSaved={refreshTemplates} onDeleted={onTemplateDeleted} />
       {/if}
       {#if loading}<p class="loading">{t.loadingTenantData}</p>{/if}
     </main>

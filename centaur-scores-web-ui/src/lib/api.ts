@@ -1,4 +1,4 @@
-import type { Account, Category, Competition, Match, ParticipantList, Profile, Tenant } from './types'
+import type { Account, Category, Competition, Match, MatchTemplate, ParticipantList, Profile, Tenant } from './types'
 
 export const apiBase = import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:5080'
 
@@ -154,6 +154,22 @@ export class ApiClient {
 
   deleteParticipantMember(listId: string, memberId: string) {
     return this.request(`/api/participant-lists/${listId}/members/${memberId}`, { method: 'DELETE' })
+  }
+
+  fetchTemplates(): Promise<MatchTemplate[]> {
+    return this.request('/api/match-templates')
+  }
+
+  createTemplate(body: { name: string; participantListId?: string | null; participantSelectionMode: string; configurationJson: string }): Promise<MatchTemplate> {
+    return this.request('/api/match-templates', { method: 'POST', body: JSON.stringify(body) })
+  }
+
+  updateTemplate(id: string, body: { name: string; participantListId?: string | null; participantSelectionMode: string; configurationJson: string }): Promise<MatchTemplate> {
+    return this.request(`/api/match-templates/${id}`, { method: 'PUT', body: JSON.stringify(body) })
+  }
+
+  deleteTemplate(id: string) {
+    return this.request(`/api/match-templates/${id}`, { method: 'DELETE' })
   }
 }
 

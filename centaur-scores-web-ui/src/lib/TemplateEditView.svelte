@@ -1,0 +1,344 @@
+<script lang="ts">
+  import type { ApiClient } from './api'
+  import { labelForError } from './errors'
+  import { keyboardColors, parseTemplateConfiguration, participantSelectionModes } from './templateConfig'
+  import type { Category, MatchTemplate, ParticipantList } from './types'
+
+  export let api: ApiClient
+  export let template: MatchTemplate
+  export let categories: Category[]
+  export let participantLists: ParticipantList[]
+  export let labels: Record<string, string>
+  export let onBack: () => void
+  export let onSaved: () => void
+  export let onDeleted: () => void
+
+  let name = template.name
+  let participantListId = template.participantListId ?? ''
+  let participantSelectionMode = template.participantSelectionMode
+  let config = parseTemplateConfiguration(template.configurationJson)
+  let saveMessage = ''
+  let saveError = ''
+  let deleteError = ''
+
+  $: nonDeleteKeys = config.keyboard.filter((key) => key.keyId !== null)
+  $: hasDeleteKey = config.keyboard.some((key) => key.keyId === null)
+  $: orderedCategories = [
+    ...config.categoryOrder.map((id) => categories.find((category) => category.id === id)).filter((category): category is Category => !!category),
+    ...categories.filter((category) => !config.categoryOrder.includes(category.id))
+  ]
+
+  function modeLabel(mode: string): string {
+    if (mode === 'list') return labels.modeList
+    if (mode === 'list-or-new') return labels.modeListOrNew
+    if (mode === 'unlisted') return labels.modeUnlisted
+    return labels.modeMatch
+  }
+
+  function toggleCategory(categoryId: string) {
+    config.categoryOrder = config.categoryOrder.includes(categoryId)
+      ? config.categoryOrder.filter((id) => id !== categoryId)
+      : [...config.categoryOrder, categoryId]
+  }
+
+  function moveCategory(index: number, direction: -1 | 1) {
+    const order = [...config.categoryOrder]
+    const target = index + direction
+    if (target < 0 || target >= order.length) return
+    ;[order[index], order[target]] = [order[target], order[index]]
+    config.categoryOrder = order
+  }
+
+  function addKey() {
+    config.keyboard = [...config.keyboard, { keyId: '', label: '', color: 'Yellow', value: 0 }]
+  }
+
+  function addDeleteKey() {
+    config.keyboard = [...config.keyboard, { keyId: null, label: labels.deleteKeyLabel, color: null, value: null }]
+  }
+
+  function removeKey(index: number) {
+    config.keyboard = config.keyboard.filter((_, i) => i !== index)
+  }
+
+  function addDisabledKeyRule() {
+    const firstCategory = categories[0]
+    if (!firstCategory) return
+    config.disabledKeyRules = [...config.disabledKeyRules, { categoryId: firstCategory.id, valueId: firstCategory.values[0]?.valueId ?? 0, disabledKeyIds: [] }]
+  }
+
+  function removeDisabledKeyRule(index: number) {
+    config.disabledKeyRules = config.disabledKeyRules.filter((_, i) => i !== index)
+  }
+
+  function toggleRuleDisabledKey(ruleIndex: number, keyId: string) {
+    config.disabledKeyRules = config.disabledKeyRules.map((rule, index) => {
+      if (index !== ruleIndex) return rule
+      const disabledKeyIds = rule.disabledKeyIds.includes(keyId) ? rule.disabledKeyIds.filter((id) => id !== keyId) : [...rule.disabledKeyIds, keyId]
+      return { ...rule, disabledKeyIds }
+    })
+  }
+
+  function addScoringRule() {
+    config.scoringRules = [...config.scoringRules, { type: 'total' }]
+  }
+
+  function removeScoringRule(index: number) {
+    if (config.scoringRules.length <= 1) return
+    config.scoringRules = config.scoringRules.filter((_, i) => i !== index)
+  }
+
+  function moveScoringRule(index: number, direction: -1 | 1) {
+    const rules = [...config.scoringRules]
+    const target = index + direction
+    if (target < 0 || target >= rules.length) return
+    ;[rules[index], rules[target]] = [rules[target], rules[index]]
+    config.scoringRules = rules
+  }
+
+  function addLiveScope() {
+    config.liveScopes = [...config.liveScopes, { scope: '', groupByCategoryIds: [], includeAverage: false, includeGroupScores: false, includeEqualizers: false, includePersonalBest: false }]
+  }
+
+  function removeLiveScope(index: number) {
+    config.liveScopes = config.liveScopes.filter((_, i) => i !== index)
+  }
+
+  function toggleScopeCategory(scopeIndex: number, categoryId: string) {
+    config.liveScopes = config.liveScopes.map((scope, index) => {
+      if (index !== scopeIndex) return scope
+      const groupByCategoryIds = scope.groupByCategoryIds.includes(categoryId)
+        ? scope.groupByCategoryIds.filter((id) => id !== categoryId)
+        : [...scope.groupByCategoryIds, categoryId]
+      return { ...scope, groupByCategoryIds }
+    })
+  }
+
+  async function save() {
+    saveMessage = ''
+    saveError = ''
+    try {
+      await api.updateTemplate(template.id, {
+        name,
+        participantListId: participantListId || null,
+        participantSelectionMode,
+        configurationJson: JSON.stringify(config)
+      })
+      saveMessage = labels.templateSaved
+      onSaved()
+    } catch (error) {
+      saveError = labelForError(error, labels, 'templateSaveError')
+    }
+  }
+
+  async function remove() {
+    deleteError = ''
+    const message = labels.deleteTemplateConfirm.replace('{name}', name)
+    if (!confirm(message)) return
+    try {
+      await api.deleteTemplate(template.id)
+      onDeleted()
+    } catch (error) {
+      deleteError = labelForError(error, labels, 'templateDeleteError')
+    }
+  }
+</script>
+
+<button class="back-link" on:click={onBack}>← {labels.templates}</button>
+<div class="page-intro">
+  <div><p class="eyebrow">{labels.eyebrowTemplateDetail}</p><h1>{template.name}</h1></div>
+</div>
+
+<section class="panel">
+  <label>{labels.templateNameLabel}<input bind:value={name} /></label>
+  <label>{labels.participantListLabel}
+    <select bind:value={participantListId}>
+      <option value="">{labels.noParticipantList}</option>
+      {#each participantLists as list}<option value={list.id}>{list.name}</option>{/each}
+    </select>
+  </label>
+  <label>{labels.participantSelectionModeLabel}
+    <select bind:value={participantSelectionMode}>
+      {#each participantSelectionModes as mode}<option value={mode}>{modeLabel(mode)}</option>{/each}
+    </select>
+  </label>
+</section>
+
+<section class="panel section-gap">
+  <h2>{labels.categoryOrderLabel}</h2>
+  <p class="muted">{labels.categoryOrderHint}</p>
+  <div class="list-panel">
+    {#each orderedCategories as category, index}
+      <div class="editor-row">
+        <label class="checkbox-label">
+          <input type="checkbox" checked={config.categoryOrder.includes(category.id)} on:change={() => toggleCategory(category.id)} />
+          {category.name}
+        </label>
+        {#if config.categoryOrder.includes(category.id)}
+          <button class="icon-button move-button" aria-label={labels.moveUp} disabled={index === 0} on:click={() => moveCategory(index, -1)}>▲</button>
+          <button class="icon-button move-button" aria-label={labels.moveDown} disabled={index === config.categoryOrder.length - 1} on:click={() => moveCategory(index, 1)}>▼</button>
+        {/if}
+      </div>
+    {/each}
+  </div>
+</section>
+
+<section class="panel section-gap">
+  <h2>{labels.keyboardLabel}</h2>
+  <p class="muted">{labels.keyboardHint}</p>
+  {#each config.keyboard as key, index}
+    <div class="editor-row">
+      {#if key.keyId === null}
+        <span class="key-summary">{labels.deleteKeyLabel}</span>
+      {:else}
+        <label>{labels.keyLabelLabel}<input bind:value={key.label} /></label>
+        <label>{labels.keyIdLabel}<input bind:value={key.keyId} /></label>
+        <label>{labels.keyColorLabel}
+          <select bind:value={key.color}>
+            {#each keyboardColors as color}<option value={color}>{labels[`color${color}`]}</option>{/each}
+          </select>
+        </label>
+        <label>{labels.keyValueLabel}<input type="number" bind:value={key.value} /></label>
+      {/if}
+      <button class="icon-button" aria-label={labels.removeValue} on:click={() => removeKey(index)}>🗑</button>
+    </div>
+  {/each}
+  <div class="editor-actions">
+    <button class="primary" on:click={addKey}>+ {labels.addKey}</button>
+    {#if !hasDeleteKey}<button class="primary" on:click={addDeleteKey}>+ {labels.addDeleteKey}</button>{/if}
+  </div>
+</section>
+
+<section class="panel section-gap">
+  <h2>{labels.disabledKeysLabel}</h2>
+  <p class="muted">{labels.disabledKeysHint}</p>
+  {#each config.disabledKeyRules as rule, index}
+    <div class="editor-row wrap">
+      <label>{labels.ruleCategoryLabel}
+        <select bind:value={rule.categoryId}>
+          {#each categories as category}<option value={category.id}>{category.name}</option>{/each}
+        </select>
+      </label>
+      <label>{labels.ruleValueLabel}
+        <select bind:value={rule.valueId}>
+          {#each categories.find((category) => category.id === rule.categoryId)?.values ?? [] as value}
+            <option value={value.valueId}>{value.name}</option>
+          {/each}
+        </select>
+      </label>
+      <div class="checkbox-grid">
+        <span class="muted">{labels.ruleDisabledKeysLabel}:</span>
+        {#each nonDeleteKeys as key}
+          <label class="checkbox-label">
+            <input type="checkbox" checked={rule.disabledKeyIds.includes(key.keyId ?? '')} on:change={() => toggleRuleDisabledKey(index, key.keyId ?? '')} />
+            {key.label}
+          </label>
+        {/each}
+      </div>
+      <button class="icon-button" aria-label={labels.removeValue} on:click={() => removeDisabledKeyRule(index)}>🗑</button>
+    </div>
+  {/each}
+  <button class="primary" on:click={addDisabledKeyRule} disabled={categories.length === 0}>+ {labels.addDisabledKeyRule}</button>
+</section>
+
+<section class="panel section-gap">
+  <h2>{labels.scoringRulesLabel}</h2>
+  <p class="muted">{labels.scoringRulesHint}</p>
+  {#each config.scoringRules as rule, index}
+    <div class="editor-row">
+      <span class="muted">{index + 1}.</span>
+      <label>{labels.ruleTypeLabel}
+        <select bind:value={rule.type}>
+          <option value="total">{labels.ruleTypeTotal}</option>
+          <option value="countKey">{labels.ruleTypeCountKey}</option>
+        </select>
+      </label>
+      {#if rule.type === 'countKey'}
+        <label>{labels.ruleCountKeyLabel}
+          <select bind:value={rule.keyId}>
+            {#each nonDeleteKeys as key}<option value={key.keyId}>{key.label}</option>{/each}
+          </select>
+        </label>
+      {/if}
+      <button class="icon-button move-button" aria-label={labels.moveUp} disabled={index === 0} on:click={() => moveScoringRule(index, -1)}>▲</button>
+      <button class="icon-button move-button" aria-label={labels.moveDown} disabled={index === config.scoringRules.length - 1} on:click={() => moveScoringRule(index, 1)}>▼</button>
+      <button class="icon-button" aria-label={labels.removeValue} disabled={config.scoringRules.length <= 1} on:click={() => removeScoringRule(index)}>🗑</button>
+    </div>
+  {/each}
+  <button class="primary" on:click={addScoringRule}>+ {labels.addScoringRule}</button>
+</section>
+
+<section class="panel section-gap">
+  <h2>{labels.liveScopesLabel}</h2>
+  <p class="muted">{labels.liveScopesHint}</p>
+  {#each config.liveScopes as scope, index}
+    <div class="editor-row wrap">
+      <label>{labels.scopeNameLabel}<input bind:value={scope.scope} /></label>
+      <div class="checkbox-grid">
+        <span class="muted">{labels.scopeGroupByLabel}:</span>
+        {#each categories as category}
+          <label class="checkbox-label">
+            <input type="checkbox" checked={scope.groupByCategoryIds.includes(category.id)} on:change={() => toggleScopeCategory(index, category.id)} />
+            {category.name}
+          </label>
+        {/each}
+      </div>
+      <div class="checkbox-grid">
+        <label class="checkbox-label"><input type="checkbox" bind:checked={scope.includeAverage} /> {labels.scopeIncludeAverage}</label>
+        <label class="checkbox-label"><input type="checkbox" bind:checked={scope.includeGroupScores} /> {labels.scopeIncludeGroupScores}</label>
+        <label class="checkbox-label"><input type="checkbox" bind:checked={scope.includeEqualizers} /> {labels.scopeIncludeEqualizers}</label>
+        <label class="checkbox-label"><input type="checkbox" bind:checked={scope.includePersonalBest} /> {labels.scopeIncludePersonalBest}</label>
+      </div>
+      <button class="icon-button" aria-label={labels.removeValue} on:click={() => removeLiveScope(index)}>🗑</button>
+    </div>
+  {/each}
+  <button class="primary" on:click={addLiveScope}>+ {labels.addLiveScope}</button>
+</section>
+
+<section class="panel section-gap">
+  {#if saveError}<p class="error">{saveError}</p>{/if}
+  {#if saveMessage}<p class="success">{saveMessage}</p>{/if}
+  <button class="primary" on:click={save}>{labels.save}</button>
+</section>
+
+<button class="danger-button" on:click={remove}>{labels.deleteTemplate}</button>
+{#if deleteError}<p class="error">{deleteError}</p>{/if}
+
+<style>
+  .section-gap {
+    margin-top: 32px;
+  }
+
+  .editor-row {
+    display: flex;
+    align-items: end;
+    gap: 16px;
+    padding: 14px 0;
+    border-top: 1px solid var(--line);
+  }
+
+  .editor-row.wrap {
+    flex-wrap: wrap;
+  }
+
+  .editor-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 16px;
+  }
+
+  .checkbox-grid {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 16px;
+  }
+
+  .move-button:hover {
+    color: var(--green);
+  }
+
+  .key-summary {
+    color: var(--muted);
+  }
+</style>

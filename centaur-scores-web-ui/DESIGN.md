@@ -124,7 +124,10 @@ Next are all past matches; visually different ordered by date, ascending.
 
 Above the list there is a toolbar with options to add a match and a filter to filter the list on "Only future matches" or "Only past matches". There is a text field that can be used to filter the list (on name)
 
-Clicking or touching the match navigates to the matches homescreen.
+Alongside the filter options for the list of matches , there is an option to add a new match to the system.
+When adding a new match, the user must enter a name and a date, and optionally can select a template or can define the match from scratch. Selecting a template will pre-configure all templated options and then take the user to the single-match view. Not selecting a template will take the user to the match editor and the user can define all match settings ad-hoc.
+
+Clicking or touching a match from the list of matches navigates to the matches homescreen.
 
 On this screen the user can, given sufficient privilege:
 - Activate or de-activate the match
@@ -143,11 +146,11 @@ On this screen the user can, given sufficient privilege:
   - edit all entered score values
   - quick-set a 'total' for an archer; system will auto-fill the score values by equally dividing the lowest possible (last in the keyboard list) values
 
-Alongside the filter options fort the list, there is an option to add a new match to the system.
+Because of the vast amount of options available, the match's main screen is the full list of participants (see specs) and there are function buttons at the top of the page to edit the match metadata, edit the scoring devices, see the scoring device QR codes, and see the results.
 
-There is a results dropdown button also in the list options, with a dropdown per result scope, taking the user to the results link we advertise for the match.
+The match metadata screen is like the match template screen also allows assigning users as match admins.
 
-Allow assigning users as match admins
+The results function is a dropdown button, with a dropdown value per configured result scope, taking the user to the full results link for the match, including the scope.
 
 #### UC9 - Exporting matches
 

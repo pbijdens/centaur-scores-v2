@@ -417,6 +417,11 @@ nav button.active:after {
   color: $color-danger-text;
 }
 
+.icon-button:disabled {
+  opacity: .35;
+  cursor: not-allowed;
+}
+
 .arrow {
   margin-left: auto;
   color: var(--green);
