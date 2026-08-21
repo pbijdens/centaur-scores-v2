@@ -57,6 +57,8 @@ public sealed class AuthService(ApplicationDbContext db, IConfiguration configur
 
 public static class Passwords
 {
+    public static string GenerateRandom() => Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(18));
+
     public static string Hash(string value)
     {
         var salt = System.Security.Cryptography.RandomNumberGenerator.GetBytes(16);

@@ -1,5 +1,6 @@
 namespace CentaurScores.Api.Contracts;
 
+public sealed record ApiError(string Code, string Message);
 public sealed record LoginRequest(string Username, string Password, Guid TenantId);
 public sealed record CreateTenantRequest(string Name, string? LogoUrl, Guid? ParentTenantId);
 public sealed record UpdateAccountRequest(string Username, string? Password, string? DisplayName, string? Email, string Authorization);

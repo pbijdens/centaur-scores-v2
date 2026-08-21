@@ -16,7 +16,8 @@ JWTs are returned by `POST /api/auth/login` and contain the account and active t
 - Timestamps such as `generatedAt` are UTC ISO-8601 values.
 - Match and competition dates are date-only values in `yyyy-MM-dd` format and have no timezone conversion.
 - Successful creates return `201 Created`; deletes return `204 No Content`.
-- Validation or business-rule conflicts return `400 Bad Request` or `409 Conflict` with a JSON `message`.
+- Validation or business-rule conflicts return `400 Bad Request` or `409 Conflict`.
+- Endpoints that the UI must react to programmatically (currently login, change-password, and account creation) return a coded body `{ "code": "SOME_CODE", "message": "developer-facing text" }` instead of a plain `message`. `code` is a stable machine-readable identifier the client maps to a translated message; `message` is for logs/debugging only and must not be shown to end users. Known codes: `INVALID_CREDENTIALS` (401, login), `CURRENT_PASSWORD_INVALID` (400, change-password), `NEW_PASSWORD_REQUIRED` (400, change-password), `USERNAME_REQUIRED` (400, create account), `USERNAME_TAKEN` (409, create account), `INVALID_AUTHORIZATION` (400, create account).
 
 ## Health and discovery
 
@@ -31,10 +32,10 @@ JWTs are returned by `POST /api/auth/login` and contain the account and active t
 | Method | Path | Auth | Description |
 |---|---|---|---|
 | `GET` | `/api/tenants` | none | List tenants available on the login screen. |
-| `POST` | `/api/auth/login` | none | Authenticate with `{ username, password, tenantId }`; returns `{ token, expiresAt, account }`. |
+| `POST` | `/api/auth/login` | none | Authenticate with `{ username, password, tenantId }`; returns `{ token, expiresAt, account }`. `401` with a coded error body on failure. |
 | `GET` | `/api/auth/me` | user | Return the current account's profile: `{ id, username, displayName, email, authorization }`. |
 | `PUT` | `/api/auth/me` | user | Update the current account's `{ displayName, email }`. |
-| `POST` | `/api/auth/change-password` | user | Change the current account's password with `{ currentPassword, newPassword }`; `400` if the current password does not match. |
+| `POST` | `/api/auth/change-password` | user | Change the current account's password with `{ currentPassword, newPassword }`; `400` with a coded error body if the current password does not match or the new password is missing. |
 | `GET` | `/api/tenants/current` | user | Return the active tenant configuration. |
 | `PUT` | `/api/tenants/current` | admin | Update the active tenant name/logo. |
 | `POST` | `/api/tenants` | admin | Create a child tenant with `{ name, logoUrl, parentTenantId }`. |
@@ -48,7 +49,8 @@ JWTs are returned by `POST /api/auth/login` and contain the account and active t
 | Method | Path | Auth | Description |
 |---|---|---|---|
 | `GET` | `/api/accounts` | manager | List accounts in the active tenant. |
-| `POST` | `/api/accounts` | admin | Create an account with username, password, display name, email, and authorization profile. |
+| `GET` | `/api/accounts/{id}` | admin | Get a single account's details for editing. |
+| `POST` | `/api/accounts` | admin | Create an account with `{ username, password?, displayName?, email?, authorization? }`. `password` defaults to a random server-generated value and `authorization` defaults to `Viewer` when omitted. `409` with a coded error body (`USERNAME_TAKEN`) if the username is already used in the tenant. |
 | `PUT` | `/api/accounts/{id}` | admin | Update account identity, password, email, and authorization. |
 | `DELETE` | `/api/accounts/{id}` | admin | Delete an account. |
 

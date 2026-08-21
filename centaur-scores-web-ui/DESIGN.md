@@ -209,3 +209,16 @@ The changes will be final when I save them.
 Note: When for the tenant I am logged into a logo image is available then this image is shown in the header instead of the made-up avatar.
 
 I also have an option on this screen for deleting the tenant and all its data, that has a very clear confirmation dialog telling me that this is final and not recoverable.
+
+#### UC16 - Account management
+
+Pressing the accounts button on the overview will take me to a page where I can see a list of accounts that are currently created inside this tenant. 
+I can only access this page when I am a tenant administrator for this tenant.
+For each account I list the account name, the real name, and the authorization level in this tenant.
+Selecting an account from the list allows me to edit its details. I get an editor viiew for the real name, e-mail address, password, and account authorizations.
+I can change these values and save.
+I cannot change my own authorizations.
+Only when the password field is non-empty it's used to set a new password for the user.
+The page has the regular navigation for returning to the list or from the list to overview.
+
+At the top of the list, consistent with the other lists in the system there is an Add Account button, which asks for an account name and then creates the unprivileged account opening the account editor on that single account. If creating the account fails, show an error and keep the add-screen open.

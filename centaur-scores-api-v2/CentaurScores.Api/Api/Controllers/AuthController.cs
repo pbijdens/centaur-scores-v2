@@ -16,7 +16,7 @@ public sealed class AuthController(IAuthService authService, ApplicationDbContex
     public async Task<IActionResult> Login(LoginRequest request, CancellationToken cancellationToken)
     {
         var result = await authService.AuthenticateAsync(request, cancellationToken);
-        return result is null ? Unauthorized() : Ok(new { token = result.Token, expiresAt = result.ExpiresAt, account = new { result.Account.Id, result.Account.Username, result.Account.DisplayName, result.Account.Email } });
+        return result is null ? Unauthorized(new ApiError("INVALID_CREDENTIALS", "Invalid username or password.")) : Ok(new { token = result.Token, expiresAt = result.ExpiresAt, account = new { result.Account.Id, result.Account.Username, result.Account.DisplayName, result.Account.Email } });
     }
 
     [Authorize]
@@ -45,8 +45,8 @@ public sealed class AuthController(IAuthService authService, ApplicationDbContex
     {
         var account = await db.Accounts.SingleOrDefaultAsync(item => item.Id == tenantContext.AccountId, cancellationToken);
         if (account is null) return NotFound();
-        if (!Passwords.Verify(request.CurrentPassword, account.PasswordHash)) return BadRequest(new { message = "Current password is incorrect." });
-        if (string.IsNullOrWhiteSpace(request.NewPassword)) return BadRequest(new { message = "New password is required." });
+        if (!Passwords.Verify(request.CurrentPassword, account.PasswordHash)) return BadRequest(new ApiError("CURRENT_PASSWORD_INVALID", "Current password is incorrect."));
+        if (string.IsNullOrWhiteSpace(request.NewPassword)) return BadRequest(new ApiError("NEW_PASSWORD_REQUIRED", "New password is required."));
         account.PasswordHash = Passwords.Hash(request.NewPassword);
         await db.SaveChangesAsync(cancellationToken);
         return NoContent();

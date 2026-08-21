@@ -16,6 +16,7 @@ Read the system specification before changing behavior: [DESIGN.md](../documenta
 - Document non-obvious code segments and important implementation choices with concise comments in the code.
 - Use migrations for schema changes; do not replace the database with an in-memory store.
 - Preserve the public live-score and scorekeeper endpoints described in the specification.
+- When an endpoint's failure needs to drive specific UI behavior (e.g. auth, account creation), return `Contracts.ApiError { code, message }` instead of a plain `{ message }`; `code` is the stable contract the client switches on, `message` is for logs only.
 
 ## Validation
 
