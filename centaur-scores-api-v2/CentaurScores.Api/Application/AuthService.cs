@@ -20,15 +20,39 @@ public sealed class AuthService(ApplicationDbContext db, IConfiguration configur
 {
     public async Task<AuthenticatedAccount?> AuthenticateAsync(LoginRequest request, CancellationToken cancellationToken)
     {
-        var account = await db.Accounts.AsNoTracking().FirstOrDefaultAsync(item => item.TenantId == request.TenantId && item.Username == request.Username, cancellationToken);
+        var account = await FindAccountAsync(request, cancellationToken);
         if (account is null || !Passwords.Verify(request.Password, account.PasswordHash)) return null;
         var secret = configuration["Jwt:Secret"] ?? throw new InvalidOperationException("Jwt:Secret is required");
         var expires = DateTime.UtcNow.AddHours(configuration.GetValue("Jwt:Hours", 4));
-        var claims = new[] { new Claim(JwtRegisteredClaimNames.Sub, account.Id.ToString()), new Claim("tenant_id", account.TenantId.ToString()), new Claim(ClaimTypes.Name, account.DisplayName ?? account.Username), new Claim(ClaimTypes.Email, account.Email ?? ""), new Claim(ClaimTypes.Role, account.Authorization.ToString()) };
+        var authorization = account.TenantId == request.TenantId ? account.Authorization : AuthorizationProfile.Administrator;
+        var claims = new[] { new Claim(JwtRegisteredClaimNames.Sub, account.Id.ToString()), new Claim("tenant_id", request.TenantId.ToString()), new Claim(ClaimTypes.Name, account.DisplayName ?? account.Username), new Claim(ClaimTypes.Email, account.Email ?? ""), new Claim(ClaimTypes.Role, authorization.ToString()) };
         var credentials = new SigningCredentials(new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secret)), SecurityAlgorithms.HmacSha256);
         var token = new JwtSecurityToken(claims: claims, expires: expires, signingCredentials: credentials);
         return new AuthenticatedAccount(new JwtSecurityTokenHandler().WriteToken(token), expires, account);
     }
+
+    private async Task<Account?> FindAccountAsync(LoginRequest request, CancellationToken cancellationToken)
+    {
+        var tenant = await db.Tenants.AsNoTracking().SingleOrDefaultAsync(item => item.Id == request.TenantId, cancellationToken);
+        if (tenant is null) return null;
+
+        var account = await FindAccountInTenantAsync(tenant.Id, request.Username, cancellationToken);
+        if (account is not null) return account;
+
+        // Walk upward only when the requested tenant has no local account for this username.
+        while (tenant.ParentTenantId is { } parentTenantId)
+        {
+            tenant = await db.Tenants.AsNoTracking().SingleOrDefaultAsync(item => item.Id == parentTenantId, cancellationToken);
+            if (tenant is null) return null;
+            account = await FindAccountInTenantAsync(tenant.Id, request.Username, cancellationToken);
+            if (account is not null) return account.Authorization == AuthorizationProfile.Administrator ? account : null;
+        }
+
+        return null;
+    }
+
+    private Task<Account?> FindAccountInTenantAsync(Guid tenantId, string username, CancellationToken cancellationToken) =>
+        db.Accounts.AsNoTracking().SingleOrDefaultAsync(item => item.TenantId == tenantId && item.Username == username, cancellationToken);
 }
 
 public static class Passwords

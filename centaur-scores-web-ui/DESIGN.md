@@ -202,7 +202,7 @@ This function must also be available on mobile, where the user's name.
 
 As a tenant administrator for the tenant that I am logged into, from the tenant's home screen I can select a function to manage sub-tenants for my current tenant.
 
-When selecting this function, I navigate to a page showing me all sub-tenants of the current tenant. Clicking a sub-tenant from that list will show me an editor for the details for that sub-tenant being the name and logo image.I can see the current image or upload a new one. This should be a small image and can either be a SVG or a PNG. The preferred aspect ratio is 2:1 and the file size should not exceed 256KB.
+When selecting this function, I navigate to a page showing me all sub-tenants of the current tenant. Clicking a sub-tenant from that list will show me an editor for the details for that sub-tenant being the name and logo image.I can see the current image or upload a new one. This should be a small image and can either be a SVG or a PNG. The preferred aspect ratio is 1:1 and the file size should not exceed 256KB.
 
 The changes will be final when I save them.
 

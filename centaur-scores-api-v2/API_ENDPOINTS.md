@@ -38,6 +38,9 @@ JWTs are returned by `POST /api/auth/login` and contain the account and active t
 | `GET` | `/api/tenants/current` | user | Return the active tenant configuration. |
 | `PUT` | `/api/tenants/current` | admin | Update the active tenant name/logo. |
 | `POST` | `/api/tenants` | admin | Create a child tenant with `{ name, logoUrl, parentTenantId }`. |
+| `GET` | `/api/tenants/children` | admin | List direct sub-tenants of the active tenant. |
+| `GET` | `/api/tenants/children/{id}` | admin | Get a sub-tenant's details for editing. |
+| `PUT` | `/api/tenants/children/{id}` | admin | Update a sub-tenant's `{ name, logoUrl }`. |
 | `DELETE` | `/api/tenants/{id}` | admin | Delete a child tenant. The logged-in tenant cannot delete itself. |
 
 ## Accounts

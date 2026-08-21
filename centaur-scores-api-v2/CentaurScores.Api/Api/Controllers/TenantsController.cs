@@ -41,6 +41,33 @@ public sealed class TenantsController(ApplicationDbContext db, ITenantContext te
         return Ok(tenant);
     }
 
+    [HttpGet("children")]
+    public async Task<IActionResult> Children(CancellationToken cancellationToken)
+    {
+        if (!IsAdministrator) return Forbid();
+        return Ok(await db.Tenants.AsNoTracking().Where(item => item.ParentTenantId == TenantId).OrderBy(item => item.Name).Select(item => new { item.Id, item.Name, item.LogoUrl }).ToListAsync(cancellationToken));
+    }
+
+    [HttpGet("children/{id:guid}")]
+    public async Task<IActionResult> Child(Guid id, CancellationToken cancellationToken)
+    {
+        if (!IsAdministrator) return Forbid();
+        var tenant = await db.Tenants.AsNoTracking().SingleOrDefaultAsync(item => item.Id == id && item.ParentTenantId == TenantId, cancellationToken);
+        return tenant is null ? NotFound() : Ok(tenant);
+    }
+
+    [HttpPut("children/{id:guid}")]
+    public async Task<IActionResult> UpdateChild(Guid id, CreateTenantRequest request, CancellationToken cancellationToken)
+    {
+        if (!IsAdministrator) return Forbid();
+        var tenant = await db.Tenants.SingleOrDefaultAsync(item => item.Id == id && item.ParentTenantId == TenantId, cancellationToken);
+        if (tenant is null) return NotFound();
+        tenant.Name = request.Name;
+        tenant.LogoUrl = request.LogoUrl;
+        await db.SaveChangesAsync(cancellationToken);
+        return Ok(tenant);
+    }
+
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
     {

@@ -54,6 +54,30 @@ export class ApiClient {
   changePassword(currentPassword: string, newPassword: string) {
     return this.request('/api/auth/change-password', { method: 'POST', body: JSON.stringify({ currentPassword, newPassword }) })
   }
+
+  fetchCurrentTenant(): Promise<Tenant> {
+    return this.request('/api/tenants/current')
+  }
+
+  fetchChildTenants(): Promise<Tenant[]> {
+    return this.request('/api/tenants/children')
+  }
+
+  fetchChildTenant(id: string): Promise<Tenant> {
+    return this.request(`/api/tenants/children/${id}`)
+  }
+
+  createChildTenant(body: { name: string; logoUrl?: string | null; parentTenantId: string }): Promise<Tenant> {
+    return this.request('/api/tenants', { method: 'POST', body: JSON.stringify(body) })
+  }
+
+  updateChildTenant(id: string, body: { name: string; logoUrl?: string | null }): Promise<Tenant> {
+    return this.request(`/api/tenants/children/${id}`, { method: 'PUT', body: JSON.stringify(body) })
+  }
+
+  deleteChildTenant(id: string) {
+    return this.request(`/api/tenants/${id}`, { method: 'DELETE' })
+  }
 }
 
 export async function fetchTenants(): Promise<Tenant[]> {

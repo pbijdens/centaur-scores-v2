@@ -4,7 +4,7 @@
   import { translationsFor } from './lib/i18n'
   import { managementItems } from './lib/managementData'
   import { navigateTo, resolveRoute } from './lib/router'
-  import type { Competition, Language, Match, NamedItem, Tenant, View } from './lib/types'
+  import type { Competition, Language, Match, NamedItem, Profile, Tenant, View } from './lib/types'
   import { isManagementView } from './lib/types'
   import AppHeader from './lib/AppHeader.svelte'
   import CompetitionsView from './lib/CompetitionsView.svelte'
@@ -14,6 +14,8 @@
   import MatchDetailView from './lib/MatchDetailView.svelte'
   import MatchesView from './lib/MatchesView.svelte'
   import ProfileView from './lib/ProfileView.svelte'
+  import TenantEditView from './lib/TenantEditView.svelte'
+  import TenantsView from './lib/TenantsView.svelte'
 
   const rootTenant = '00000000-0000-0000-0000-000000000001'
   let loggedIn = localStorage.getItem('centaur-token') !== null
@@ -31,10 +33,18 @@
   let selectedMatch: Match | null = null
   let loginError = ''
   let loading = false
+  let profile: Profile | null = null
+  let currentTenant: Tenant | null = null
+  let childTenants: Tenant[] = []
+  let selectedTenantId: string | null = null
 
   $: t = translationsFor(language)
   $: managementView = isManagementView(view) ? view : null
   $: namedItems = managementView ? managementItems(managementView) : ([] as NamedItem[])
+  $: isAdmin = profile?.authorization === 'Administrator'
+  $: homeQuickLinks = (
+    [['participants', t.participants], ['categories', t.categories], ['templates', t.templates], ['accounts', t.accounts]] as [string, string][]
+  ).concat(isAdmin ? [['tenants', t.tenants]] : [])
 
   const api = new ApiClient(() => token, signOut)
 
@@ -56,6 +66,8 @@
     try {
       matches = await api.fetchMatches()
       competitions = await api.fetchCompetitions()
+      profile = await api.fetchProfile()
+      currentTenant = await api.fetchCurrentTenant()
       applyRoute()
     } catch { matches = []; competitions = [] } finally { loading = false }
   }
@@ -86,6 +98,22 @@
     api.deactivateAllMatches().then(loadData)
   }
 
+  function openTenant(childTenant: Tenant) { navigate(`/tenants/${childTenant.id}`) }
+
+  async function loadChildTenants() {
+    childTenants = await api.fetchChildTenants()
+  }
+
+  async function createChildTenant(name: string) {
+    await api.createChildTenant({ name, parentTenantId: tenant })
+    await loadChildTenants()
+  }
+
+  function onTenantDeleted() {
+    navigate('/tenants')
+    loadChildTenants()
+  }
+
   function navigate(path: string, replace = false) {
     const route = navigateTo(path, replace)
     applyRouteResult(route)
@@ -99,6 +127,8 @@
     if (route.invalid) { navigate('/', true); return }
     view = route.view
     selectedMatch = route.view === 'match' ? matches.find((match) => match.id === route.matchId) ?? selectedMatch : null
+    selectedTenantId = route.view === 'tenant' ? route.tenantId ?? null : null
+    if (route.view === 'tenants') loadChildTenants()
   }
 
   onMount(() => {
@@ -115,10 +145,10 @@
   <LoginView bind:tenant {tenants} {tenantsLoading} {tenantsError} bind:username bind:password {loginError} {language} labels={t} onSubmit={signIn} onLanguageChange={setLanguage} />
 {:else}
   <div class="app-shell">
-    <AppHeader {username} {language} {view} labels={t} onNavigate={navigate} onLanguageChange={setLanguage} onLogout={signOut} />
+    <AppHeader {username} {language} {view} labels={t} tenantName={currentTenant?.name} tenantLogoUrl={currentTenant?.logoUrl} onNavigate={navigate} onLanguageChange={setLanguage} onLogout={signOut} />
     <main class="content">
       {#if view === 'home'}
-        <HomeView {matches} {competitions} {language} labels={t} quickLinks={[['participants', t.participants], ['categories', t.categories], ['templates', t.templates], ['accounts', t.accounts]]} onOpenMatch={openMatch} onNavigate={navigate} onDeactivateAll={deactivateAllMatches} />
+        <HomeView {matches} {competitions} {language} labels={t} quickLinks={homeQuickLinks} onOpenMatch={openMatch} onNavigate={navigate} onDeactivateAll={deactivateAllMatches} />
       {:else if view === 'matches'}
         <MatchesView {matches} {language} labels={t} onOpenMatch={openMatch} />
       {:else if view === 'match' && selectedMatch}
@@ -127,6 +157,10 @@
         <CompetitionsView {competitions} {language} labels={t} />
       {:else if view === 'profile'}
         <ProfileView {api} labels={t} onBack={() => navigate('/')} />
+      {:else if view === 'tenants' && isAdmin}
+        <TenantsView tenants={childTenants} labels={t} onOpenTenant={openTenant} onCreateTenant={createChildTenant} onBack={() => navigate('/')} />
+      {:else if view === 'tenant' && selectedTenantId && isAdmin}
+        <TenantEditView {api} tenantId={selectedTenantId} labels={t} onBack={() => navigate('/tenants')} onDeleted={onTenantDeleted} />
       {:else if managementView}
         <section class="management-view">
           <button class="back-link" on:click={() => navigate('/')}>← {t.home}</button>

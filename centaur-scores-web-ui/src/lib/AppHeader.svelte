@@ -5,6 +5,8 @@
   export let language: Language
   export let view: View
   export let labels: Record<string, string>
+  export let tenantName: string | null | undefined = undefined
+  export let tenantLogoUrl: string | null | undefined = undefined
   export let onNavigate: (path: string) => void
   export let onLanguageChange: (value: string) => void
   export let onLogout: () => void
@@ -12,8 +14,12 @@
 
 <header>
   <button class="brand" on:click={() => onNavigate('/')}>
-    <span class="brand-mark small">CS</span>
-    <span><strong>Centaur Scores</strong><small>Root Tenant</small></span>
+    {#if tenantLogoUrl}
+      <img class="brand-mark small" src={tenantLogoUrl} alt="" />
+    {:else}
+      <span class="brand-mark small">CS</span>
+    {/if}
+    <span><strong>{tenantName ?? 'Centaur Scores'}</strong><small>Root Tenant</small></span>
   </button>
   <nav>
     <button class:active={view === 'home'} on:click={() => onNavigate('/')}>{labels.home}</button>
