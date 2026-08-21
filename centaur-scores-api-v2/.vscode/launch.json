@@ -1,0 +1,19 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "CentaurScores.Api (HTTP 5080)",
+            "type": "coreclr",
+            "request": "launch",
+            "program": "${workspaceFolder}/CentaurScores.Api/bin/Debug/net10.0/CentaurScores.Api",
+            "cwd": "${workspaceFolder}/CentaurScores.Api",
+            "env": {
+                "ASPNETCORE_ENVIRONMENT": "Development",
+                "ASPNETCORE_URLS": "http://localhost:5080"
+            },
+            "stopAtEntry": false,
+            "launchBrowser": true,
+            "launchUrl": "swagger"
+        }
+    ]
+}

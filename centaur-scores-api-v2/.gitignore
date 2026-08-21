@@ -10,17 +10,21 @@
 
 # Local tooling and IDE files
 .vs/
-.vscode/
+.vscode/*
 .idea/
 *.user
 *.suo
 *.userosscache
 *.sln.docstates
+!.vscode/
+!.vscode/launch.json
 .DS_Store
 
 # Local configuration and secrets
 appsettings.Local.json
 appsettings.*.Local.json
+appSettings.*.Local.json
+
 secrets.json
 *.pfx
 *.cer
