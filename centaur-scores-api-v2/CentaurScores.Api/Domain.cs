@@ -60,7 +60,8 @@ public sealed class MatchTemplate : TenantOwnedEntity
 {
     public string Name { get; set; } = "";
     public Guid? ParticipantListId { get; set; }
-    public string ParticipantSelectionMode { get; set; } = "match";
+    public bool AllowFreeParticipants { get; set; }
+    public string DeviceSelectionMode { get; set; } = "restricted";
     public string ConfigurationJson { get; set; } = "{}";
 }
 
@@ -70,6 +71,8 @@ public sealed class Match : TenantOwnedEntity
     public DateOnly Date { get; set; }
     public string? ShortCode { get; set; }
     public bool IsOpen { get; set; }
+    public Guid? ParticipantListId { get; set; }
+    public string DeviceSelectionMode { get; set; } = "restricted";
     public int Ends { get; set; }
     public int ArrowsPerEnd { get; set; }
     public int? GroupEnds { get; set; }
@@ -106,8 +109,6 @@ public sealed class ScoreDevice : TenantOwnedEntity
 {
     public Guid MatchId { get; init; }
     public string Name { get; set; } = "";
-    public string SelectionMode { get; set; } = "match";
-    public string ParticipantOrderJson { get; set; } = "[]";
 }
 
 public sealed class LiveScoreScope : TenantOwnedEntity

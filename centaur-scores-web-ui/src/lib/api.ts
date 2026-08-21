@@ -1,6 +1,21 @@
-import type { Account, Category, Competition, Match, MatchTemplate, ParticipantList, Profile, Tenant } from './types'
+import type { Account, Category, Competition, Match, MatchParticipant, MatchTemplate, ParticipantList, Profile, ScoreDevice, Tenant } from './types'
 
 export const apiBase = import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:5080'
+
+export type MatchInput = {
+  name: string
+  date: string
+  shortCode?: string | null
+  isOpen: boolean
+  participantListId?: string | null
+  deviceSelectionMode: string
+  ends: number
+  arrowsPerEnd: number
+  groupEnds?: number | null
+  allowFreeParticipants: boolean
+  keyboardJson: string
+  scoringRulesJson: string
+}
 
 // Carries the API's stable error `code` so callers can map it to a translated message instead of showing server text.
 export class ApiRequestError extends Error {
@@ -44,16 +59,76 @@ export class ApiClient {
     return this.request('/api/matches')
   }
 
+  fetchMatch(id: string): Promise<Match> {
+    return this.request(`/api/matches/${id}`)
+  }
+
+  createMatch(body: MatchInput): Promise<Match> {
+    return this.request('/api/matches', { method: 'POST', body: JSON.stringify(body) })
+  }
+
   fetchCompetitions(): Promise<Competition[]> {
     return this.request('/api/competitions')
   }
 
-  updateMatch(id: string, body: unknown) {
+  updateMatch(id: string, body: MatchInput) {
     return this.request(`/api/matches/${id}`, { method: 'PUT', body: JSON.stringify(body) })
+  }
+
+  deleteMatch(id: string) {
+    return this.request(`/api/matches/${id}`, { method: 'DELETE' })
   }
 
   deactivateAllMatches() {
     return this.request('/api/matches/deactivate-all', { method: 'POST' })
+  }
+
+  fetchMatchParticipants(matchId: string): Promise<MatchParticipant[]> {
+    return this.request(`/api/matches/${matchId}/participants`)
+  }
+
+  addMatchParticipant(matchId: string, body: { participantListMemberId?: string | null; lastName: string; fullName: string; federationNumber?: string | null; categories: Record<string, number> }): Promise<MatchParticipant> {
+    return this.request(`/api/matches/${matchId}/participants`, { method: 'POST', body: JSON.stringify(body) })
+  }
+
+  removeMatchParticipant(matchId: string, participantId: string) {
+    return this.request(`/api/matches/${matchId}/participants/${participantId}`, { method: 'DELETE' })
+  }
+
+  assignParticipantDevice(matchId: string, participantId: string, deviceId: string | null) {
+    return this.request(`/api/matches/${matchId}/participants/${participantId}/device`, { method: 'PUT', body: JSON.stringify({ deviceId }) })
+  }
+
+  enterScore(matchId: string, participantId: string, body: { end: number; arrow: number; keyId: string; value: number }) {
+    return this.request(`/api/matches/${matchId}/participants/${participantId}/scores`, { method: 'POST', body: JSON.stringify(body) })
+  }
+
+  fetchMatchResults(matchId: string) {
+    return this.request(`/api/matches/${matchId}/results`)
+  }
+
+  addDevice(matchId: string, body: { name: string }): Promise<ScoreDevice> {
+    return this.request(`/api/matches/${matchId}/devices`, { method: 'POST', body: JSON.stringify(body) })
+  }
+
+  deleteDevice(matchId: string, deviceId: string) {
+    return this.request(`/api/matches/${matchId}/devices/${deviceId}`, { method: 'DELETE' })
+  }
+
+  addLiveScope(matchId: string, body: { scope: string; groupByCategoryIds: string[]; includeAverage: boolean; includeGroupScores: boolean; includeEqualizers: boolean; includePersonalBest: boolean }) {
+    return this.request(`/api/matches/${matchId}/live-scopes`, { method: 'POST', body: JSON.stringify(body) })
+  }
+
+  deleteLiveScope(matchId: string, scopeId: string) {
+    return this.request(`/api/matches/${matchId}/live-scopes/${scopeId}`, { method: 'DELETE' })
+  }
+
+  async downloadMatchExport(matchId: string): Promise<{ blob: Blob; filename: string }> {
+    const response = await fetch(`${apiBase}/api/matches/${matchId}/export.csv`, { headers: this.headers() })
+    if (!response.ok) throw await readApiError(response)
+    const disposition = response.headers.get('content-disposition') ?? ''
+    const filenameMatch = /filename="?([^"]+)"?/.exec(disposition)
+    return { blob: await response.blob(), filename: filenameMatch?.[1] ?? 'export.csv' }
   }
 
   fetchProfile(): Promise<Profile> {
@@ -160,11 +235,11 @@ export class ApiClient {
     return this.request('/api/match-templates')
   }
 
-  createTemplate(body: { name: string; participantListId?: string | null; participantSelectionMode: string; configurationJson: string }): Promise<MatchTemplate> {
+  createTemplate(body: { name: string; participantListId?: string | null; allowFreeParticipants: boolean; deviceSelectionMode: string; configurationJson: string }): Promise<MatchTemplate> {
     return this.request('/api/match-templates', { method: 'POST', body: JSON.stringify(body) })
   }
 
-  updateTemplate(id: string, body: { name: string; participantListId?: string | null; participantSelectionMode: string; configurationJson: string }): Promise<MatchTemplate> {
+  updateTemplate(id: string, body: { name: string; participantListId?: string | null; allowFreeParticipants: boolean; deviceSelectionMode: string; configurationJson: string }): Promise<MatchTemplate> {
     return this.request(`/api/match-templates/${id}`, { method: 'PUT', body: JSON.stringify(body) })
   }
 
@@ -183,4 +258,8 @@ export async function login(username: string, password: string, tenantId: string
   const response = await fetch(`${apiBase}/api/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password, tenantId }) })
   if (!response.ok) throw await readApiError(response)
   return response.json()
+}
+
+export function scorekeeperUrl(tenantId: string, matchId: string, deviceId: string): string {
+  return `${apiBase}/scorekeeper/${tenantId}/${matchId}/${deviceId}`
 }

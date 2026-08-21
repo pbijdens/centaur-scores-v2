@@ -17,7 +17,7 @@ public sealed class TemplatesController(ApplicationDbContext db, ITenantContext 
     public async Task<IActionResult> Create(CreateTemplateRequest request, CancellationToken cancellationToken)
     {
         if (!CanManage) return Forbid();
-        var template = new MatchTemplate { Id = Guid.NewGuid(), TenantId = TenantId, Name = request.Name, ParticipantListId = request.ParticipantListId, ParticipantSelectionMode = request.ParticipantSelectionMode, ConfigurationJson = request.ConfigurationJson };
+        var template = new MatchTemplate { Id = Guid.NewGuid(), TenantId = TenantId, Name = request.Name, ParticipantListId = request.ParticipantListId, AllowFreeParticipants = request.AllowFreeParticipants, DeviceSelectionMode = request.DeviceSelectionMode, ConfigurationJson = request.ConfigurationJson };
         db.MatchTemplates.Add(template);
         await db.SaveChangesAsync(cancellationToken);
         return Created($"api/match-templates/{template.Id}", template);
@@ -31,7 +31,8 @@ public sealed class TemplatesController(ApplicationDbContext db, ITenantContext 
         if (template is null) return NotFound();
         template.Name = request.Name;
         template.ParticipantListId = request.ParticipantListId;
-        template.ParticipantSelectionMode = request.ParticipantSelectionMode;
+        template.AllowFreeParticipants = request.AllowFreeParticipants;
+        template.DeviceSelectionMode = request.DeviceSelectionMode;
         template.ConfigurationJson = request.ConfigurationJson;
         await db.SaveChangesAsync(cancellationToken);
         return Ok(template);

@@ -4,6 +4,7 @@ using CentaurScores.Api.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace CentaurScores.Api.Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260821154207_RemoveStrayMatchParticipantCountColumn")]
+    partial class RemoveStrayMatchParticipantCountColumn
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -383,11 +386,6 @@ namespace CentaurScores.Api.Infrastructure.Migrations
                         .HasColumnType("date")
                         .HasColumnName("date");
 
-                    b.Property<string>("DeviceSelectionMode")
-                        .IsRequired()
-                        .HasColumnType("longtext")
-                        .HasColumnName("device_selection_mode");
-
                     b.Property<int>("Ends")
                         .HasColumnType("int")
                         .HasColumnName("ends");
@@ -409,10 +407,6 @@ namespace CentaurScores.Api.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("longtext")
                         .HasColumnName("name");
-
-                    b.Property<Guid?>("ParticipantListId")
-                        .HasColumnType("char(36)")
-                        .HasColumnName("participant_list_id");
 
                     b.Property<string>("ScoringRulesJson")
                         .IsRequired()
@@ -491,19 +485,10 @@ namespace CentaurScores.Api.Infrastructure.Migrations
                         .HasColumnType("char(36)")
                         .HasColumnName("id");
 
-                    b.Property<bool>("AllowFreeParticipants")
-                        .HasColumnType("tinyint(1)")
-                        .HasColumnName("allow_free_participants");
-
                     b.Property<string>("ConfigurationJson")
                         .IsRequired()
                         .HasColumnType("longtext")
                         .HasColumnName("configuration_json");
-
-                    b.Property<string>("DeviceSelectionMode")
-                        .IsRequired()
-                        .HasColumnType("longtext")
-                        .HasColumnName("device_selection_mode");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -513,6 +498,11 @@ namespace CentaurScores.Api.Infrastructure.Migrations
                     b.Property<Guid?>("ParticipantListId")
                         .HasColumnType("char(36)")
                         .HasColumnName("participant_list_id");
+
+                    b.Property<string>("ParticipantSelectionMode")
+                        .IsRequired()
+                        .HasColumnType("longtext")
+                        .HasColumnName("participant_selection_mode");
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("char(36)")
@@ -612,6 +602,16 @@ namespace CentaurScores.Api.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("longtext")
                         .HasColumnName("name");
+
+                    b.Property<string>("ParticipantOrderJson")
+                        .IsRequired()
+                        .HasColumnType("longtext")
+                        .HasColumnName("participant_order_json");
+
+                    b.Property<string>("SelectionMode")
+                        .IsRequired()
+                        .HasColumnType("longtext")
+                        .HasColumnName("selection_mode");
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("char(36)")

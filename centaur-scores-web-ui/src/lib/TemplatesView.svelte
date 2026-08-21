@@ -24,16 +24,15 @@
 
   function modeLabel(mode: string): string {
     if (mode === 'list') return labels.modeList
-    if (mode === 'list-or-new') return labels.modeListOrNew
-    if (mode === 'unlisted') return labels.modeUnlisted
-    return labels.modeMatch
+    if (mode === 'list-and-free') return labels.modeListAndFree
+    return labels.modeRestricted
   }
 
   async function submitAdd() {
     if (!newTemplateName.trim()) return
     createError = ''
     try {
-      const template = await api.createTemplate({ name: newTemplateName.trim(), participantSelectionMode: 'match', configurationJson: defaultTemplateConfigurationJson })
+      const template = await api.createTemplate({ name: newTemplateName.trim(), allowFreeParticipants: false, deviceSelectionMode: 'restricted', configurationJson: defaultTemplateConfigurationJson })
       newTemplateName = ''
       showAddForm = false
       onChanged()
@@ -61,7 +60,7 @@
   {#each sortedTemplates as template}
     <button class="list-row" on:click={() => onOpenTemplate(template)}>
       <span class="management-icon">◇</span>
-      <span><strong>{template.name}</strong><small>{modeLabel(template.participantSelectionMode)}{#if participantListName(template.participantListId)} · {participantListName(template.participantListId)}{/if}</small></span>
+      <span><strong>{template.name}</strong><small>{modeLabel(template.deviceSelectionMode)}{#if participantListName(template.participantListId)} · {participantListName(template.participantListId)}{/if}</small></span>
       <span class="arrow">→</span>
     </button>
   {/each}

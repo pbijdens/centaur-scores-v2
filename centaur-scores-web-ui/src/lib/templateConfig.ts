@@ -2,7 +2,7 @@ import type { TemplateConfiguration } from './types'
 
 export const keyboardColors = ['Yellow', 'Red', 'Blue', 'Black', 'White'] as const
 
-export const participantSelectionModes = ['match', 'list', 'list-or-new', 'unlisted'] as const
+export const deviceSelectionModes = ['restricted', 'list', 'list-and-free'] as const
 
 export const emptyTemplateConfiguration: TemplateConfiguration = {
   categoryOrder: [],

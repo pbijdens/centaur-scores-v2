@@ -17,7 +17,7 @@ public sealed class MatchesController(ApplicationDbContext db, ITenantContext te
     public async Task<IActionResult> Create(CreateMatchRequest request, CancellationToken cancellationToken)
     {
         if (!CanManage) return Forbid();
-        var match = new Match { Id = Guid.NewGuid(), TenantId = TenantId, Name = request.Name, Date = request.Date, ShortCode = request.ShortCode, IsOpen = request.IsOpen, Ends = request.Ends, ArrowsPerEnd = request.ArrowsPerEnd, GroupEnds = request.GroupEnds, AllowFreeParticipants = request.AllowFreeParticipants, KeyboardJson = request.KeyboardJson, ScoringRulesJson = request.ScoringRulesJson };
+        var match = new Match { Id = Guid.NewGuid(), TenantId = TenantId, Name = request.Name, Date = request.Date, ShortCode = request.ShortCode, IsOpen = request.IsOpen, ParticipantListId = request.ParticipantListId, DeviceSelectionMode = request.DeviceSelectionMode, Ends = request.Ends, ArrowsPerEnd = request.ArrowsPerEnd, GroupEnds = request.GroupEnds, AllowFreeParticipants = request.AllowFreeParticipants, KeyboardJson = request.KeyboardJson, ScoringRulesJson = request.ScoringRulesJson };
         db.Matches.Add(match);
         await db.SaveChangesAsync(cancellationToken);
         return CreatedAtAction(nameof(Get), new { id = match.Id }, match);
@@ -32,10 +32,14 @@ public sealed class MatchesController(ApplicationDbContext db, ITenantContext te
         if (!CanManage) return Forbid();
         var match = await db.Matches.SingleOrDefaultAsync(item => item.Id == id && item.TenantId == TenantId, cancellationToken);
         if (match is null) return NotFound();
+        if (match.ParticipantListId != request.ParticipantListId && await db.MatchParticipants.AnyAsync(item => item.MatchId == id, cancellationToken))
+            return Conflict(new ApiError("PARTICIPANT_LIST_LOCKED", "The source participant list cannot change once the match has participants."));
         match.Name = request.Name;
         match.Date = request.Date;
         match.ShortCode = request.ShortCode;
         match.IsOpen = request.IsOpen;
+        match.ParticipantListId = request.ParticipantListId;
+        match.DeviceSelectionMode = request.DeviceSelectionMode;
         match.Ends = request.Ends;
         match.ArrowsPerEnd = request.ArrowsPerEnd;
         match.GroupEnds = request.GroupEnds;
@@ -124,7 +128,7 @@ public sealed class MatchesController(ApplicationDbContext db, ITenantContext te
     {
         if (!CanManage) return Forbid();
         if (!await db.Matches.AnyAsync(item => item.Id == id && item.TenantId == TenantId, cancellationToken)) return NotFound();
-        var device = new ScoreDevice { Id = Guid.NewGuid(), TenantId = TenantId, MatchId = id, Name = request.Name, SelectionMode = request.SelectionMode, ParticipantOrderJson = System.Text.Json.JsonSerializer.Serialize(request.ParticipantIds) };
+        var device = new ScoreDevice { Id = Guid.NewGuid(), TenantId = TenantId, MatchId = id, Name = request.Name };
         db.ScoreDevices.Add(device);
         await db.SaveChangesAsync(cancellationToken);
         return Created($"api/matches/{id}/devices/{device.Id}", device);
@@ -139,6 +143,18 @@ public sealed class MatchesController(ApplicationDbContext db, ITenantContext te
         db.LiveScoreScopes.Add(scope);
         await db.SaveChangesAsync(cancellationToken);
         return Created($"api/matches/{id}/live-scopes/{scope.Id}", scope);
+    }
+
+    [HttpPut("{id:guid}/participants/{participantId:guid}/device")]
+    public async Task<IActionResult> AssignParticipantDevice(Guid id, Guid participantId, AssignParticipantDeviceRequest request, CancellationToken cancellationToken)
+    {
+        if (!CanManage) return Forbid();
+        var participant = await db.MatchParticipants.SingleOrDefaultAsync(item => item.Id == participantId && item.MatchId == id && item.TenantId == TenantId, cancellationToken);
+        if (participant is null) return NotFound();
+        if (request.DeviceId is { } deviceId && !await db.ScoreDevices.AnyAsync(item => item.Id == deviceId && item.MatchId == id && item.TenantId == TenantId, cancellationToken)) return NotFound();
+        participant.DeviceId = request.DeviceId;
+        await db.SaveChangesAsync(cancellationToken);
+        return Ok(participant);
     }
 
     [HttpDelete("{id:guid}/devices/{deviceId:guid}")]

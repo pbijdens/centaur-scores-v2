@@ -17,7 +17,7 @@ JWTs are returned by `POST /api/auth/login` and contain the account and active t
 - Match and competition dates are date-only values in `yyyy-MM-dd` format and have no timezone conversion.
 - Successful creates return `201 Created`; deletes return `204 No Content`.
 - Validation or business-rule conflicts return `400 Bad Request` or `409 Conflict`.
-- Endpoints that the UI must react to programmatically (currently login, change-password, and account creation) return a coded body `{ "code": "SOME_CODE", "message": "developer-facing text" }` instead of a plain `message`. `code` is a stable machine-readable identifier the client maps to a translated message; `message` is for logs/debugging only and must not be shown to end users. Known codes: `INVALID_CREDENTIALS` (401, login), `CURRENT_PASSWORD_INVALID` (400, change-password), `NEW_PASSWORD_REQUIRED` (400, change-password), `USERNAME_REQUIRED` (400, create account), `USERNAME_TAKEN` (409, create account), `INVALID_AUTHORIZATION` (400, create account).
+- Endpoints that the UI must react to programmatically (currently login, change-password, account creation, and match updates) return a coded body `{ "code": "SOME_CODE", "message": "developer-facing text" }` instead of a plain `message`. `code` is a stable machine-readable identifier the client maps to a translated message; `message` is for logs/debugging only and must not be shown to end users. Known codes: `INVALID_CREDENTIALS` (401, login), `CURRENT_PASSWORD_INVALID` (400, change-password), `NEW_PASSWORD_REQUIRED` (400, change-password), `USERNAME_REQUIRED` (400, create account), `USERNAME_TAKEN` (409, create account), `INVALID_AUTHORIZATION` (400, create account), `PARTICIPANT_LIST_LOCKED` (409, update match).
 
 ## Health and discovery
 
@@ -76,7 +76,7 @@ JWTs are returned by `POST /api/auth/login` and contain the account and active t
 | Method | Path | Auth | Description |
 |---|---|---|---|
 | `GET` | `/api/match-templates` | user | List reusable match templates. |
-| `POST` | `/api/match-templates` | manager | Create a template, including selection mode and configuration JSON. |
+| `POST` | `/api/match-templates` | manager | Create a template with an optional source `participantListId`, `allowFreeParticipants`, `deviceSelectionMode` (`restricted`, `list`, or `list-and-free`), and configuration JSON. |
 | `PUT` | `/api/match-templates/{id}` | manager | Update a template. |
 | `DELETE` | `/api/match-templates/{id}` | admin | Delete a template. |
 
@@ -85,18 +85,19 @@ JWTs are returned by `POST /api/auth/login` and contain the account and active t
 | Method | Path | Auth | Description |
 |---|---|---|---|
 | `GET` | `/api/matches` | user | List matches, open matches first and then by date. |
-| `POST` | `/api/matches` | manager | Create match metadata, end configuration, keyboard, and scoring rules. |
+| `POST` | `/api/matches` | manager | Create match metadata, end configuration, an optional `participantListId` (the match's single source list), `deviceSelectionMode` (`restricted`, `list`, or `list-and-free`), keyboard, and scoring rules. |
 | `GET` | `/api/matches/{id}` | user | Get match metadata, participants, devices, and live scopes. |
-| `PUT` | `/api/matches/{id}` | manager | Update match configuration or open state. |
+| `PUT` | `/api/matches/{id}` | manager | Update match configuration or open state. `409` with a coded error body (`PARTICIPANT_LIST_LOCKED`) if `participantListId` changes after the match already has participants. |
 | `DELETE` | `/api/matches/{id}` | admin | Delete a match and its dependent scoring data. |
 | `POST` | `/api/matches/deactivate-all` | manager | Close all matches in the active tenant. |
 | `GET` | `/api/matches/{id}/participants` | user | List match participants and entered scores. |
 | `POST` | `/api/matches/{id}/participants` | manager | Add a source-list or free participant. |
 | `DELETE` | `/api/matches/{id}/participants/{participantId}` | manager | Remove a match participant. |
+| `PUT` | `/api/matches/{id}/participants/{participantId}/device` | manager | Assign/unassign the participant to a score device with `{ deviceId }` (`deviceId` may be `null`). Removes the participant from any other device's restricted list. |
 | `POST` | `/api/matches/{id}/participants/{participantId}/scores` | scorekeeper/user | Upsert one arrow score using `{ end, arrow, keyId, value }`. |
 | `GET` | `/api/matches/{id}/results` | user | Return ranked match results with totals, averages, and groups. |
 | `GET` | `/api/matches/{id}/export.csv` | user | Download federation number, name, and total score CSV. |
-| `POST` | `/api/matches/{id}/devices` | manager | Add a score-entry device with selection mode and participant order. |
+| `POST` | `/api/matches/{id}/devices` | manager | Add a score-entry device with `{ name }`. Which participants a device may select comes from the match's `deviceSelectionMode`, not the device itself. |
 | `DELETE` | `/api/matches/{id}/devices/{deviceId}` | manager | Remove a score-entry device. |
 | `POST` | `/api/matches/{id}/live-scopes` | manager | Configure a live score scope and display fields. |
 | `DELETE` | `/api/matches/{id}/live-scopes/{scopeId}` | manager | Remove a live score scope. |

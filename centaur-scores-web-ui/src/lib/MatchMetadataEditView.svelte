@@ -1,11 +1,12 @@
 <script lang="ts">
   import type { ApiClient } from './api'
   import { labelForError } from './errors'
-  import { keyboardColors, deviceSelectionModes, parseTemplateConfiguration } from './templateConfig'
-  import type { Category, MatchTemplate, ParticipantList } from './types'
+  import { parseMatchKeyboardConfig, parseMatchScoringRules } from './matchConfig'
+  import { deviceSelectionModes, keyboardColors } from './templateConfig'
+  import type { Category, Match, ParticipantList } from './types'
 
   export let api: ApiClient
-  export let template: MatchTemplate
+  export let match: Match
   export let categories: Category[]
   export let participantLists: ParticipantList[]
   export let labels: Record<string, string>
@@ -13,18 +14,25 @@
   export let onSaved: () => void
   export let onDeleted: () => void
 
-  let name = template.name
-  let participantListId = template.participantListId ?? ''
-  let allowFreeParticipants = template.allowFreeParticipants
-  let deviceSelectionMode = template.deviceSelectionMode
-  let config = parseTemplateConfiguration(template.configurationJson)
+  let name = match.name
+  let date = match.date.slice(0, 10)
+  let shortCode = match.shortCode ?? ''
+  let participantListId = match.participantListId ?? ''
+  let allowFreeParticipants = match.allowFreeParticipants
+  let deviceSelectionMode = match.deviceSelectionMode
+  let ends = match.ends
+  let arrowsPerEnd = match.arrowsPerEnd
+  let groupEnds = match.groupEnds ?? null
+  let keyboardConfig = parseMatchKeyboardConfig(match.keyboardJson)
+  let scoringRules = parseMatchScoringRules(match.scoringRulesJson)
   let saveMessage = ''
   let saveError = ''
   let deleteError = ''
 
+  $: hasParticipants = (match.participants ?? []).length > 0
   $: orderedCategories = [
-    ...config.categoryOrder.map((id) => categories.find((category) => category.id === id)).filter((category): category is Category => !!category),
-    ...categories.filter((category) => !config.categoryOrder.includes(category.id))
+    ...keyboardConfig.categoryOrder.map((id) => categories.find((category) => category.id === id)).filter((category): category is Category => !!category),
+    ...categories.filter((category) => !keyboardConfig.categoryOrder.includes(category.id))
   ]
 
   function modeLabel(mode: string): string {
@@ -34,47 +42,47 @@
   }
 
   function toggleCategory(categoryId: string) {
-    config.categoryOrder = config.categoryOrder.includes(categoryId)
-      ? config.categoryOrder.filter((id) => id !== categoryId)
-      : [...config.categoryOrder, categoryId]
+    keyboardConfig.categoryOrder = keyboardConfig.categoryOrder.includes(categoryId)
+      ? keyboardConfig.categoryOrder.filter((id) => id !== categoryId)
+      : [...keyboardConfig.categoryOrder, categoryId]
   }
 
   function moveCategory(index: number, direction: -1 | 1) {
-    const order = [...config.categoryOrder]
+    const order = [...keyboardConfig.categoryOrder]
     const target = index + direction
     if (target < 0 || target >= order.length) return
     ;[order[index], order[target]] = [order[target], order[index]]
-    config.categoryOrder = order
+    keyboardConfig.categoryOrder = order
   }
 
   function addKey() {
-    config.keyboard = [...config.keyboard, { keyId: '', label: '', color: 'Yellow', value: 0 }]
+    keyboardConfig.keyboard = [...keyboardConfig.keyboard, { keyId: '', label: '', color: 'Yellow', value: 0 }]
   }
 
   function removeKey(index: number) {
-    config.keyboard = config.keyboard.filter((_, i) => i !== index)
+    keyboardConfig.keyboard = keyboardConfig.keyboard.filter((_, i) => i !== index)
   }
 
   function moveKey(index: number, direction: -1 | 1) {
-    const keyboard = [...config.keyboard]
+    const keyboard = [...keyboardConfig.keyboard]
     const target = index + direction
     if (target < 0 || target >= keyboard.length) return
     ;[keyboard[index], keyboard[target]] = [keyboard[target], keyboard[index]]
-    config.keyboard = keyboard
+    keyboardConfig.keyboard = keyboard
   }
 
   function addDisabledKeyRule() {
     const firstCategory = categories[0]
     if (!firstCategory) return
-    config.disabledKeyRules = [...config.disabledKeyRules, { categoryId: firstCategory.id, valueId: firstCategory.values[0]?.valueId ?? 0, disabledKeyIds: [] }]
+    keyboardConfig.disabledKeyRules = [...keyboardConfig.disabledKeyRules, { categoryId: firstCategory.id, valueId: firstCategory.values[0]?.valueId ?? 0, disabledKeyIds: [] }]
   }
 
   function removeDisabledKeyRule(index: number) {
-    config.disabledKeyRules = config.disabledKeyRules.filter((_, i) => i !== index)
+    keyboardConfig.disabledKeyRules = keyboardConfig.disabledKeyRules.filter((_, i) => i !== index)
   }
 
   function toggleRuleDisabledKey(ruleIndex: number, keyId: string) {
-    config.disabledKeyRules = config.disabledKeyRules.map((rule, index) => {
+    keyboardConfig.disabledKeyRules = keyboardConfig.disabledKeyRules.map((rule, index) => {
       if (index !== ruleIndex) return rule
       const disabledKeyIds = rule.disabledKeyIds.includes(keyId) ? rule.disabledKeyIds.filter((id) => id !== keyId) : [...rule.disabledKeyIds, keyId]
       return { ...rule, disabledKeyIds }
@@ -82,84 +90,83 @@
   }
 
   function addScoringRule() {
-    config.scoringRules = [...config.scoringRules, { type: 'total' }]
+    scoringRules = [...scoringRules, { type: 'total' }]
   }
 
   function removeScoringRule(index: number) {
-    if (config.scoringRules.length <= 1) return
-    config.scoringRules = config.scoringRules.filter((_, i) => i !== index)
+    if (scoringRules.length <= 1) return
+    scoringRules = scoringRules.filter((_, i) => i !== index)
   }
 
   function moveScoringRule(index: number, direction: -1 | 1) {
-    const rules = [...config.scoringRules]
+    const rules = [...scoringRules]
     const target = index + direction
     if (target < 0 || target >= rules.length) return
     ;[rules[index], rules[target]] = [rules[target], rules[index]]
-    config.scoringRules = rules
-  }
-
-  function addLiveScope() {
-    config.liveScopes = [...config.liveScopes, { scope: '', groupByCategoryIds: [], includeAverage: false, includeGroupScores: false, includeEqualizers: false, includePersonalBest: false }]
-  }
-
-  function removeLiveScope(index: number) {
-    config.liveScopes = config.liveScopes.filter((_, i) => i !== index)
-  }
-
-  function toggleScopeCategory(scopeIndex: number, categoryId: string) {
-    config.liveScopes = config.liveScopes.map((scope, index) => {
-      if (index !== scopeIndex) return scope
-      const groupByCategoryIds = scope.groupByCategoryIds.includes(categoryId)
-        ? scope.groupByCategoryIds.filter((id) => id !== categoryId)
-        : [...scope.groupByCategoryIds, categoryId]
-      return { ...scope, groupByCategoryIds }
-    })
+    scoringRules = rules
   }
 
   async function save() {
     saveMessage = ''
     saveError = ''
     try {
-      await api.updateTemplate(template.id, {
+      await api.updateMatch(match.id, {
         name,
+        date,
+        shortCode: shortCode || null,
+        isOpen: match.isOpen,
         participantListId: participantListId || null,
-        allowFreeParticipants,
         deviceSelectionMode,
-        configurationJson: JSON.stringify(config)
+        ends,
+        arrowsPerEnd,
+        groupEnds,
+        allowFreeParticipants,
+        keyboardJson: JSON.stringify(keyboardConfig),
+        scoringRulesJson: JSON.stringify(scoringRules)
       })
-      saveMessage = labels.templateSaved
+      saveMessage = labels.matchSaved
       onSaved()
     } catch (error) {
-      saveError = labelForError(error, labels, 'templateSaveError')
+      saveError = labelForError(error, labels, 'matchSaveError')
     }
   }
 
   async function remove() {
     deleteError = ''
-    const message = labels.deleteTemplateConfirm.replace('{name}', name)
+    const message = labels.deleteMatchConfirm.replace('{name}', name)
     if (!confirm(message)) return
     try {
-      await api.deleteTemplate(template.id)
+      await api.deleteMatch(match.id)
       onDeleted()
     } catch (error) {
-      deleteError = labelForError(error, labels, 'templateDeleteError')
+      deleteError = labelForError(error, labels, 'matchDeleteError')
     }
   }
 </script>
 
-<button class="back-link" on:click={onBack}>← {labels.templates}</button>
+<button class="back-link" on:click={onBack}>← {match.name}</button>
 <div class="page-intro">
-  <div><p class="eyebrow">{labels.eyebrowTemplateDetail}</p><h1>{template.name}</h1></div>
+  <div><p class="eyebrow">{labels.eyebrowMatchMetadata}</p><h1>{match.name}</h1></div>
 </div>
 
 <section class="panel">
-  <label>{labels.templateNameLabel}<input bind:value={name} /></label>
+  <label>{labels.matchNameLabel}<input bind:value={name} /></label>
+  <label>{labels.matchDateLabel}<input type="date" bind:value={date} /></label>
+  <label>{labels.shortCodeLabel}<input bind:value={shortCode} /></label>
+  <label>{labels.endsLabel}<input type="number" min="1" bind:value={ends} /></label>
+  <label>{labels.arrowsPerEndLabel}<input type="number" min="1" bind:value={arrowsPerEnd} /></label>
+  <label>{labels.groupEndsLabel}<input type="number" min="1" bind:value={groupEnds} /></label>
+</section>
+
+<section class="panel section-gap">
+  <h2>{labels.participantsBlockLabel}</h2>
   <label>{labels.participantListLabel}
-    <select bind:value={participantListId}>
+    <select bind:value={participantListId} disabled={hasParticipants}>
       <option value="">{labels.noParticipantList}</option>
       {#each participantLists as list}<option value={list.id}>{list.name}</option>{/each}
     </select>
   </label>
+  {#if hasParticipants}<p class="muted">{labels.participantListLockedHint}</p>{/if}
   <label class="checkbox-label"><input type="checkbox" bind:checked={allowFreeParticipants} /> {labels.allowFreeParticipantsLabel}</label>
   <label>{labels.deviceModeLabel}
     <select bind:value={deviceSelectionMode}>
@@ -175,12 +182,12 @@
     {#each orderedCategories as category, index}
       <div class="editor-row">
         <label class="checkbox-label">
-          <input type="checkbox" checked={config.categoryOrder.includes(category.id)} on:change={() => toggleCategory(category.id)} />
+          <input type="checkbox" checked={keyboardConfig.categoryOrder.includes(category.id)} on:change={() => toggleCategory(category.id)} />
           {category.name}
         </label>
-        {#if config.categoryOrder.includes(category.id)}
+        {#if keyboardConfig.categoryOrder.includes(category.id)}
           <button class="icon-button move-button" aria-label={labels.moveUp} disabled={index === 0} on:click={() => moveCategory(index, -1)}>▲</button>
-          <button class="icon-button move-button" aria-label={labels.moveDown} disabled={index === config.categoryOrder.length - 1} on:click={() => moveCategory(index, 1)}>▼</button>
+          <button class="icon-button move-button" aria-label={labels.moveDown} disabled={index === keyboardConfig.categoryOrder.length - 1} on:click={() => moveCategory(index, 1)}>▼</button>
         {/if}
       </div>
     {/each}
@@ -190,7 +197,7 @@
 <section class="panel section-gap">
   <h2>{labels.keyboardLabel}</h2>
   <p class="muted">{labels.keyboardHint}</p>
-  {#each config.keyboard as key, index}
+  {#each keyboardConfig.keyboard as key, index}
     <div class="editor-row">
       <label>{labels.keyLabelLabel}<input bind:value={key.label} /></label>
       <label>{labels.keyIdLabel}<input bind:value={key.keyId} /></label>
@@ -201,7 +208,7 @@
       </label>
       <label>{labels.keyValueLabel}<input type="number" bind:value={key.value} /></label>
       <button class="icon-button move-button" aria-label={labels.moveUp} disabled={index === 0} on:click={() => moveKey(index, -1)}>▲</button>
-      <button class="icon-button move-button" aria-label={labels.moveDown} disabled={index === config.keyboard.length - 1} on:click={() => moveKey(index, 1)}>▼</button>
+      <button class="icon-button move-button" aria-label={labels.moveDown} disabled={index === keyboardConfig.keyboard.length - 1} on:click={() => moveKey(index, 1)}>▼</button>
       <button class="icon-button" aria-label={labels.removeValue} on:click={() => removeKey(index)}>🗑</button>
     </div>
   {/each}
@@ -213,7 +220,7 @@
 <section class="panel section-gap">
   <h2>{labels.disabledKeysLabel}</h2>
   <p class="muted">{labels.disabledKeysHint}</p>
-  {#each config.disabledKeyRules as rule, index}
+  {#each keyboardConfig.disabledKeyRules as rule, index}
     <div class="editor-row wrap">
       <label>{labels.ruleCategoryLabel}
         <select bind:value={rule.categoryId}>
@@ -229,7 +236,7 @@
       </label>
       <div class="checkbox-grid">
         <span class="muted">{labels.ruleDisabledKeysLabel}:</span>
-        {#each config.keyboard as key}
+        {#each keyboardConfig.keyboard as key}
           <label class="checkbox-label">
             <input type="checkbox" checked={rule.disabledKeyIds.includes(key.keyId)} on:change={() => toggleRuleDisabledKey(index, key.keyId)} />
             {key.label}
@@ -245,7 +252,7 @@
 <section class="panel section-gap">
   <h2>{labels.scoringRulesLabel}</h2>
   <p class="muted">{labels.scoringRulesHint}</p>
-  {#each config.scoringRules as rule, index}
+  {#each scoringRules as rule, index}
     <div class="editor-row">
       <span class="muted">{index + 1}.</span>
       <label>{labels.ruleTypeLabel}
@@ -257,43 +264,16 @@
       {#if rule.type === 'countKey'}
         <label>{labels.ruleCountKeyLabel}
           <select bind:value={rule.keyId}>
-            {#each config.keyboard as key}<option value={key.keyId}>{key.label}</option>{/each}
+            {#each keyboardConfig.keyboard as key}<option value={key.keyId}>{key.label}</option>{/each}
           </select>
         </label>
       {/if}
       <button class="icon-button move-button" aria-label={labels.moveUp} disabled={index === 0} on:click={() => moveScoringRule(index, -1)}>▲</button>
-      <button class="icon-button move-button" aria-label={labels.moveDown} disabled={index === config.scoringRules.length - 1} on:click={() => moveScoringRule(index, 1)}>▼</button>
-      <button class="icon-button" aria-label={labels.removeValue} disabled={config.scoringRules.length <= 1} on:click={() => removeScoringRule(index)}>🗑</button>
+      <button class="icon-button move-button" aria-label={labels.moveDown} disabled={index === scoringRules.length - 1} on:click={() => moveScoringRule(index, 1)}>▼</button>
+      <button class="icon-button" aria-label={labels.removeValue} disabled={scoringRules.length <= 1} on:click={() => removeScoringRule(index)}>🗑</button>
     </div>
   {/each}
   <button class="primary" on:click={addScoringRule}>+ {labels.addScoringRule}</button>
-</section>
-
-<section class="panel section-gap">
-  <h2>{labels.liveScopesLabel}</h2>
-  <p class="muted">{labels.liveScopesHint}</p>
-  {#each config.liveScopes as scope, index}
-    <div class="editor-row wrap">
-      <label>{labels.scopeNameLabel}<input bind:value={scope.scope} /></label>
-      <div class="checkbox-grid">
-        <span class="muted">{labels.scopeGroupByLabel}:</span>
-        {#each categories as category}
-          <label class="checkbox-label">
-            <input type="checkbox" checked={scope.groupByCategoryIds.includes(category.id)} on:change={() => toggleScopeCategory(index, category.id)} />
-            {category.name}
-          </label>
-        {/each}
-      </div>
-      <div class="checkbox-grid">
-        <label class="checkbox-label"><input type="checkbox" bind:checked={scope.includeAverage} /> {labels.scopeIncludeAverage}</label>
-        <label class="checkbox-label"><input type="checkbox" bind:checked={scope.includeGroupScores} /> {labels.scopeIncludeGroupScores}</label>
-        <label class="checkbox-label"><input type="checkbox" bind:checked={scope.includeEqualizers} /> {labels.scopeIncludeEqualizers}</label>
-        <label class="checkbox-label"><input type="checkbox" bind:checked={scope.includePersonalBest} /> {labels.scopeIncludePersonalBest}</label>
-      </div>
-      <button class="icon-button" aria-label={labels.removeValue} on:click={() => removeLiveScope(index)}>🗑</button>
-    </div>
-  {/each}
-  <button class="primary" on:click={addLiveScope}>+ {labels.addLiveScope}</button>
 </section>
 
 <section class="panel section-gap">
@@ -302,7 +282,7 @@
   <button class="primary" on:click={save}>{labels.save}</button>
 </section>
 
-<button class="danger-button" on:click={remove}>{labels.deleteTemplate}</button>
+<button class="danger-button" on:click={remove}>{labels.deleteMatch}</button>
 {#if deleteError}<p class="error">{deleteError}</p>{/if}
 
 <style>
