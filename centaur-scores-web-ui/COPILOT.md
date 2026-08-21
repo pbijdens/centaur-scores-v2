@@ -2,6 +2,8 @@
 
 Read the system specification before changing behavior: [DESIGN.md](../documentation/DESIGN.md).
 
+The management UI's own requirements and use cases live in [DESIGN.md](DESIGN.md) in this project; the root specification no longer covers them.
+
 ## API
 
 Documentation for the REST API is here [API-ENDPOINTS>md](../centaur-scores-api-v2/API_ENDPOINTS.md)

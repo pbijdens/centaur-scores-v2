@@ -1,6 +1,6 @@
 # Project Memory
 
-Specification: [DESIGN.md](../documentation/DESIGN.md)
+Specification: [DESIGN.md](../documentation/DESIGN.md) (root system design) and [DESIGN.md](DESIGN.md) (this project's requirements and use cases, UC1-UC14).
 
 - This project is the Svelte + TypeScript management UI.
 - The API defaults to `http://127.0.0.1:5080`; override it with `VITE_API_BASE_URL`.
