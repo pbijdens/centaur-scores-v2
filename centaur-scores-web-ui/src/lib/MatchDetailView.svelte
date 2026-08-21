@@ -11,18 +11,18 @@
 
 <button class="back-link" on:click={onBack}>← {labels.matches}</button>
 <div class="page-intro">
-  <div><p class="eyebrow">MATCH</p><h1>{match.name}</h1><p class="muted">{formatLocalDate(match.date, language)}</p></div>
-  <button class="primary" on:click={onToggleOpen}>{match.isOpen ? 'Deactivate' : 'Activate'}</button>
+  <div><p class="eyebrow">{labels.eyebrowMatch}</p><h1>{match.name}</h1><p class="muted">{formatLocalDate(match.date, language)}</p></div>
+  <button class="primary" on:click={onToggleOpen}>{match.isOpen ? labels.deactivate : labels.activate}</button>
 </div>
 <div class="detail-grid">
   <section class="panel">
-    <p class="eyebrow">PARTICIPANTS</p>
+    <p class="eyebrow">{labels.eyebrowParticipants}</p>
     <h2>{match.participantCount ?? 0}</h2>
-    <p class="muted">Manage assignments, devices and entered scores.</p>
+    <p class="muted">{labels.matchParticipantsDescription}</p>
   </section>
   <section class="panel">
-    <p class="eyebrow">RESULTS</p>
-    <h2>Live</h2>
-    <p class="muted">Export and printable results are available from this workspace.</p>
+    <p class="eyebrow">{labels.eyebrowResults}</p>
+    <h2>{labels.matchResultsLive}</h2>
+    <p class="muted">{labels.matchResultsDescription}</p>
   </section>
 </div>

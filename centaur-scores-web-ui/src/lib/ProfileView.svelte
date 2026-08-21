@@ -31,7 +31,7 @@
       profile = await api.updateProfile({ displayName, email })
       detailsMessage = labels.profileSaved
     } catch {
-      detailsError = 'Unable to save profile details.'
+      detailsError = labels.profileSaveError
     }
   }
 
@@ -51,7 +51,7 @@
 
 <button class="back-link" on:click={onBack}>← {labels.home}</button>
 <div class="page-intro">
-  <div><p class="eyebrow">ACCOUNT</p><h1>{labels.profile}</h1></div>
+  <div><p class="eyebrow">{labels.eyebrowAccount}</p><h1>{labels.profile}</h1></div>
 </div>
 <div class="profile-grid">
   <section class="panel">

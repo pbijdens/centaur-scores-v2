@@ -17,25 +17,25 @@
 
 <main class="login-shell">
   <section class="login-card">
-    <div class="brand-mark">CS</div>
-    <p class="eyebrow">CENTAUR SCORES</p>
+    <div class="brand-mark">{labels.brandInitials}</div>
+    <p class="eyebrow">{labels.eyebrowLogin}</p>
     <h1>{labels.login}</h1>
     <form autocomplete="off" on:submit|preventDefault={onSubmit}>
-      <label>Tenant
+      <label>{labels.tenantLabel}
         <select bind:value={tenant} autocomplete="off" disabled={tenantsLoading || tenants.length === 0}>
-          <option value="" disabled>{tenantsLoading ? 'Loading tenants…' : 'Select a tenant'}</option>
+          <option value="" disabled>{tenantsLoading ? labels.loadingTenants : labels.selectTenant}</option>
           {#each tenants as availableTenant}<option value={availableTenant.id}>{availableTenant.name}</option>{/each}
         </select>
       </label>
       {#if tenantsError}<p class="error">{tenantsError}</p>{/if}
-      <label>Username<input bind:value={username} autocomplete="off" /></label>
-      <label>Password<input type="password" bind:value={password} autocomplete="new-password" /></label>
+      <label>{labels.usernameLabel}<input bind:value={username} autocomplete="off" /></label>
+      <label>{labels.passwordLabel}<input type="password" bind:value={password} autocomplete="new-password" /></label>
       {#if loginError}<p class="error">{loginError}</p>{/if}
       <button class="primary" disabled={!username || !password || tenants.length === 0}>{labels.signIn}<span>→</span></button>
     </form>
     <select class="language" value={language} on:change={(event) => onLanguageChange(event.currentTarget.value)}>
-      <option value="en">English</option>
-      <option value="nl">Nederlands</option>
+      <option value="en">{labels.languageEnglish}</option>
+      <option value="nl">{labels.languageDutch}</option>
     </select>
   </section>
 </main>

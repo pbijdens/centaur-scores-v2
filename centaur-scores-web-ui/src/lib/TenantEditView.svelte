@@ -42,7 +42,7 @@
       tenant = await api.updateChildTenant(tenantId, { name, logoUrl })
       saveMessage = labels.tenantSaved
     } catch {
-      saveError = 'Unable to save this sub-tenant.'
+      saveError = labels.tenantSaveError
     }
   }
 
@@ -57,7 +57,7 @@
 
 <button class="back-link" on:click={onBack}>← {labels.tenants}</button>
 {#if tenant}
-  <div class="page-intro"><div><p class="eyebrow">SUB-TENANT</p><h1>{tenant.name}</h1></div></div>
+  <div class="page-intro"><div><p class="eyebrow">{labels.eyebrowSubTenant}</p><h1>{tenant.name}</h1></div></div>
   <section class="panel">
     <form on:submit|preventDefault={save}>
       <label>{labels.tenantName}<input bind:value={name} /></label>

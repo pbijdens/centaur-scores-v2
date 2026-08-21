@@ -14,6 +14,7 @@ Documentation for the REST API is here [API-ENDPOINTS>md](../centaur-scores-api-
 - Preserve the mobile-friendly management workflows described in the specification.
 - Use the typed API boundary and keep authentication state in local storage as specified.
 - Use English and Dutch translations, remembering the selected language locally.
+- Never hardcode user-facing labels in views/components; always add them to the [i18n.ts](src/lib/i18n.ts) label dictionary and update every language.
 - Render API timestamps as UTC-aware values and render date-only values without timezone shifts.
 - Keep live score and scorekeeper pages free of the management header.
 - Prefer small reusable components and utility modules over adding more monolithic page markup.

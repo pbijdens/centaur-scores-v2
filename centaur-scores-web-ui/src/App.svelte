@@ -56,7 +56,7 @@
       if (tenants.length > 0 && !tenants.some((item) => item.id === tenant)) tenant = tenants[0].id
     } catch {
       tenants = []
-      tenantsError = 'Unable to load tenants. Check the API connection.'
+      tenantsError = t.tenantsLoadError
     } finally { tenantsLoading = false }
   }
 
@@ -78,7 +78,7 @@
       token = result.token; loggedIn = true; loginError = ''
       localStorage.setItem('centaur-token', token); localStorage.setItem('centaur-tenant', tenant); await loadData()
       navigate('/')
-    } catch { loginError = 'Unable to sign in. Check your credentials or API connection.' }
+    } catch { loginError = t.signInError }
   }
 
   function signOut() {
@@ -164,10 +164,10 @@
       {:else if managementView}
         <section class="management-view">
           <button class="back-link" on:click={() => navigate('/')}>← {t.home}</button>
-          <ManagementView eyebrow="TENANT CONFIGURATION" title={t[managementView]} description="Configure the data used by matches and competitions." action={`+ ${t.add}`} items={namedItems} />
+          <ManagementView eyebrow={t.eyebrowTenantConfig} title={t[managementView]} description={t.manageDataDescription} action={`+ ${t.add}`} items={namedItems} labels={t} />
         </section>
       {/if}
-      {#if loading}<p class="loading">Loading tenant data…</p>{/if}
+      {#if loading}<p class="loading">{t.loadingTenantData}</p>{/if}
     </main>
   </div>
 {/if}

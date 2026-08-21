@@ -13,14 +13,14 @@
 </script>
 
 <div class="page-intro">
-  <div><p class="eyebrow">TENANT HOME</p><h1>{labels.home}</h1><p class="muted">{labels.manage}</p></div>
+  <div><p class="eyebrow">{labels.eyebrowTenantHome}</p><h1>{labels.home}</h1><p class="muted">{labels.manage}</p></div>
   <button class="primary" on:click={() => onNavigate('/matches')}>+ {labels.matches}</button>
 </div>
 <div class="dashboard-grid">
   <section class="panel">
     <div class="panel-heading">
-      <div><p class="eyebrow">LIVE</p><h2>{labels.open}</h2></div>
-      <button class="text-button" on:click={onDeactivateAll}>Deactivate all</button>
+      <div><p class="eyebrow">{labels.eyebrowLive}</p><h2>{labels.open}</h2></div>
+      <button class="text-button" on:click={onDeactivateAll}>{labels.deactivateAll}</button>
     </div>
     {#each matches.filter((match) => match.isOpen) as match}
       <button class="match-row" on:click={() => onOpenMatch(match)}>
@@ -32,8 +32,8 @@
   </section>
   <section class="panel">
     <div class="panel-heading">
-      <div><p class="eyebrow">NEXT</p><h2>{labels.upcoming}</h2></div>
-      <button class="text-button" on:click={() => onNavigate('/matches')}>See all</button>
+      <div><p class="eyebrow">{labels.eyebrowNext}</p><h2>{labels.upcoming}</h2></div>
+      <button class="text-button" on:click={() => onNavigate('/matches')}>{labels.seeAll}</button>
     </div>
     {#each matches.filter((match) => !match.isOpen).slice(0, 3) as match}
       <button class="match-row" on:click={() => onOpenMatch(match)}>
@@ -45,8 +45,8 @@
   </section>
   <section class="panel wide">
     <div class="panel-heading">
-      <div><p class="eyebrow">SEASON</p><h2>{labels.competitions}</h2></div>
-      <button class="text-button" on:click={() => onNavigate('/competitions')}>See all</button>
+      <div><p class="eyebrow">{labels.eyebrowSeason}</p><h2>{labels.competitions}</h2></div>
+      <button class="text-button" on:click={() => onNavigate('/competitions')}>{labels.seeAll}</button>
     </div>
     {#each competitions.slice(0, 3) as competition}
       <button class="match-row">

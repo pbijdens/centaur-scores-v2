@@ -17,9 +17,9 @@
     {#if tenantLogoUrl}
       <img class="brand-mark small" src={tenantLogoUrl} alt="" />
     {:else}
-      <span class="brand-mark small">CS</span>
+      <span class="brand-mark small">{labels.brandInitials}</span>
     {/if}
-    <span><strong>{tenantName ?? 'Centaur Scores'}</strong><small>Root Tenant</small></span>
+    <span><strong>{tenantName ?? labels.defaultTenantName}</strong><small>{labels.rootTenantLabel}</small></span>
   </button>
   <nav>
     <button class:active={view === 'home'} on:click={() => onNavigate('/')}>{labels.home}</button>
@@ -28,8 +28,8 @@
   </nav>
   <div class="user-menu">
     <select value={language} on:change={(event) => onLanguageChange(event.currentTarget.value)} aria-label="Language">
-      <option value="en">EN</option>
-      <option value="nl">NL</option>
+      <option value="en">{labels.languageEnShort}</option>
+      <option value="nl">{labels.languageNlShort}</option>
     </select>
     <button class="profile-button" class:active={view === 'profile'} on:click={() => onNavigate('/profile')} aria-label={labels.profile}>
       <span class="avatar">{username.slice(0, 1).toUpperCase()}</span>

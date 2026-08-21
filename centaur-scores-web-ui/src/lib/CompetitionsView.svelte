@@ -8,7 +8,7 @@
 </script>
 
 <div class="page-intro">
-  <div><p class="eyebrow">TENANT DATA</p><h1>{labels.competitions}</h1><p class="muted">Rounds, assigned matches and combined results.</p></div>
+  <div><p class="eyebrow">{labels.eyebrowTenantData}</p><h1>{labels.competitions}</h1><p class="muted">{labels.competitionsDescription}</p></div>
   <button class="primary">+ {labels.add}</button>
 </div>
 <section class="list-panel">
@@ -16,7 +16,7 @@
     <button class="list-row">
       <span class="competition-icon">◎</span>
       <span><strong>{competition.name}</strong><small>{formatLocalDate(competition.startDate, language)} – {formatLocalDate(competition.endDate, language)} · {competition.rounds?.length ?? competition.roundCount ?? 0} rounds</small></span>
-      <span class="tag">ACTIVE</span>
+      <span class="tag">{labels.statusActive}</span>
       <span class="arrow">→</span>
     </button>
   {/each}

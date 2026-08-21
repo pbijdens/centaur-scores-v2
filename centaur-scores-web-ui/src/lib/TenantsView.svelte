@@ -20,7 +20,7 @@
 
 <button class="back-link" on:click={onBack}>← {labels.home}</button>
 <div class="page-intro">
-  <div><p class="eyebrow">TENANT ADMINISTRATION</p><h1>{labels.tenants}</h1><p class="muted">{labels.tenantsHint}</p></div>
+  <div><p class="eyebrow">{labels.eyebrowTenantAdmin}</p><h1>{labels.tenants}</h1><p class="muted">{labels.tenantsHint}</p></div>
   <button class="primary" on:click={() => (showAddForm = !showAddForm)}>+ {labels.newTenant}</button>
 </div>
 {#if showAddForm}
@@ -30,7 +30,7 @@
   </form>
 {/if}
 <section class="list-panel">
-  {#if tenants.length === 0}<p class="empty-state">Nothing has been configured yet.</p>{/if}
+  {#if tenants.length === 0}<p class="empty-state">{labels.emptyState}</p>{/if}
   {#each tenants as tenant}
     <button class="list-row" on:click={() => onOpenTenant(tenant)}>
       {#if tenant.logoUrl}<img class="tenant-logo-thumb" src={tenant.logoUrl} alt="" />{:else}<span class="management-icon">◇</span>{/if}
