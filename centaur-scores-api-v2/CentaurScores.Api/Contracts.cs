@@ -1,0 +1,21 @@
+namespace CentaurScores.Api.Contracts;
+
+public sealed record LoginRequest(string Username, string Password, Guid TenantId);
+public sealed record CreateTenantRequest(string Name, string? LogoUrl, Guid? ParentTenantId);
+public sealed record UpdateAccountRequest(string Username, string? Password, string? DisplayName, string? Email, string Authorization);
+public sealed record UpdateProfileRequest(string? DisplayName, string? Email);
+public sealed record ChangePasswordRequest(string CurrentPassword, string NewPassword);
+public sealed record CreateCategoryRequest(string Name);
+public sealed record CreateCategoryValueRequest(int ValueId, string Name);
+public sealed record CreateParticipantListRequest(string Name, bool IsActive);
+public sealed record CreateParticipantRequest(string LastName, string FullName, string? FederationNumber, Dictionary<Guid, int> Categories);
+public sealed record CreateTemplateRequest(string Name, Guid? ParticipantListId, string ParticipantSelectionMode, string ConfigurationJson);
+public sealed record CreateMatchRequest(string Name, DateOnly Date, string? ShortCode, bool IsOpen, int Ends, int ArrowsPerEnd, int? GroupEnds, bool AllowFreeParticipants, string KeyboardJson, string ScoringRulesJson);
+public sealed record CreateMatchParticipantRequest(Guid? ParticipantListMemberId, string LastName, string FullName, string? FederationNumber, Dictionary<Guid, int> Categories);
+public sealed record EnterScoreRequest(int End, int Arrow, string KeyId, int Value);
+public sealed record CreateDeviceRequest(string Name, string SelectionMode, List<Guid> ParticipantIds);
+public sealed record CreateScopeRequest(string Scope, List<Guid> GroupByCategoryIds, bool IncludeAverage, bool IncludeGroupScores, bool IncludeEqualizers, bool IncludePersonalBest);
+public sealed record CreateCompetitionRequest(string Name, DateOnly StartDate, DateOnly EndDate, List<Guid> GroupByCategoryIds);
+public sealed record CreateRoundRequest(int Order, string ShortName, string LongName);
+public sealed record AssignMatchRequest(Guid MatchId);
+public sealed record CreateCompetitionRuleRequest(string Name, List<Guid> RoundIds, int HighestScores, int MinimumScores, string Aggregation);

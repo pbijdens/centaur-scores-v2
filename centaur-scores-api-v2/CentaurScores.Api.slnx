@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="CentaurScores.Api.Tests/CentaurScores.Api.Tests.csproj" />
+  <Project Path="CentaurScores.Api/CentaurScores.Api.csproj" />
+</Solution>

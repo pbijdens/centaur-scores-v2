@@ -1,0 +1,10 @@
+import type { Language } from './types'
+
+export const labels = {
+  en: { home: 'Overview', matches: 'Matches', competitions: 'Competitions', participants: 'Participants', categories: 'Categories', templates: 'Templates', accounts: 'Accounts', open: 'Open now', upcoming: 'Coming up', login: 'Sign in to manage your tenant', signIn: 'Sign in', logout: 'Log out', manage: 'Manage tenant data', add: 'Add', profile: 'Profile', profileDetails: 'Profile details', profileDetailsHint: 'Update your real name and e-mail address.', displayName: 'Display name', email: 'E-mail', save: 'Save', password: 'Password', changePassword: 'Change password', changePasswordHint: 'Enter your current password to set a new one.', currentPassword: 'Current password', newPassword: 'New password', confirmPassword: 'Confirm new password', profileSaved: 'Profile details saved.', passwordSaved: 'Password changed.', passwordMismatch: 'New password and confirmation do not match.', currentPasswordWrong: 'Current password is incorrect.' },
+  nl: { home: 'Overzicht', matches: 'Wedstrijden', competitions: 'Competities', participants: 'Schutters', categories: 'Categorieën', templates: 'Sjablonen', accounts: 'Accounts', open: 'Nu open', upcoming: 'Binnenkort', login: 'Meld je aan om je tenant te beheren', signIn: 'Aanmelden', logout: 'Afmelden', manage: 'Tenantgegevens beheren', add: 'Toevoegen', profile: 'Profiel', profileDetails: 'Profielgegevens', profileDetailsHint: 'Werk je naam en e-mailadres bij.', displayName: 'Weergavenaam', email: 'E-mail', save: 'Opslaan', password: 'Wachtwoord', changePassword: 'Wachtwoord wijzigen', changePasswordHint: 'Vul je huidige wachtwoord in om een nieuw wachtwoord in te stellen.', currentPassword: 'Huidig wachtwoord', newPassword: 'Nieuw wachtwoord', confirmPassword: 'Bevestig nieuw wachtwoord', profileSaved: 'Profielgegevens opgeslagen.', passwordSaved: 'Wachtwoord gewijzigd.', passwordMismatch: 'Nieuw wachtwoord en bevestiging komen niet overeen.', currentPasswordWrong: 'Huidig wachtwoord is onjuist.' }
+} satisfies Record<Language, Record<string, string>>
+
+export function translationsFor(language: Language) {
+  return labels[language]
+}
