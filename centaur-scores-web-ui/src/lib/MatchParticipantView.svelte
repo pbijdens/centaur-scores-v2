@@ -2,12 +2,13 @@
   import type { ApiClient } from './api'
   import { labelForError } from './errors'
   import { parseMatchKeyboardConfig } from './matchConfig'
-  import type { Category, KeyboardKey, Match, MatchParticipant } from './types'
+  import type { ArrowScore, Category, KeyboardKey, Match, MatchParticipant, ParticipantList, ParticipantListMember } from './types'
 
   export let api: ApiClient
   export let match: Match
   export let participant: MatchParticipant
   export let categories: Category[]
+  export let participantLists: ParticipantList[]
   export let labels: Record<string, string>
   export let onBack: () => void
   export let onChanged: () => void | Promise<void>
@@ -17,6 +18,16 @@
   let quickTotal = 0
   let quickSetError = ''
   let quickSetMessage = ''
+
+  let showMetadataEditor = false
+  let editMode: 'manual' | 'list' = 'manual'
+  let editLastName = ''
+  let editFullName = ''
+  let editFederationNumber = ''
+  let editCategoryValues: Record<string, string> = {}
+  let editSourceMemberId = ''
+  let metadataError = ''
+  let metadataMessage = ''
 
   $: keyboardConfig = parseMatchKeyboardConfig(match.keyboardJson)
   $: matchCategories = keyboardConfig.categoryOrder.map((id) => categories.find((category) => category.id === id)).filter((category): category is Category => !!category)
@@ -28,6 +39,15 @@
   $: availableKeys = keyboardConfig.keyboard.filter((key) => !disabledKeyIds.has(key.keyId))
   $: devices = match.devices ?? []
   $: totalScore = (participant.scores ?? []).reduce((sum, score) => sum + score.value, 0)
+  $: sourceList = participantLists.find((list) => list.id === match.participantListId) ?? null
+  $: assignedMemberIds = new Set(
+    (match.participants ?? [])
+      .filter((item) => item.id !== participant.id)
+      .map((item) => item.participantListMemberId)
+      .filter((id): id is string => !!id)
+  )
+  $: availableMembers = sourceList ? sourceList.members.filter((member) => member.isActive && !assignedMemberIds.has(member.id)) : []
+  $: if (!sourceList) editMode = 'manual'
   $: showGroupRunningTotal = !!match.groupEnds && match.groupEnds > 0 && match.groupEnds < match.ends
 
   function categoryLabel(): string {
@@ -35,6 +55,70 @@
       .map((category) => category.values.find((value) => value.valueId === participant.categories[category.id])?.name)
       .filter((value): value is string => !!value)
       .join(' / ')
+  }
+
+  function memberDisplayLabel(member: ParticipantListMember): string {
+    const name = member.fullName || member.lastName
+    const values = categories
+      .map((category) => category.values.find((value) => value.valueId === member.categories[category.id])?.name)
+      .filter((value): value is string => !!value)
+      .join(' / ')
+    return values ? `${name} (${values})` : name
+  }
+
+  function openMetadataEditor() {
+    editLastName = participant.lastName
+    editFullName = participant.fullName
+    editFederationNumber = participant.federationNumber ?? ''
+    editCategoryValues = {}
+    for (const category of matchCategories) {
+      const value = participant.categories[category.id]
+      if (value !== undefined) editCategoryValues[category.id] = String(value)
+    }
+    editSourceMemberId = participant.participantListMemberId ?? ''
+    editMode = sourceList ? 'list' : 'manual'
+    metadataError = ''
+    metadataMessage = ''
+    showMetadataEditor = true
+  }
+
+  function applyUpdatedMetadata(updated: MatchParticipant) {
+    // the update endpoint does not return entered scores, so keep the ones we already have locally until the next full refresh
+    participant = { ...participant, ...updated, scores: participant.scores }
+  }
+
+  async function submitManualEdit() {
+    if (!editLastName.trim() || !editFullName.trim()) return
+    metadataError = ''
+    const categoryValues: Record<string, number> = {}
+    for (const category of matchCategories) {
+      const value = editCategoryValues[category.id]
+      if (value) categoryValues[category.id] = Number(value)
+    }
+    try {
+      const updated = await api.updateMatchParticipant(match.id, participant.id, { participantListMemberId: null, lastName: editLastName.trim(), fullName: editFullName.trim(), federationNumber: editFederationNumber || null, categories: categoryValues })
+      applyUpdatedMetadata(updated)
+      showMetadataEditor = false
+      metadataMessage = labels.participantSaved
+      await onChanged()
+    } catch (error) {
+      metadataError = labelForError(error, labels, 'participantSaveError')
+    }
+  }
+
+  async function submitReplaceFromList() {
+    const member = sourceList?.members.find((item) => item.id === editSourceMemberId)
+    if (!member) return
+    metadataError = ''
+    try {
+      const updated = await api.updateMatchParticipant(match.id, participant.id, { participantListMemberId: member.id, lastName: member.lastName, fullName: member.fullName, federationNumber: member.federationNumber, categories: member.categories })
+      applyUpdatedMetadata(updated)
+      showMetadataEditor = false
+      metadataMessage = labels.participantSaved
+      await onChanged()
+    } catch (error) {
+      metadataError = labelForError(error, labels, 'participantSaveError')
+    }
   }
 
   function scoreFor(end: number, arrow: number) {
@@ -64,13 +148,17 @@
   async function setScore(end: number, arrow: number, keyId: string) {
     const key = keyboardConfig.keyboard.find((item) => item.keyId === keyId)
     if (!key) return
+    // update totals immediately instead of waiting for the round-trip to finish
+    const otherScores = (participant.scores ?? []).filter((score) => !(score.end === end && score.arrow === arrow))
+    participant = { ...participant, scores: [...otherScores, { id: `${participant.id}-${end}-${arrow}`, matchParticipantId: participant.id, end, arrow, keyId: key.keyId, value: key.value }] }
     await api.enterScore(match.id, participant.id, { end, arrow, keyId: key.keyId, value: key.value })
     await onChanged()
   }
 
   async function assignDevice(deviceId: string) {
+    participant = { ...participant, deviceId: deviceId || null }
     await api.assignParticipantDevice(match.id, participant.id, deviceId || null)
-    onChanged()
+    await onChanged()
   }
 
   function bestFillAssignments(total: number): KeyboardKey[] {
@@ -127,13 +215,19 @@
     const assignments = bestFillAssignments(quickTotal)
     if (assignments.length === 0) { quickSetError = labels.templateSaveError; return }
     try {
+      const newScores: ArrowScore[] = []
       let index = 0
       for (let end = 1; end <= match.ends; end++) {
         for (let arrow = 1; arrow <= match.arrowsPerEnd; arrow++) {
           const key = assignments[index]
           index++
-          await api.enterScore(match.id, participant.id, { end, arrow, keyId: key.keyId, value: key.value })
+          newScores.push({ id: `${participant.id}-${end}-${arrow}`, matchParticipantId: participant.id, end, arrow, keyId: key.keyId, value: key.value })
         }
+      }
+      // reflect the new totals and dropdown selections immediately, then reconcile with the server
+      participant = { ...participant, scores: newScores }
+      for (const score of newScores) {
+        await api.enterScore(match.id, participant.id, { end: score.end, arrow: score.arrow, keyId: score.keyId, value: score.value })
       }
       await onChanged()
       quickSetMessage = labels.templateSaved
@@ -161,6 +255,56 @@
 </div>
 
 <section class="panel">
+  <div>
+    <h2>{labels.participantDetailsLabel}</h2>
+    <p class="muted">{participant.federationNumber} / {participant.fullName || participant.lastName}{#if categoryLabel()}<span class="muted">/ {categoryLabel()}</span>{/if}</p>
+    <button class="primary" on:click={() => (showMetadataEditor ? (showMetadataEditor = false) : openMetadataEditor())}>{labels.editParticipantDetails}</button>
+  </div>
+  {#if showMetadataEditor}
+    {#if sourceList}
+      <form class="inline-form">
+        <label>{labels.addModeLabel}
+          <select bind:value={editMode}>
+            <option value="manual">{labels.editModeManual}</option>
+            <option value="list">{labels.editModeReplace}</option>
+          </select>
+        </label>
+      </form>
+    {/if}
+    {#if editMode === 'list' && sourceList}
+      <form class="inline-form" on:submit|preventDefault={submitReplaceFromList}>
+        <label>{labels.selectParticipantLabel}
+          <select bind:value={editSourceMemberId}>
+            <option value="">{labels.selectValue}</option>
+            {#each availableMembers as member}<option value={member.id}>{memberDisplayLabel(member)}</option>{/each}
+          </select>
+        </label>
+        <button class="primary" type="submit" disabled={!editSourceMemberId}>{labels.save}</button>
+        <button type="button" on:click={() => (showMetadataEditor = false)}>{labels.cancel}</button>
+      </form>
+    {:else}
+      <form class="inline-form" on:submit|preventDefault={submitManualEdit}>
+        <label>{labels.lastNameLabel}<input bind:value={editLastName} /></label>
+        <label>{labels.fullNameLabel}<input bind:value={editFullName} /></label>
+        <label>{labels.federationNumberLabel}<input bind:value={editFederationNumber} /></label>
+        {#each matchCategories as category}
+          <label>{category.name}
+            <select bind:value={editCategoryValues[category.id]}>
+              <option value="">{labels.selectValue}</option>
+              {#each [...category.values].sort((a, b) => a.valueId - b.valueId) as value}<option value={String(value.valueId)}>{value.name}</option>{/each}
+            </select>
+          </label>
+        {/each}
+        <button class="primary" type="submit" disabled={!editLastName.trim() || !editFullName.trim()}>{labels.save}</button>
+        <button class="secondary" type="button" on:click={() => (showMetadataEditor = false)}>{labels.cancel}</button>
+      </form>
+    {/if}
+  {/if}
+  {#if metadataError}<p class="error">{metadataError}</p>{/if}
+  {#if metadataMessage}<p class="success">{metadataMessage}</p>{/if}
+</section>
+
+<section class="panel section-gap">
   <label>{labels.assignedDeviceLabel}
     <select value={participant.deviceId ?? ''} on:change={(event) => assignDevice(event.currentTarget.value)}>
       <option value="">{labels.noDevice}</option>
@@ -177,10 +321,7 @@
       <div class="score-summary">
         <span><span class="muted">{labels.endLabel}</span><strong>{endIndex + 1}</strong></span>
         <span><span class="muted">{labels.endScoreLabel}</span><strong>{totalForEnd(endIndex + 1)}</strong></span>
-        <span><span class="muted">{labels.runningTotalLabel}</span><strong>{runningTotal(endIndex + 1)}</strong></span>
-        {#if showGroupRunningTotal}
-          <span><span class="muted">{labels.groupRunningTotalLabel}</span><strong>{groupRunningTotal(endIndex + 1)}</strong></span>
-        {/if}
+        <span><span class="muted">{labels.runningTotalLabel}</span><strong>{runningTotal(endIndex + 1)}{#if showGroupRunningTotal}<span>&nbsp;({groupRunningTotal(endIndex + 1)})</span>{/if}</strong></span>
       </div>
       {#each Array(match.arrowsPerEnd) as _, arrowIndex}
         <label>{labels.arrowLabel} {arrowIndex + 1}

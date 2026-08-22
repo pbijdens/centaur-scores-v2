@@ -91,6 +91,10 @@ export class ApiClient {
     return this.request(`/api/matches/${matchId}/participants`, { method: 'POST', body: JSON.stringify(body) })
   }
 
+  updateMatchParticipant(matchId: string, participantId: string, body: { participantListMemberId?: string | null; lastName: string; fullName: string; federationNumber?: string | null; categories: Record<string, number> }): Promise<MatchParticipant> {
+    return this.request(`/api/matches/${matchId}/participants/${participantId}`, { method: 'PUT', body: JSON.stringify(body) })
+  }
+
   removeMatchParticipant(matchId: string, participantId: string) {
     return this.request(`/api/matches/${matchId}/participants/${participantId}`, { method: 'DELETE' })
   }

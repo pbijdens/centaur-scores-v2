@@ -92,6 +92,7 @@ JWTs are returned by `POST /api/auth/login` and contain the account and active t
 | `POST` | `/api/matches/deactivate-all` | manager | Close all matches in the active tenant. |
 | `GET` | `/api/matches/{id}/participants` | user | List match participants and entered scores. |
 | `POST` | `/api/matches/{id}/participants` | manager | Add a source-list or free participant. |
+| `PUT` | `/api/matches/{id}/participants/{participantId}` | manager | Update a participant's metadata: `{ participantListMemberId?, lastName, fullName, federationNumber?, categories }`. Used to edit details or "replace" the participant with another source-list member. `409` if `participantListMemberId` is already assigned to a different participant in the match. |
 | `DELETE` | `/api/matches/{id}/participants/{participantId}` | manager | Remove a match participant. |
 | `PUT` | `/api/matches/{id}/participants/{participantId}/device` | manager | Assign/unassign the participant to a score device with `{ deviceId }` (`deviceId` may be `null`). Removes the participant from any other device's restricted list. |
 | `POST` | `/api/matches/{id}/participants/{participantId}/scores` | scorekeeper/user | Upsert one arrow score using `{ end, arrow, keyId, value }`. |

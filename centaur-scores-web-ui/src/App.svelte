@@ -274,7 +274,7 @@
         <MatchDevicesView {api} match={currentMatch} labels={t} onBack={() => navigate(`/matches/${currentMatch.id}`)} onChanged={refreshSelectedMatch} />
       {:else if view === 'match-participant' && selectedMatch && selectedParticipant}
         {@const currentMatch = selectedMatch}
-        <MatchParticipantView {api} match={currentMatch} participant={selectedParticipant} {categories} labels={t} onBack={() => navigate(`/matches/${currentMatch.id}`)} onChanged={refreshSelectedMatch} onRemoved={() => navigate(`/matches/${currentMatch.id}`)} />
+        <MatchParticipantView {api} match={currentMatch} participant={selectedParticipant} {categories} {participantLists} labels={t} onBack={() => navigate(`/matches/${currentMatch.id}`)} onChanged={refreshSelectedMatch} onRemoved={() => navigate(`/matches/${currentMatch.id}`)} />
       {:else if view === 'competitions'}
         <CompetitionsView {competitions} {language} labels={t} />
       {:else if view === 'profile'}

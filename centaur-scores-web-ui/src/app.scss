@@ -201,6 +201,8 @@ select:focus {
 
 .app-shell {
   min-height: 100svh;
+  background: radial-gradient(circle at 85% 15%, #{$tint-accent} 0, transparent 32%),
+  #{$color-neutral};
 }
 
 header {
@@ -674,6 +676,7 @@ nav button.active:after {
   }
 }
 
+/*
 @media (prefers-color-scheme: dark) {
   :root {
     --text: #9ca3af;
@@ -692,6 +695,7 @@ nav button.active:after {
     filter: invert(1) brightness(2);
   }
 }
+  */
 
 body {
   margin: 0;

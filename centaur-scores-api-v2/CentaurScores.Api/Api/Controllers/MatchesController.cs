@@ -86,6 +86,22 @@ public sealed class MatchesController(ApplicationDbContext db, ITenantContext te
         return Created($"api/matches/{id}/participants/{participant.Id}", participant);
     }
 
+    [HttpPut("{id:guid}/participants/{participantId:guid}")]
+    public async Task<IActionResult> UpdateParticipant(Guid id, Guid participantId, CreateMatchParticipantRequest request, CancellationToken cancellationToken)
+    {
+        if (!CanManage) return Forbid();
+        var participant = await db.MatchParticipants.SingleOrDefaultAsync(item => item.Id == participantId && item.MatchId == id && item.TenantId == TenantId, cancellationToken);
+        if (participant is null) return NotFound();
+        if (request.ParticipantListMemberId is { } memberId && await db.MatchParticipants.AnyAsync(item => item.MatchId == id && item.Id != participantId && item.ParticipantListMemberId == memberId, cancellationToken)) return Conflict(new { message = "Participant is already assigned." });
+        participant.ParticipantListMemberId = request.ParticipantListMemberId;
+        participant.LastName = request.LastName;
+        participant.FullName = request.FullName;
+        participant.FederationNumber = request.FederationNumber;
+        participant.Categories = request.Categories;
+        await db.SaveChangesAsync(cancellationToken);
+        return Ok(participant);
+    }
+
     [HttpDelete("{id:guid}/participants/{participantId:guid}")]
     public async Task<IActionResult> RemoveParticipant(Guid id, Guid participantId, CancellationToken cancellationToken)
     {
