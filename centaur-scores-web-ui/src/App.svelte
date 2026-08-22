@@ -118,11 +118,15 @@
   function openMatch(match: Match) { navigate(`/matches/${match.id}`) }
 
   async function loadSelectedMatch(id: string) {
-    selectedMatch = await api.fetchMatch(id)
+    const [match, participants] = await Promise.all([
+      api.fetchMatch(id),
+      api.fetchMatchParticipants(id)
+    ])
+    selectedMatch = { ...match, participants }
   }
 
   async function refreshSelectedMatch() {
-    if (selectedMatchId) selectedMatch = await api.fetchMatch(selectedMatchId)
+    if (selectedMatchId) await loadSelectedMatch(selectedMatchId)
   }
 
   function toggleSelectedMatch() {

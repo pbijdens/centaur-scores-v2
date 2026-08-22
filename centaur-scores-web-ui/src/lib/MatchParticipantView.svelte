@@ -10,7 +10,7 @@
   export let categories: Category[]
   export let labels: Record<string, string>
   export let onBack: () => void
-  export let onChanged: () => void
+  export let onChanged: () => void | Promise<void>
   export let onRemoved: () => void
 
   let removeError = ''
@@ -28,6 +28,7 @@
   $: availableKeys = keyboardConfig.keyboard.filter((key) => !disabledKeyIds.has(key.keyId))
   $: devices = match.devices ?? []
   $: totalScore = (participant.scores ?? []).reduce((sum, score) => sum + score.value, 0)
+  $: showGroupRunningTotal = !!match.groupEnds && match.groupEnds > 0 && match.groupEnds < match.ends
 
   function categoryLabel(): string {
     return matchCategories
@@ -40,11 +41,31 @@
     return (participant.scores ?? []).find((score) => score.end === end && score.arrow === arrow)
   }
 
+  function totalForEnd(end: number): number {
+    return totalBetweenEnds(end, end)
+  }
+
+  function totalBetweenEnds(firstEnd: number, lastEnd: number): number {
+    return (participant.scores ?? [])
+      .filter((score) => score.end >= firstEnd && score.end <= lastEnd)
+      .reduce((sum, score) => sum + score.value, 0)
+  }
+
+  function runningTotal(end: number): number {
+    return totalBetweenEnds(1, end)
+  }
+
+  function groupRunningTotal(end: number): number {
+    const groupEnds = match.groupEnds ?? match.ends
+    const firstEnd = Math.floor((end - 1) / groupEnds) * groupEnds + 1
+    return totalBetweenEnds(firstEnd, end)
+  }
+
   async function setScore(end: number, arrow: number, keyId: string) {
     const key = keyboardConfig.keyboard.find((item) => item.keyId === keyId)
     if (!key) return
     await api.enterScore(match.id, participant.id, { end, arrow, keyId: key.keyId, value: key.value })
-    onChanged()
+    await onChanged()
   }
 
   async function assignDevice(deviceId: string) {
@@ -56,6 +77,7 @@
     const totalArrows = match.ends * match.arrowsPerEnd
     if (totalArrows === 0 || total <= 0) return []
 
+    // prefer keys with a numeric label over keys with labels such as X, M, etc. when the value is the same
     const orderedKeys = [...availableKeys]
       .sort((a, b) => {
         if (a.value !== b.value) return a.value - b.value
@@ -85,12 +107,12 @@
     while (arrowsToSet > 0) {
       const averageTarget = pointsLeftToSet / arrowsToSet
       const nextHigher = scoringKeys
-        .filter((key) => key.value > averageTarget)[0]
+        .filter((key) => key.value >= averageTarget)[0]
+
+      // console.log('averageTarget', averageTarget, 'nextHigher', nextHigher)
 
       const selected = nextHigher ?? scoringKeys[scoringKeys.length - 1] // if no higher, pick the highest available
       assignments.push(selected)
-
-      console.log('selected', selected, 'averageTarget', averageTarget, 'pointsLeftToSet', pointsLeftToSet, 'arrowsToSet', arrowsToSet)
 
       pointsLeftToSet -= selected.value
       arrowsToSet -= 1
@@ -103,7 +125,6 @@
     quickSetError = ''
     quickSetMessage = ''
     const assignments = bestFillAssignments(quickTotal)
-    console.log('assignments', assignments);
     if (assignments.length === 0) { quickSetError = labels.templateSaveError; return }
     try {
       let index = 0
@@ -114,8 +135,8 @@
           await api.enterScore(match.id, participant.id, { end, arrow, keyId: key.keyId, value: key.value })
         }
       }
+      await onChanged()
       quickSetMessage = labels.templateSaved
-      onChanged()
     } catch (error) {
       quickSetError = labelForError(error, labels, 'templateSaveError')
     }
@@ -153,7 +174,14 @@
   <p class="muted">{labels.totalScoreLabel}: {totalScore}</p>
   {#each Array(match.ends) as _, endIndex}
     <div class="editor-row wrap">
-      <span class="muted">{labels.endLabel} {endIndex + 1}</span>
+      <div class="score-summary">
+        <span><span class="muted">{labels.endLabel}</span><strong>{endIndex + 1}</strong></span>
+        <span><span class="muted">{labels.endScoreLabel}</span><strong>{totalForEnd(endIndex + 1)}</strong></span>
+        <span><span class="muted">{labels.runningTotalLabel}</span><strong>{runningTotal(endIndex + 1)}</strong></span>
+        {#if showGroupRunningTotal}
+          <span><span class="muted">{labels.groupRunningTotalLabel}</span><strong>{groupRunningTotal(endIndex + 1)}</strong></span>
+        {/if}
+      </div>
       {#each Array(match.arrowsPerEnd) as _, arrowIndex}
         <label>{labels.arrowLabel} {arrowIndex + 1}
           <select value={scoreFor(endIndex + 1, arrowIndex + 1)?.keyId ?? ''} on:change={(event) => setScore(endIndex + 1, arrowIndex + 1, event.currentTarget.value)}>
@@ -194,5 +222,17 @@
 
   .editor-row.wrap {
     flex-wrap: wrap;
+  }
+
+  .score-summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+
+  .score-summary > span {
+    display: grid;
+    gap: 4px;
+    min-width: 96px;
   }
 </style>
