@@ -10,6 +10,8 @@
   import AppHeader from './lib/AppHeader.svelte'
   import CategoriesView from './lib/CategoriesView.svelte'
   import CategoryDetailView from './lib/CategoryDetailView.svelte'
+  import CompetitionDetailView from './lib/CompetitionDetailView.svelte'
+  import CompetitionResultsView from './lib/CompetitionResultsView.svelte'
   import CompetitionsView from './lib/CompetitionsView.svelte'
   import HomeView from './lib/HomeView.svelte'
   import LoginView from './lib/LoginView.svelte'
@@ -60,6 +62,8 @@
   let selectedTemplateId: string | null = null
   let selectedMatchId: string | null = null
   let selectedParticipantId: string | null = null
+  let selectedCompetitionId: string | null = null
+  let selectedCompetition: Competition | null = null
   let narrowcastTenantId: string | null = null
   let narrowcastScope: string | null = null
 
@@ -130,6 +134,25 @@
 
   async function refreshSelectedMatch() {
     if (selectedMatchId) await loadSelectedMatch(selectedMatchId)
+  }
+
+  async function loadSelectedCompetition(id: string) {
+    selectedCompetition = await api.fetchCompetition(id)
+  }
+
+  async function refreshSelectedCompetition() {
+    if (selectedCompetitionId) await loadSelectedCompetition(selectedCompetitionId)
+  }
+
+  function openCompetition(competition: Competition) { navigate(`/competitions/${competition.id}`) }
+
+  async function loadCompetitionsList() {
+    competitions = await api.fetchCompetitions()
+  }
+
+  function onCompetitionDeleted() {
+    navigate('/competitions')
+    loadCompetitionsList()
   }
 
   function toggleSelectedMatch() {
@@ -241,6 +264,10 @@
     selectedMatchId = matchScopedViews.includes(route.view) ? route.matchId ?? null : null
     if (selectedMatchId) loadSelectedMatch(selectedMatchId)
     else selectedMatch = null
+    const competitionScopedViews: View[] = ['competition', 'competition-results']
+    selectedCompetitionId = competitionScopedViews.includes(route.view) ? route.competitionId ?? null : null
+    if (selectedCompetitionId) loadSelectedCompetition(selectedCompetitionId)
+    else selectedCompetition = null
     selectedParticipantId = route.view === 'match-participant' ? route.participantId ?? null : null
     selectedTenantId = route.view === 'tenant' ? route.tenantId ?? null : null
     if (route.view === 'tenants') loadChildTenants()
@@ -268,6 +295,8 @@
   <LiveScoringView tenantId={narrowcastTenantId} scope={narrowcastScope} />
 {:else if view === 'match-qr' && selectedMatch}
   <MatchQrCodesView match={selectedMatch} tenantId={tenant} labels={t} />
+{:else if view === 'competition-results' && selectedCompetitionId}
+  <CompetitionResultsView {api} competitionId={selectedCompetitionId} {language} labels={t} />
 {:else if !loggedIn}
   <LoginView bind:tenant {tenants} {tenantsLoading} {tenantsError} bind:username bind:password {loginError} {language} labels={t} onSubmit={signIn} onLanguageChange={setLanguage} />
 {:else}
@@ -291,7 +320,10 @@
         {@const currentMatch = selectedMatch}
         <MatchParticipantView {api} match={currentMatch} participant={selectedParticipant} {categories} {participantLists} labels={t} onBack={returnToSelectedMatch} onChanged={refreshSelectedMatch} onRemoved={() => navigate(`/matches/${currentMatch.id}`)} />
       {:else if view === 'competitions'}
-        <CompetitionsView {competitions} {language} labels={t} />
+        <CompetitionsView {api} {competitions} {language} labels={t} onOpenCompetition={openCompetition} onChanged={loadCompetitionsList} />
+      {:else if view === 'competition' && selectedCompetition}
+        {@const currentCompetition = selectedCompetition}
+        <CompetitionDetailView {api} competition={currentCompetition} {categories} {matches} {language} labels={t} onBack={() => navigate('/competitions')} onChanged={refreshSelectedCompetition} onDeleted={onCompetitionDeleted} onViewResults={() => window.open(`/competitions/${currentCompetition.id}/results`, '_blank')} />
       {:else if view === 'profile'}
         <ProfileView {api} labels={t} onBack={() => navigate('/')} />
       {:else if view === 'tenants' && isAdmin}

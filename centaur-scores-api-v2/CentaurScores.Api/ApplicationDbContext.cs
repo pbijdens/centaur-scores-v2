@@ -58,6 +58,7 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
         modelBuilder.Entity<Competition>().HasMany(item => item.Rounds).WithOne().HasForeignKey(item => item.CompetitionId).OnDelete(DeleteBehavior.Cascade);
         modelBuilder.Entity<Competition>().HasMany(item => item.ScoringRules).WithOne().HasForeignKey(item => item.CompetitionId).OnDelete(DeleteBehavior.Cascade);
         modelBuilder.Entity<CompetitionRound>().HasMany(item => item.Matches).WithOne().HasForeignKey(item => item.CompetitionRoundId).OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<CompetitionScoreRule>().Property(item => item.SortOrder).HasDefaultValue(0);
     }
 }
 

@@ -180,7 +180,9 @@
       {#each participantLists as list}<option value={list.id}>{list.name}</option>{/each}
     </select>
   </label>
+  <div class="editor-row">
   <label class="checkbox-label"><input type="checkbox" bind:checked={allowFreeParticipants} /> {labels.allowFreeParticipantsLabel}</label>
+  </div>
   <label>{labels.deviceModeLabel}
     <select bind:value={deviceSelectionMode}>
       {#each deviceSelectionModes as mode}<option value={mode}>{modeLabel(mode)}</option>{/each}
@@ -192,7 +194,7 @@
   <h2>{labels.categoryOrderLabel}</h2>
   <p class="muted">{labels.categoryOrderHint}</p>
   <div class="list-panel">
-    {#each orderedCategories as category, index}
+    {#each orderedCategories as category, index (category.id)}
       <div class="editor-row">
         <label class="checkbox-label">
           <input type="checkbox" checked={config.categoryOrder.includes(category.id)} on:change={() => toggleCategory(category.id)} />

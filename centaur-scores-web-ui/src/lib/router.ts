@@ -1,6 +1,6 @@
 import type { View } from './types'
 
-export type Route = { view: View; matchId?: string; tenantId?: string; scope?: string; accountId?: string; categoryId?: string; listId?: string; memberId?: string; templateId?: string; participantId?: string; invalid?: boolean }
+export type Route = { view: View; matchId?: string; tenantId?: string; scope?: string; accountId?: string; categoryId?: string; listId?: string; memberId?: string; templateId?: string; participantId?: string; competitionId?: string; invalid?: boolean }
 
 export function navigateTo(path: string, replace = false) {
   const normalizedPath = path || '/'
@@ -24,7 +24,11 @@ export function resolveRoute(path = location.pathname): Route {
     if (segments[2] === 'participants' && segments[3]) return { view: 'match-participant', matchId: segments[1], participantId: segments[3] }
     return { view: 'match', matchId: segments[1] }
   }
-  if (section === 'competitions') return { view: 'competitions' }
+  if (section === 'competitions') {
+    if (!segments[1]) return { view: 'competitions' }
+    if (segments[2] === 'results') return { view: 'competition-results', competitionId: segments[1] }
+    return { view: 'competition', competitionId: segments[1] }
+  }
   if (section === 'profile') return { view: 'profile' }
   if (section === 'tenants') {
     return segments[1] ? { view: 'tenant', tenantId: segments[1] } : { view: 'tenants' }

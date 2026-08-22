@@ -301,6 +301,11 @@ namespace CentaurScores.Api.Infrastructure.Migrations
                         .HasColumnType("longtext")
                         .HasColumnName("round_ids_json");
 
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int")
+                        .HasColumnName("sort_order")
+                        .HasDefaultValue(0);
+
                     b.Property<Guid>("TenantId")
                         .HasColumnType("char(36)")
                         .HasColumnName("tenant_id");
@@ -445,13 +450,13 @@ namespace CentaurScores.Api.Infrastructure.Migrations
                         .HasColumnType("longtext")
                         .HasColumnName("categories");
 
-                    b.Property<Guid?>("DeviceId")
-                        .HasColumnType("char(36)")
-                        .HasColumnName("device_id");
-
                     b.Property<int?>("DeviceOrder")
                         .HasColumnType("int")
                         .HasColumnName("device_order");
+
+                    b.Property<Guid?>("DeviceId")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("device_id");
 
                     b.Property<string>("FederationNumber")
                         .HasColumnType("longtext")
@@ -513,10 +518,6 @@ namespace CentaurScores.Api.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("longtext")
                         .HasColumnName("name");
-
-                    b.Property<int>("SortOrder")
-                        .HasColumnType("int")
-                        .HasColumnName("sort_order");
 
                     b.Property<Guid?>("ParticipantListId")
                         .HasColumnType("char(36)")
@@ -620,6 +621,10 @@ namespace CentaurScores.Api.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("longtext")
                         .HasColumnName("name");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int")
+                        .HasColumnName("sort_order");
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("char(36)")

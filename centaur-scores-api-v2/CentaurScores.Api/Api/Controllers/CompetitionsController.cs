@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 namespace CentaurScores.Api.Controllers;
 
 [Route("api/competitions")]
-public sealed class CompetitionsController(ApplicationDbContext db, ITenantContext tenantContext) : ApiControllerBase(tenantContext)
+public sealed class CompetitionsController(ApplicationDbContext db, ITenantContext tenantContext, ICompetitionService competitionService) : ApiControllerBase(tenantContext)
 {
     [HttpGet]
     public async Task<IActionResult> List(CancellationToken cancellationToken) => Ok(await db.Competitions.AsNoTracking().Include(item => item.Rounds).Include(item => item.ScoringRules).Where(item => item.TenantId == TenantId).OrderBy(item => item.StartDate).ToListAsync(cancellationToken));
@@ -73,6 +73,35 @@ public sealed class CompetitionsController(ApplicationDbContext db, ITenantConte
         return NoContent();
     }
 
+    [HttpPut("{id:guid}/rounds/{roundId:guid}")]
+    public async Task<IActionResult> UpdateRound(Guid id, Guid roundId, UpdateRoundRequest request, CancellationToken cancellationToken)
+    {
+        if (!CanManage) return Forbid();
+        var round = await db.CompetitionRounds.SingleOrDefaultAsync(item => item.Id == roundId && item.CompetitionId == id && item.TenantId == TenantId, cancellationToken);
+        if (round is null) return NotFound();
+        round.ShortName = request.ShortName;
+        round.LongName = request.LongName;
+        await db.SaveChangesAsync(cancellationToken);
+        return Ok(round);
+    }
+
+    [HttpPut("{id:guid}/rounds/order")]
+    public async Task<IActionResult> ReorderRounds(Guid id, ReorderRoundsRequest request, CancellationToken cancellationToken)
+    {
+        if (!CanManage) return Forbid();
+        var rounds = await db.CompetitionRounds.Where(item => item.CompetitionId == id && item.TenantId == TenantId).OrderBy(item => item.Order).ToListAsync(cancellationToken);
+        if (request.RoundIds.Count != rounds.Count) return BadRequest(new { message = "All rounds must be included." });
+        if (request.RoundIds.Distinct().Count() != request.RoundIds.Count) return BadRequest(new { message = "Duplicate round IDs are not allowed." });
+        var byId = rounds.ToDictionary(item => item.Id, item => item);
+        for (var index = 0; index < request.RoundIds.Count; index++)
+        {
+            if (!byId.TryGetValue(request.RoundIds[index], out var round)) return BadRequest(new { message = "Unknown round ID in reorder request." });
+            round.Order = index;
+        }
+        await db.SaveChangesAsync(cancellationToken);
+        return Ok(rounds.OrderBy(item => item.Order));
+    }
+
     [HttpPost("{id:guid}/rounds/{roundId:guid}/matches")]
     public async Task<IActionResult> AssignMatch(Guid id, Guid roundId, AssignMatchRequest request, CancellationToken cancellationToken)
     {
@@ -100,10 +129,44 @@ public sealed class CompetitionsController(ApplicationDbContext db, ITenantConte
     {
         if (!CanManage) return Forbid();
         if (!await db.Competitions.AnyAsync(item => item.Id == id && item.TenantId == TenantId, cancellationToken)) return NotFound();
-        var rule = new CompetitionScoreRule { Id = Guid.NewGuid(), TenantId = TenantId, CompetitionId = id, Name = request.Name, RoundIdsJson = System.Text.Json.JsonSerializer.Serialize(request.RoundIds), HighestScores = request.HighestScores, MinimumScores = request.MinimumScores, Aggregation = request.Aggregation };
+        var existingSortOrders = await db.CompetitionScoreRules.Where(item => item.CompetitionId == id && item.TenantId == TenantId).Select(item => item.SortOrder).ToListAsync(cancellationToken);
+        var sortOrder = existingSortOrders.Count == 0 ? 0 : existingSortOrders.Max() + 1;
+        var rule = new CompetitionScoreRule { Id = Guid.NewGuid(), TenantId = TenantId, CompetitionId = id, Name = request.Name, RoundIdsJson = System.Text.Json.JsonSerializer.Serialize(request.RoundIds), HighestScores = request.HighestScores, MinimumScores = request.MinimumScores, Aggregation = request.Aggregation, SortOrder = sortOrder };
         db.CompetitionScoreRules.Add(rule);
         await db.SaveChangesAsync(cancellationToken);
         return Created($"api/competitions/{id}/scoring-rules/{rule.Id}", rule);
+    }
+
+    [HttpPut("{id:guid}/scoring-rules/{ruleId:guid}")]
+    public async Task<IActionResult> UpdateRule(Guid id, Guid ruleId, UpdateCompetitionRuleRequest request, CancellationToken cancellationToken)
+    {
+        if (!CanManage) return Forbid();
+        var rule = await db.CompetitionScoreRules.SingleOrDefaultAsync(item => item.Id == ruleId && item.CompetitionId == id && item.TenantId == TenantId, cancellationToken);
+        if (rule is null) return NotFound();
+        rule.Name = request.Name;
+        rule.RoundIdsJson = System.Text.Json.JsonSerializer.Serialize(request.RoundIds);
+        rule.HighestScores = request.HighestScores;
+        rule.MinimumScores = request.MinimumScores;
+        rule.Aggregation = request.Aggregation;
+        await db.SaveChangesAsync(cancellationToken);
+        return Ok(rule);
+    }
+
+    [HttpPut("{id:guid}/scoring-rules/order")]
+    public async Task<IActionResult> ReorderRules(Guid id, ReorderCompetitionRulesRequest request, CancellationToken cancellationToken)
+    {
+        if (!CanManage) return Forbid();
+        var rules = await db.CompetitionScoreRules.Where(item => item.CompetitionId == id && item.TenantId == TenantId).OrderBy(item => item.SortOrder).ToListAsync(cancellationToken);
+        if (request.RuleIds.Count != rules.Count) return BadRequest(new { message = "All scoring rules must be included." });
+        if (request.RuleIds.Distinct().Count() != request.RuleIds.Count) return BadRequest(new { message = "Duplicate scoring rule IDs are not allowed." });
+        var byId = rules.ToDictionary(item => item.Id, item => item);
+        for (var index = 0; index < request.RuleIds.Count; index++)
+        {
+            if (!byId.TryGetValue(request.RuleIds[index], out var rule)) return BadRequest(new { message = "Unknown scoring rule ID in reorder request." });
+            rule.SortOrder = index;
+        }
+        await db.SaveChangesAsync(cancellationToken);
+        return Ok(rules.OrderBy(item => item.SortOrder));
     }
 
     [HttpDelete("{id:guid}/scoring-rules/{ruleId:guid}")]
@@ -120,11 +183,15 @@ public sealed class CompetitionsController(ApplicationDbContext db, ITenantConte
     [HttpGet("{id:guid}/results")]
     public async Task<IActionResult> Results(Guid id, CancellationToken cancellationToken)
     {
-        var competition = await db.Competitions.AsNoTracking().Include(item => item.Rounds).ThenInclude(item => item.Matches).SingleOrDefaultAsync(item => item.Id == id && item.TenantId == TenantId, cancellationToken);
+        var competition = await db.Competitions.AsNoTracking().Include(item => item.Rounds).ThenInclude(item => item.Matches).Include(item => item.ScoringRules).SingleOrDefaultAsync(item => item.Id == id && item.TenantId == TenantId, cancellationToken);
         if (competition is null) return NotFound();
+        var categories = await db.Categories.AsNoTracking().Include(item => item.Values).Where(item => item.TenantId == TenantId).ToListAsync(cancellationToken);
         var matchIds = competition.Rounds.SelectMany(item => item.Matches).Select(item => item.MatchId).Distinct().ToList();
-        var participants = await db.MatchParticipants.AsNoTracking().Include(item => item.Scores).Where(item => matchIds.Contains(item.MatchId) && item.TenantId == TenantId && item.ParticipantListMemberId != null).ToListAsync(cancellationToken);
-        var results = participants.GroupBy(item => item.ParticipantListMemberId).Select(group => new { participantId = group.Key, name = group.First().FullName, total = group.Sum(item => item.Scores.Sum(score => score.Value)), matches = group.Count() }).OrderByDescending(item => item.total).ThenBy(item => item.name).ToList();
-        return Ok(new { competition.Id, competition.Name, results });
+        var matches = await db.Matches.AsNoTracking().Include(item => item.Participants).ThenInclude(item => item.Scores).Where(item => matchIds.Contains(item.Id) && item.TenantId == TenantId).ToListAsync(cancellationToken);
+        var matchesById = matches.ToDictionary(item => item.Id);
+        var matchesByRound = competition.Rounds.ToDictionary(
+            round => round.Id,
+            round => (IReadOnlyList<Match>)round.Matches.Select(item => matchesById.GetValueOrDefault(item.MatchId)).Where(item => item is not null).Cast<Match>().ToList());
+        return Ok(competitionService.BuildResults(competition, categories, matchesByRound));
     }
 }

@@ -157,4 +157,5 @@ public sealed class CompetitionScoreRule : TenantOwnedEntity
     public int HighestScores { get; set; }
     public int MinimumScores { get; set; }
     public string Aggregation { get; set; } = "total";
+    public int SortOrder { get; set; }
 }

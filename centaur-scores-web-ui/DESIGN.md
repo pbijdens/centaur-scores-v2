@@ -86,6 +86,7 @@ This will take me to a page where I can then set up a match template. I can:
   - Only unlisted (ad-hoc match)
 - Select the catgeories for this type of match and place them in the correct order
 - Define the scoring "keyboard"
+- Define an ordered list of standard score-entry devices that are created with each match using the template
 - Define per category rules for which keyboard elements are disabled
   - e.g. For the categorynode "Compound" from the "Discipline" category the value kys with ID '5', '4', '3', '2', and '1' are not available.
 - Define the scoring rules for calculating the match result
@@ -169,35 +170,75 @@ Selecting the function will take the user to the list of competitions.
 
 The order of that list is such that the currently relevant competitions are at the top of the list, visually different from future competitions (shown next) and past competitions (shown last); when start dates overlap, sort order is secondary by name.
 
-I don't see a reason yet to filter the list, but should for consistency allow filtering on past, active, future.
+I don't see a reason yet to filter the list, but should for consistency allow filtering on past, active, future and allow searching on title, as we do for matches.
 
-Selecting a competition takes the user to the competition homepage.
+Selecting a competition takes the user to the competition's homepage.
+
+A user can add a competition by provided the competition's name, start date and end date. After choosing to add the competition, the user is taken to the competition's homepage.
 
 #### UC12 - Deleting a competition
 
-tenant admins can delete competitions from the competitioon homepage. This does require confirmation.
+Tenant admins can delete competitions from the competition homepage. This does require confirmation.
 
 #### UC13 - The competition homepage
 
-Shows the list of rounds (manageable, add, delete)
+Show the list's metadata and allows editing this and storing the result.
+- When the date(s) change it may be required to re-load the list of qualifying matches.
 
-Shows assigned matches per round.
+Shows the list of rounds, in the order defined in the database.
+- Allows adding a round, deleting a round, editing a round and re-ordering a round.
+- When adding or editing a round, the user can change the round's long name and short name.
+- The round list also shows the matches assigned per round.
+- We'll use the same style of list for the rounds as we used for devices in the match view.
+- We'll follow the same pattern for adding matches to a round that we followed for adding match participants to devices, so we have an add butotn that toggles showing a match selection dropdown. In that dropdown matches are sorted by their date(s), newest first. We'll only show matches that have a date that falls within the competition period.
+- Note that matches may be added to the same competition multiple times (in different contexts)
 
-Shows scoring rules in place (editable, manageable)
+Shows the grouping configuration
+- Allows configuring the categories that are used for grouping the competition results by.
 
-Allows
-- Editing metadata and saving edits
-- Deleting the competition for tenant admins only
-- Assigning users as match admins
-- Showing the results by navigating to a **printable** page in a new tab
-  - Results have a header with the current date
-  - Results show scores for all participants for all rounds
-  - Results show the total score for each element in the scoring rules per participant
-  - Results are groups by categories defined in the rules
-  - Results are ordered per group on total score
-    - disqualified participants have a 0 total score and tail the list
-    - disqualified participants do not have a position number
-    - participants with the same score share a position number
+Shows the list of scoring rules that are in place
+- Rules can be added or removed
+- Rules can be re-ordered
+- A rule has a name
+- A rule refers to a subset of all rounds defined (RoundIdsJson)
+- In HighestScores it defines the number of scores that are added to calculate the total score. If there are more than this many non-zero scores in the included rounds, it uses only this many for the calculation. In the result-list the scores that havenot been used are rendered in a strikethrough format.
+- In MinimumScores it defines the minimum number of scores a user should have to qualify for the results at all. Participants with less scores than this will be disqualified for the competition; their scores will be included in the result list, but they will not be assigned a position and will be placed in the results below the lowest qualifying participant in their group.
+- Only participants that are actually in a participant list are included in the results. It does not really matter which list, but ad-hoc participants are not part of the competition result. 
+- In Aggregation it defines how the score for a round is calculated. 
+   - When Aggregation is "f1" then to calculate a round score:
+      - Per match, the results of all participants that match the competition's grouping are selected
+      - These are sorted as they are for UC17, including the tiebreakers
+      - Then each archer that ends on #1 position gets 12 points
+      - ... each archer that ends on #2 position gets 10 points
+      - ... each archer that ends on #3,#4,#5,#6,#7,#8 and #9 position gets 8,7,6,5,4,3 and 2 points respectively
+      - ... all remaining archers with a non-zero score get 1 point
+      - intentionally saying each archer because two archers may be on #1 position, in hwich case we'll skip #2
+      - That point score is the score that's used for the match when calculating the archer's score for that competition rule.
+   - When  Aggregation is "total"
+      - The match's total score is the score for the archer in this competition round
+   - Some participants will parttake in all matches, but most will not. When gathering scores, per participant, per rule, per round store the score. Do not create multiple records for the same paarticipant...
+
+To calculate the result for a group:
+- Add up the score for all scoring rules for all participants in that group
+   - Keep track of the scores for the individual matches though, including information about which ones are not used in the result
+- Order the results descending by that total score
+- If two participants have the same total score, use as tie-breaker
+   - the count over all matches in the competition of the number of times they hit an arrow with an X key-id
+   - then, the count over all matches in the competition of the number of times they hit an arrow with a 10 key id
+   - then, the count over all matches in the competition of the number of times they hit an arrow with a 9 key id
+   - and so on until 1.
+ - If even the number of 1s is identical, the archers are in the same place in the competition.
+ - Assign position numbers using the same algorithm we use for UC17 - Live scoring
+
+The results can be shown by pressing the "Results" button, which will navigate to a **printable** page in a new tab
+  - Results have a header with the current date, ideally on each printed page
+  - Result-rows show the position and the name of the participant and an asterix when participants truly are in the same place
+  - Result-rows show all scores for all participants (with an entry in the participants for the tenant) for all rounds
+  - Result-rows show the total score for each element in the scoring rules per participant
+  - Results are grouped by the categories defined, the groups are presented sorted alphabetically
+  - Results are ordered per group as defined
+    - disqualified participants are put in a list-position as defined before; their total score is shown as 'n/a'
+    - disqualified participants do not have a position number, it renders as '-'
 
 #### UC14 - Profile management
 

@@ -167,7 +167,9 @@
     </select>
   </label>
   {#if hasParticipants}<p class="muted">{labels.participantListLockedHint}</p>{/if}
+  <div class="editor-row">
   <label class="checkbox-label"><input type="checkbox" bind:checked={allowFreeParticipants} /> {labels.allowFreeParticipantsLabel}</label>
+  </div>
   <label>{labels.deviceModeLabel}
     <select bind:value={deviceSelectionMode}>
       {#each deviceSelectionModes as mode}<option value={mode}>{modeLabel(mode)}</option>{/each}

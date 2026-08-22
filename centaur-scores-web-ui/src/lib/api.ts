@@ -1,4 +1,4 @@
-import type { Account, Category, Competition, LiveScoringMatch, LiveScoringPage, Match, MatchParticipant, MatchTemplate, ParticipantList, Profile, ScoreDevice, Tenant } from './types'
+import type { Account, Category, Competition, CompetitionResultsDocument, CompetitionRound, CompetitionScoreRule, LiveScoringMatch, LiveScoringPage, Match, MatchParticipant, MatchTemplate, ParticipantList, Profile, ScoreDevice, Tenant } from './types'
 
 export const apiBase = import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:5080'
 
@@ -69,6 +69,66 @@ export class ApiClient {
 
   fetchCompetitions(): Promise<Competition[]> {
     return this.request('/api/competitions')
+  }
+
+  fetchCompetition(id: string): Promise<Competition> {
+    return this.request(`/api/competitions/${id}`)
+  }
+
+  createCompetition(body: { name: string; startDate: string; endDate: string; groupByCategoryIds: string[] }): Promise<Competition> {
+    return this.request('/api/competitions', { method: 'POST', body: JSON.stringify(body) })
+  }
+
+  updateCompetition(id: string, body: { name: string; startDate: string; endDate: string; groupByCategoryIds: string[] }): Promise<Competition> {
+    return this.request(`/api/competitions/${id}`, { method: 'PUT', body: JSON.stringify(body) })
+  }
+
+  deleteCompetition(id: string) {
+    return this.request(`/api/competitions/${id}`, { method: 'DELETE' })
+  }
+
+  addCompetitionRound(competitionId: string, body: { order: number; shortName: string; longName: string }): Promise<CompetitionRound> {
+    return this.request(`/api/competitions/${competitionId}/rounds`, { method: 'POST', body: JSON.stringify(body) })
+  }
+
+  updateCompetitionRound(competitionId: string, roundId: string, body: { shortName: string; longName: string }): Promise<CompetitionRound> {
+    return this.request(`/api/competitions/${competitionId}/rounds/${roundId}`, { method: 'PUT', body: JSON.stringify(body) })
+  }
+
+  deleteCompetitionRound(competitionId: string, roundId: string) {
+    return this.request(`/api/competitions/${competitionId}/rounds/${roundId}`, { method: 'DELETE' })
+  }
+
+  reorderCompetitionRounds(competitionId: string, roundIds: string[]) {
+    return this.request(`/api/competitions/${competitionId}/rounds/order`, { method: 'PUT', body: JSON.stringify({ roundIds }) })
+  }
+
+  assignMatchToRound(competitionId: string, roundId: string, matchId: string) {
+    return this.request(`/api/competitions/${competitionId}/rounds/${roundId}/matches`, { method: 'POST', body: JSON.stringify({ matchId }) })
+  }
+
+  unassignMatchFromRound(competitionId: string, roundId: string, matchId: string) {
+    return this.request(`/api/competitions/${competitionId}/rounds/${roundId}/matches/${matchId}`, { method: 'DELETE' })
+  }
+
+  addCompetitionRule(competitionId: string, body: { name: string; roundIds: string[]; highestScores: number; minimumScores: number; aggregation: string }): Promise<CompetitionScoreRule> {
+    return this.request(`/api/competitions/${competitionId}/scoring-rules`, { method: 'POST', body: JSON.stringify(body) })
+  }
+
+  updateCompetitionRule(competitionId: string, ruleId: string, body: { name: string; roundIds: string[]; highestScores: number; minimumScores: number; aggregation: string }): Promise<CompetitionScoreRule> {
+    return this.request(`/api/competitions/${competitionId}/scoring-rules/${ruleId}`, { method: 'PUT', body: JSON.stringify(body) })
+  }
+
+  deleteCompetitionRule(competitionId: string, ruleId: string) {
+    return this.request(`/api/competitions/${competitionId}/scoring-rules/${ruleId}`, { method: 'DELETE' })
+  }
+
+  reorderCompetitionRules(competitionId: string, ruleIds: string[]) {
+    return this.request(`/api/competitions/${competitionId}/scoring-rules/order`, { method: 'PUT', body: JSON.stringify({ ruleIds }) })
+  }
+
+  fetchCompetitionResults(competitionId: string): Promise<CompetitionResultsDocument> {
+    return this.request(`/api/competitions/${competitionId}/results`)
   }
 
   updateMatch(id: string, body: MatchInput) {
