@@ -14,7 +14,7 @@
 
 <div class="page-intro">
   <div><p class="eyebrow">{labels.eyebrowTenantHome}</p><h1>{labels.home}</h1><p class="muted">{labels.manage}</p></div>
-  <button class="primary" on:click={() => onNavigate('/matches')}>+ {labels.matches}</button>
+  <button class="primary" on:click={() => onNavigate('/matches')}>{labels.matches}</button>
 </div>
 <div class="dashboard-grid">
   <section class="panel">
@@ -49,7 +49,7 @@
       <button class="text-button" on:click={() => onNavigate('/competitions')}>{labels.seeAll}</button>
     </div>
     {#each competitions.slice(0, 3) as competition}
-      <button class="match-row">
+      <button class="match-row" on:click={() => onNavigate(`/competitions/${competition.id}`)}>
         <span class="competition-icon">◎</span>
         <span><strong>{competition.name}</strong><small>{formatLocalDate(competition.startDate, language)} – {formatLocalDate(competition.endDate, language)}</small></span>
         <span class="arrow">→</span>

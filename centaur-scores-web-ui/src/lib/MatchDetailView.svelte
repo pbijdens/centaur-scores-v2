@@ -70,8 +70,10 @@
     return values ? `${name} (${values})` : name
   }
 
-  function participantTotal(participantId: string): number {
-    return results.find((row) => row.participantId === participantId)?.total ?? 0
+  $: totalsByParticipantId = new Map(results.map((row) => [row.participantId, row.total]))
+
+  function participantTotal(participantId: string, totals: Map<string, number>): number {
+    return totals.get(participantId) ?? 0
   }
 
   function deviceName(deviceId: string | null | undefined): string {
@@ -89,7 +91,7 @@
   }
 
   $: sortedParticipants = [...participants].sort((a, b) => {
-    if (sortBy === 'score') return participantTotal(b.id) - participantTotal(a.id)
+    if (sortBy === 'score') return participantTotal(b.id, totalsByParticipantId) - participantTotal(a.id, totalsByParticipantId)
     return (a.fullName || a.lastName).localeCompare(b.fullName || b.lastName)
   })
 
@@ -270,7 +272,7 @@
         <button class="list-row match-participant-row" on:click={() => onOpenParticipant(participant.id)}>
           <span class="management-icon">◇</span>
           <span class="participant-name"><strong>{participant.fullName || participant.lastName}</strong>{#if categoryLabel(participant.categories)}<span class="member-categories"> ({categoryLabel(participant.categories)})</span>{/if}</span>
-          <strong class="participant-score">{participantTotal(participant.id)}</strong>
+          <strong class="participant-score">{participantTotal(participant.id, totalsByParticipantId)}</strong>
           <span class="arrow">→</span>
         </button>
       {/each}
