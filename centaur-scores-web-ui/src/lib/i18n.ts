@@ -319,7 +319,9 @@ export const labels = {
         resultsPageTitle: 'Competition results',
         totalLabel: 'Total',
         positionLabel: 'Pos',
-        edit: 'Edit'
+        edit: 'Edit',
+        saveCopy: 'Save a copy',
+        competitionCopyError: 'Unable to copy this competition.'
     },
     nl: {
         home: 'Overzicht',
@@ -639,7 +641,9 @@ export const labels = {
         resultsPageTitle: 'Competitieresultaten',
         totalLabel: 'Totaal',
         positionLabel: 'Pos',
-        edit: 'Bewerken'
+        edit: 'Bewerken',
+        saveCopy: 'Kopie opslaan',
+        competitionCopyError: 'Kopiëren van deze competitie is mislukt.'
     }
 } satisfies Record<Language, Record<string, string>>
 

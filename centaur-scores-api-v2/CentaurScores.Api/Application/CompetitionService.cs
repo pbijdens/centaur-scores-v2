@@ -43,8 +43,8 @@ public sealed class CompetitionService(IScoringService scoringService) : ICompet
                 ruleScores[rule.Name] = used.Sum(item => item.Total);
                 usedRoundIdsByRule[rule.Name] = used.Select(item => item.RoundId).ToHashSet();
             }
-            return new CompetitionParticipantResult(participantId, namesByParticipant[participantId], disqualified ? 0 : ruleScores.Values.Sum(), disqualified, ruleScores, usedRoundIdsByRule);
-        }).OrderByDescending(item => item.Disqualified ? -1 : item.Total).ThenBy(item => item.Name).ToList();
+            return new CompetitionParticipantResult(participantId, namesByParticipant[participantId], ruleScores.Values.Sum(), disqualified, ruleScores, usedRoundIdsByRule);
+        }).OrderByDescending(item => item.Disqualified ? int.MinValue : item.Total).ThenByDescending(item => item.Total).ThenBy(item => item.Name).ToList();
     }
 
     public CompetitionResultsDocument BuildResults(Competition competition, IReadOnlyList<Category> categories, IReadOnlyDictionary<Guid, IReadOnlyList<Match>> matchesByRound)
@@ -89,31 +89,40 @@ public sealed class CompetitionService(IScoringService scoringService) : ICompet
             .GroupBy(item => item.Participant.ParticipantListMemberId!.Value)
             .Select(group =>
             {
-                var totalScore = group.Sum(item => scoringService.Calculate(item.Participant, item.Match.ArrowsPerEnd, item.Match.GroupEnds).Total);
-                var totalArrows = group.Sum(item => item.Participant.Scores.Count);
-                var name = group.First().Participant.FullName;
-                var displayName = string.IsNullOrWhiteSpace(name) ? group.First().Participant.LastName : name;
-                return new ParticipantResult(group.Key, displayName, totalScore, totalArrows == 0 ? 0 : (double)totalScore / totalArrows, new Dictionary<int, int>());
+                // A participant is only scored once per round even if assigned to multiple matches in it: take the
+                // earliest-dated match (archers cannot improve an already-recorded result later), and on a tie use
+                // the lower score.
+                var chosen = group
+                    .Select(item => (item.Match, item.Participant, Result: scoringService.Calculate(item.Participant, item.Match.ArrowsPerEnd, item.Match.GroupEnds)))
+                    .OrderBy(item => item.Match.Date)
+                    .ThenBy(item => item.Result.Total)
+                    .First();
+                var name = chosen.Participant.FullName;
+                var displayName = string.IsNullOrWhiteSpace(name) ? chosen.Participant.LastName : name;
+                return new ParticipantResult(group.Key, displayName, chosen.Result.Total, chosen.Result.Average, new Dictionary<int, int>());
             }).ToList();
     }
 
     private IReadOnlyList<ParticipantResult> BuildRoundF1Points(IReadOnlyList<Match> matches, IReadOnlyList<Guid> groupCategoryIds)
     {
-        var totals = new Dictionary<Guid, int>();
-        var names = new Dictionary<Guid, string>();
+        var chosen = new Dictionary<Guid, (Match Match, int RawTotal, int Points, string Name)>();
         foreach (var match in matches)
         {
-            foreach (var (participantId, points) in ComputeMatchF1Points(match, groupCategoryIds))
-            {
-                totals[participantId] = totals.GetValueOrDefault(participantId) + points;
-            }
+            var pointsByParticipant = ComputeMatchF1Points(match, groupCategoryIds);
             foreach (var participant in match.Participants.Where(item => item.ParticipantListMemberId is not null))
             {
+                var participantId = participant.ParticipantListMemberId!.Value;
+                if (!pointsByParticipant.TryGetValue(participantId, out var points)) continue;
+                var rawTotal = scoringService.Calculate(participant, match.ArrowsPerEnd, match.GroupEnds).Total;
                 var displayName = string.IsNullOrWhiteSpace(participant.FullName) ? participant.LastName : participant.FullName;
-                names[participant.ParticipantListMemberId!.Value] = displayName;
+                // Same round, multiple matches: keep only the earliest-dated match's points; on a tie, the lower score.
+                if (!chosen.TryGetValue(participantId, out var existing) || match.Date < existing.Match.Date || (match.Date == existing.Match.Date && rawTotal < existing.RawTotal))
+                {
+                    chosen[participantId] = (match, rawTotal, points, displayName);
+                }
             }
         }
-        return totals.Select(pair => new ParticipantResult(pair.Key, names.GetValueOrDefault(pair.Key, ""), pair.Value, 0, new Dictionary<int, int>())).ToList();
+        return chosen.Select(pair => new ParticipantResult(pair.Key, pair.Value.Name, pair.Value.Points, 0, new Dictionary<int, int>())).ToList();
     }
 
     private Dictionary<Guid, int> ComputeMatchF1Points(Match match, IReadOnlyList<Guid> groupCategoryIds)
@@ -178,7 +187,7 @@ public sealed class CompetitionService(IScoringService scoringService) : ICompet
             index += bucket.Count;
         }
 
-        foreach (var participant in participants.Where(item => item.Disqualified).OrderBy(item => item.Name))
+        foreach (var participant in participants.Where(item => item.Disqualified).OrderByDescending(item => item.Total).ThenBy(item => item.Name))
         {
             entries.Add(BuildEntry(participant, "-", false, totalResultsByRound, rounds));
         }
@@ -196,7 +205,7 @@ public sealed class CompetitionService(IScoringService scoringService) : ICompet
             var used = participant.UsedRoundIdsByRule is null || participant.UsedRoundIdsByRule.Values.Any(set => set.Contains(round.Id));
             roundScores[round.Id] = new CompetitionResultScore(entry.Total, used);
         }
-        return new CompetitionResultEntry(participant.Disqualified ? "-" : position, needsTieBreaker, participant.Name, participant.Disqualified, participant.Disqualified ? null : participant.Total, roundScores, participant.RuleScores);
+        return new CompetitionResultEntry(participant.Disqualified ? "-" : position, needsTieBreaker, participant.Name, participant.Disqualified, participant.Total, roundScores, participant.RuleScores);
     }
 
     private static int[] TieBreakKey(Guid participantId, IReadOnlyDictionary<Guid, Dictionary<string, int>> keyCountsByParticipant)

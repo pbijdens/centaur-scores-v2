@@ -20,7 +20,7 @@ public sealed class CompetitionServiceTests
         };
         var result = new CompetitionService(new ScoringService()).Calculate(competition, results).Single();
         Assert.True(result.Disqualified);
-        Assert.Equal(0, result.Total);
+        Assert.Equal(100, result.Total);
         Assert.Equal(100, result.RuleScores["Score 1"]);
     }
 
@@ -93,5 +93,43 @@ public sealed class CompetitionServiceTests
         var group = Assert.Single(document.Groups);
         Assert.Equal(12, group.Entries.Single(item => item.Name == "A Archer").RuleScores["Points"]);
         Assert.Equal(10, group.Entries.Single(item => item.Name == "B Archer").RuleScores["Points"]);
+    }
+
+    [Fact]
+    public void BuildResults_uses_earliest_match_score_and_lower_score_on_a_date_tie_when_a_round_has_overlapping_matches()
+    {
+        var roundId = Guid.NewGuid();
+        var idEarliestWins = Guid.NewGuid();
+        var idTieWins = Guid.NewGuid();
+
+        MatchParticipant Participant(Guid participantId, string name, int value) => new()
+        {
+            Id = Guid.NewGuid(),
+            ParticipantListMemberId = participantId,
+            FullName = name,
+            Categories = [],
+            Scores = [new ArrowScore { Id = Guid.NewGuid(), KeyId = value.ToString(), Value = value }]
+        };
+
+        var earlierMatch = new Match { Id = Guid.NewGuid(), Date = new DateOnly(2026, 1, 1), ArrowsPerEnd = 1, Participants = [Participant(idEarliestWins, "Early Archer", 5)] };
+        var laterMatch = new Match { Id = Guid.NewGuid(), Date = new DateOnly(2026, 1, 8), ArrowsPerEnd = 1, Participants = [Participant(idEarliestWins, "Early Archer", 9)] };
+        var sameDateHigh = new Match { Id = Guid.NewGuid(), Date = new DateOnly(2026, 2, 1), ArrowsPerEnd = 1, Participants = [Participant(idTieWins, "Tie Archer", 9)] };
+        var sameDateLow = new Match { Id = Guid.NewGuid(), Date = new DateOnly(2026, 2, 1), ArrowsPerEnd = 1, Participants = [Participant(idTieWins, "Tie Archer", 3)] };
+
+        var competition = new Competition
+        {
+            Id = Guid.NewGuid(),
+            Name = "Overlap Cup",
+            ScoringRules = [new CompetitionScoreRule { Id = Guid.NewGuid(), Name = "Total", RoundIdsJson = JsonSerializer.Serialize(new[] { roundId }), HighestScores = 1, MinimumScores = 1, Aggregation = "total" }]
+        };
+
+        var document = new CompetitionService(new ScoringService()).BuildResults(
+            competition,
+            [],
+            new Dictionary<Guid, IReadOnlyList<Match>> { [roundId] = [earlierMatch, laterMatch, sameDateHigh, sameDateLow] });
+
+        var group = Assert.Single(document.Groups);
+        Assert.Equal(5, group.Entries.Single(item => item.Name == "Early Archer").RuleScores["Total"]);
+        Assert.Equal(3, group.Entries.Single(item => item.Name == "Tie Archer").RuleScores["Total"]);
     }
 }

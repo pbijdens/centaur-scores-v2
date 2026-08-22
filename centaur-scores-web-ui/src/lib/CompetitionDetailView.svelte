@@ -14,6 +14,7 @@
   export let onChanged: () => void | Promise<void>
   export let onDeleted: () => void
   export let onViewResults: () => void
+  export let onCopied: (competition: Competition) => void
 
   let name = competition.name
   let startDate = competition.startDate.slice(0, 10)
@@ -23,12 +24,17 @@
   let deleteError = ''
   let roundError = ''
   let ruleError = ''
+  let copyError = ''
 
   let showAddRound = false
   let newRoundShortName = ''
   let newRoundLongName = ''
   let openMatchEditorRoundId: string | null = null
   let pendingMatchSelections: Record<string, string> = {}
+
+  let editingRoundId: string | null = null
+  let editRoundShortName = ''
+  let editRoundLongName = ''
 
   let showAddRule = false
   let newRuleName = ''
@@ -87,6 +93,29 @@
     }
   }
 
+  async function copyCompetition() {
+    copyError = ''
+    try {
+      const copy = await api.createCompetition({ name: `Copy of ${competition.name}`, startDate: competition.startDate, endDate: competition.endDate, groupByCategoryIds })
+      const roundIdMap = new Map<string, string>()
+      for (const round of rounds) {
+        const newRound = await api.addCompetitionRound(copy.id, { order: round.order, shortName: round.shortName, longName: round.longName })
+        roundIdMap.set(round.id, newRound.id)
+        for (const roundMatch of round.matches ?? []) {
+          await api.assignMatchToRound(copy.id, newRound.id, roundMatch.matchId)
+        }
+      }
+      for (const rule of rules) {
+        const oldRoundIds: string[] = JSON.parse(rule.roundIdsJson || '[]')
+        const newRoundIds = oldRoundIds.map((id) => roundIdMap.get(id)).filter((id): id is string => !!id)
+        await api.addCompetitionRule(copy.id, { name: rule.name, roundIds: newRoundIds, highestScores: rule.highestScores, minimumScores: rule.minimumScores, aggregation: rule.aggregation })
+      }
+      onCopied(copy)
+    } catch (error) {
+      copyError = labelForError(error, labels, 'competitionCopyError')
+    }
+  }
+
   async function addRound() {
     if (!newRoundShortName.trim() || !newRoundLongName.trim()) return
     roundError = ''
@@ -128,6 +157,25 @@
     }
   }
 
+  function startEditRound(round: CompetitionRound) {
+    editingRoundId = editingRoundId === round.id ? null : round.id
+    if (editingRoundId === null) return
+    editRoundShortName = round.shortName
+    editRoundLongName = round.longName
+  }
+
+  async function saveRoundEdit(round: CompetitionRound) {
+    if (!editRoundShortName.trim() || !editRoundLongName.trim()) return
+    roundError = ''
+    try {
+      await api.updateCompetitionRound(competition.id, round.id, { shortName: editRoundShortName.trim(), longName: editRoundLongName.trim() })
+      editingRoundId = null
+      await onChanged()
+    } catch (error) {
+      roundError = labelForError(error, labels, 'roundSaveError')
+    }
+  }
+
   async function assignMatch(roundId: string) {
     const matchId = pendingMatchSelections[roundId]
     if (!matchId) return
@@ -135,6 +183,7 @@
     try {
       await api.assignMatchToRound(competition.id, roundId, matchId)
       pendingMatchSelections = { ...pendingMatchSelections, [roundId]: '' }
+      openMatchEditorRoundId = null
       await onChanged()
     } catch (error) {
       roundError = labelForError(error, labels, 'matchAssignError')
@@ -294,15 +343,23 @@
             <button class="icon-button" aria-label={labels.moveUp} disabled={roundIndex === 0} on:click={() => moveRound(round.id, -1)}>↑</button>
             <button class="icon-button" aria-label={labels.moveDown} disabled={roundIndex === rounds.length - 1} on:click={() => moveRound(round.id, 1)}>↓</button>
             <button class="icon-button" aria-label={labels.addMatchToRound} on:click={() => (openMatchEditorRoundId = openMatchEditorRoundId === round.id ? null : round.id)}>+</button>
+            <button class="icon-button" aria-label={labels.edit} aria-expanded={editingRoundId === round.id} on:click={() => startEditRound(round)}>✎</button>
             <button class="icon-button danger-icon-button" aria-label={labels.removeValue} on:click={() => removeRound(round)}>🗑</button>
           </div>
         </div>
+        {#if editingRoundId === round.id}
+          <form class="inline-form" on:submit|preventDefault={() => saveRoundEdit(round)}>
+            <label>{labels.roundShortNameLabel}<input bind:value={editRoundShortName} /></label>
+            <label>{labels.roundLongNameLabel}<input bind:value={editRoundLongName} /></label>
+            <button class="primary" type="submit" disabled={!editRoundShortName.trim() || !editRoundLongName.trim()}>{labels.save}</button>
+          </form>
+        {/if}
         {#if openMatchEditorRoundId === round.id}
           <div class="inline-form participant-add-row">
             <label>{labels.selectMatchLabel}
               <select value={pendingMatchSelections[round.id] ?? ''} on:change={(event) => (pendingMatchSelections = { ...pendingMatchSelections, [round.id]: event.currentTarget.value })}>
                 <option value="">{labels.selectValue}</option>
-                {#each [...eligibleMatches].sort((a, b) => b.date.localeCompare(a.date)) as match}<option value={match.id}>{match.name} ({formatLocalDate(match.date, language)})</option>{/each}
+                {#each [...eligibleMatches].sort((a, b) => a.date.localeCompare(b.date) || a.name.localeCompare(b.name)) as match}<option value={match.id}>{match.name} ({formatLocalDate(match.date, language)})</option>{/each}
               </select>
             </label>
             <button class="primary" on:click={() => assignMatch(round.id)} disabled={!(pendingMatchSelections[round.id] ?? '').trim()}>+ {labels.addMatchToRound}</button>
@@ -395,6 +452,11 @@
     {/each}
   </div>
   {#if ruleError}<p class="error">{ruleError}</p>{/if}
+</section>
+
+<section class="section-gap">
+  <button class="text-button" on:click={copyCompetition}>{labels.saveCopy}</button>
+  {#if copyError}<p class="error">{copyError}</p>{/if}
 </section>
 
 <section class="section-gap">

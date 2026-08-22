@@ -296,7 +296,7 @@
 {:else if view === 'match-qr' && selectedMatch}
   <MatchQrCodesView match={selectedMatch} tenantId={tenant} labels={t} />
 {:else if view === 'competition-results' && selectedCompetitionId}
-  <CompetitionResultsView {api} competitionId={selectedCompetitionId} {language} labels={t} />
+  <CompetitionResultsView {api} competitionId={selectedCompetitionId} tenantLogoUrl={currentTenant?.logoUrl} {language} labels={t} />
 {:else if !loggedIn}
   <LoginView bind:tenant {tenants} {tenantsLoading} {tenantsError} bind:username bind:password {loginError} {language} labels={t} onSubmit={signIn} onLanguageChange={setLanguage} />
 {:else}
@@ -323,7 +323,7 @@
         <CompetitionsView {api} {competitions} {language} labels={t} onOpenCompetition={openCompetition} onChanged={loadCompetitionsList} />
       {:else if view === 'competition' && selectedCompetition}
         {@const currentCompetition = selectedCompetition}
-        <CompetitionDetailView {api} competition={currentCompetition} {categories} {matches} {language} labels={t} onBack={() => navigate('/competitions')} onChanged={refreshSelectedCompetition} onDeleted={onCompetitionDeleted} onViewResults={() => window.open(`/competitions/${currentCompetition.id}/results`, '_blank')} />
+        <CompetitionDetailView {api} competition={currentCompetition} {categories} {matches} {language} labels={t} onBack={() => navigate('/competitions')} onChanged={refreshSelectedCompetition} onDeleted={onCompetitionDeleted} onViewResults={() => window.open(`/competitions/${currentCompetition.id}/results`, '_blank')} onCopied={(copy) => { loadCompetitionsList(); openCompetition(copy) }} />
       {:else if view === 'profile'}
         <ProfileView {api} labels={t} onBack={() => navigate('/')} />
       {:else if view === 'tenants' && isAdmin}

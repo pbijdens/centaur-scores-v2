@@ -6,6 +6,7 @@
 
   export let api: ApiClient
   export let competitionId: string
+  export let tenantLogoUrl: string | null | undefined = undefined
   export let language: Language
   export let labels: Record<string, string>
 
@@ -45,8 +46,11 @@
 {:else}
   <div class="results-page">
     <header class="results-header">
-      <h1>{document_.competitionName}</h1>
-      <p>{formatLocalDate(document_.startDate, language)} – {formatLocalDate(document_.endDate, language)} · {new Date().toLocaleDateString()}</p>
+      {#if tenantLogoUrl}<img class="results-logo" src={tenantLogoUrl} alt="" />{/if}
+      <div class="results-header-text">
+        <h1>{document_.competitionName}</h1>
+        <p>{formatLocalDate(document_.startDate, language)} – {formatLocalDate(document_.endDate, language)} · {new Date().toLocaleDateString()}</p>
+      </div>
     </header>
     {#each document_.groups as group}
       <section class="results-group">
@@ -68,7 +72,7 @@
                 {#each document_.rounds as round}
                   <td class:unused-score={!roundScoreUsed(entry, round.id)}>{roundScoreDisplay(entry, round.id)}</td>
                 {/each}
-                <td>{entry.disqualified ? 'n/a' : entry.total}</td>
+                <td>{entry.total}</td>
               </tr>
             {/each}
           </tbody>
@@ -102,11 +106,29 @@
 
   .results-header {
     display: flex;
-    justify-content: space-between;
-    align-items: baseline;
+    align-items: center;
+    gap: 16px;
     border-bottom: 2px solid #000;
     padding-bottom: 8px;
     margin-bottom: 16px;
+  }
+
+  .results-logo {
+    height: 48px;
+    width: auto;
+    flex: 0 0 auto;
+  }
+
+  .results-header-text {
+    display: flex;
+    flex: 1;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+
+  .results-header h1 {
+    font-size: 22px;
+    margin: 0;
   }
 
   .results-group {

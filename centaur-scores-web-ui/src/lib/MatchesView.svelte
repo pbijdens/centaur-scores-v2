@@ -151,6 +151,10 @@
     text-align: right;
   }
 
+  .list-row .arrow {
+    margin-left: 0;
+  }
+
   .list-row.past {
     opacity: .65;
   }

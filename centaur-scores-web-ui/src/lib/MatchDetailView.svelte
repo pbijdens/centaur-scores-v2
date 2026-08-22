@@ -112,7 +112,7 @@
       results = rows
     } catch { results = [] }
   }
-  loadResults()
+  $: if (match.id) loadResults()
 
   function openResultsScope(scope: string) {
     window.open(`/narrowcast/${tenantId}/${encodeURIComponent(scope)}`, '_blank')
