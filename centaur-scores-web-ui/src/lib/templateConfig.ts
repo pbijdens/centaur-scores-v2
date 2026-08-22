@@ -6,6 +6,7 @@ export const deviceSelectionModes = ['restricted', 'list', 'list-and-free'] as c
 
 export const emptyTemplateConfiguration: TemplateConfiguration = {
   categoryOrder: [],
+  deviceNames: [],
   keyboard: [],
   disabledKeyRules: [],
   scoringRules: [{ type: 'total' }],
@@ -19,6 +20,7 @@ export function parseTemplateConfiguration(json: string): TemplateConfiguration 
     const parsed = JSON.parse(json)
     return {
       categoryOrder: Array.isArray(parsed.categoryOrder) ? parsed.categoryOrder : [],
+      deviceNames: Array.isArray(parsed.deviceNames) ? parsed.deviceNames.filter((name: unknown): name is string => typeof name === 'string') : [],
       keyboard: Array.isArray(parsed.keyboard) ? parsed.keyboard : [],
       disabledKeyRules: Array.isArray(parsed.disabledKeyRules) ? parsed.disabledKeyRules : [],
       scoringRules: Array.isArray(parsed.scoringRules) && parsed.scoringRules.length > 0 ? parsed.scoringRules : [{ type: 'total' }],

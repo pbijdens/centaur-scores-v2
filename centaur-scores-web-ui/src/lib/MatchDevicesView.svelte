@@ -21,6 +21,9 @@
 
   $: devices = [...(match.devices ?? [])].sort((a, b) => (a.sortOrder ?? Number.MAX_SAFE_INTEGER) - (b.sortOrder ?? Number.MAX_SAFE_INTEGER) || a.name.localeCompare(b.name))
   $: participants = match.participants ?? []
+  $: unassignedParticipants = participants
+    .filter((participant) => !participant.deviceId)
+    .sort((a, b) => participantName(a).localeCompare(participantName(b)))
 
   function assignedCount(deviceId: string): number {
     return participants.filter((participant) => participant.deviceId === deviceId).length
@@ -41,12 +44,6 @@
     return participants
       .filter((participant) => participant.deviceId === deviceId)
       .sort((a, b) => (a.deviceOrder ?? Number.MAX_SAFE_INTEGER) - (b.deviceOrder ?? Number.MAX_SAFE_INTEGER) || participantName(a).localeCompare(participantName(b)))
-  }
-
-  function unassignedParticipants(): MatchParticipant[] {
-    return participants
-      .filter((participant) => !participant.deviceId)
-      .sort((a, b) => participantName(a).localeCompare(participantName(b)))
   }
 
   function participantLabel(participant: MatchParticipant): string {
@@ -101,6 +98,9 @@
     assignmentError = ''
     try {
       await api.assignParticipantDevice(match.id, participantId, deviceId)
+      participants = participants.map((participant) =>
+        participant.id === participantId ? { ...participant, deviceId } : participant
+      )
       pendingSelections = { ...pendingSelections, [deviceId]: '' }
       await onChanged()
     } catch (error) {
@@ -181,7 +181,7 @@
           <label>{labels.selectParticipantLabel}
             <select value={pendingSelections[device.id] ?? ''} on:change={(event) => (pendingSelections = { ...pendingSelections, [device.id]: event.currentTarget.value })}>
               <option value="">{labels.selectValue}</option>
-              {#each unassignedParticipants() as participant}<option value={participant.id}>{participantLabel(participant)}</option>{/each}
+              {#each unassignedParticipants as participant (participant.id)}<option value={participant.id}>{participantLabel(participant)}</option>{/each}
             </select>
           </label>
           <button class="primary" on:click={() => addParticipantToDevice(device.id)} disabled={!(pendingSelections[device.id] ?? '').trim()}>+ {labels.addParticipant}</button>

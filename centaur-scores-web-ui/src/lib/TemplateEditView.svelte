@@ -47,6 +47,26 @@
     config.categoryOrder = order
   }
 
+  function addDevice() {
+    config.deviceNames = [...config.deviceNames, '']
+  }
+
+  function renameDevice(index: number, name: string) {
+    config.deviceNames = config.deviceNames.map((currentName, currentIndex) => currentIndex === index ? name : currentName)
+  }
+
+  function removeDevice(index: number) {
+    config.deviceNames = config.deviceNames.filter((_, currentIndex) => currentIndex !== index)
+  }
+
+  function moveDevice(index: number, direction: -1 | 1) {
+    const deviceNames = [...config.deviceNames]
+    const target = index + direction
+    if (target < 0 || target >= deviceNames.length) return
+    ;[deviceNames[index], deviceNames[target]] = [deviceNames[target], deviceNames[index]]
+    config.deviceNames = deviceNames
+  }
+
   function addKey() {
     config.keyboard = [...config.keyboard, { keyId: '', label: '', color: 'Yellow', value: 0 }]
   }
@@ -188,6 +208,23 @@
 </section>
 
 <section class="panel section-gap">
+  <h2>{labels.templateDevicesLabel}</h2>
+  <p class="muted">{labels.templateDevicesHint}</p>
+  {#each config.deviceNames as deviceName, index}
+    <div class="editor-row device-row">
+      <span class="muted device-position">{index + 1}.</span>
+      <label>{labels.deviceNameLabel}<input value={deviceName} on:input={(event) => renameDevice(index, event.currentTarget.value)} /></label>
+      <div class="row-actions">
+        <button class="icon-button move-button" aria-label={labels.moveUp} disabled={index === 0} on:click={() => moveDevice(index, -1)}>▲</button>
+        <button class="icon-button move-button" aria-label={labels.moveDown} disabled={index === config.deviceNames.length - 1} on:click={() => moveDevice(index, 1)}>▼</button>
+        <button class="icon-button danger-icon-button" aria-label={labels.removeValue} on:click={() => removeDevice(index)}>🗑</button>
+      </div>
+    </div>
+  {/each}
+  <button class="primary" on:click={addDevice}>+ {labels.addTemplateDevice}</button>
+</section>
+
+<section class="panel section-gap">
   <h2>{labels.keyboardLabel}</h2>
   <p class="muted">{labels.keyboardHint}</p>
   {#each config.keyboard as key, index}
@@ -310,6 +347,16 @@
     margin-top: 32px;
   }
 
+  .panel > label {
+    min-width: 0;
+  }
+
+  .panel > label input,
+  .panel > label select {
+    width: 100%;
+    max-width: 100%;
+  }
+
   .editor-row {
     display: flex;
     align-items: end;
@@ -337,5 +384,53 @@
 
   .move-button:hover {
     color: var(--green);
+  }
+
+  .device-row label {
+    flex: 1;
+  }
+
+  .device-position {
+    align-self: center;
+    min-width: 2ch;
+  }
+
+  .row-actions {
+    display: flex;
+    gap: 10px;
+  }
+
+  .row-actions .icon-button {
+    display: grid;
+    place-items: center;
+    flex: 0 0 44px;
+    width: 44px;
+    height: 44px;
+    margin-left: 0;
+    padding: 0;
+    border: 1px solid var(--line);
+    background: var(--paper);
+  }
+
+  .row-actions .danger-icon-button:hover {
+    color: #b84232;
+    border-color: #e8755b;
+    background: #fdeeea;
+  }
+
+  @media (max-width: 720px) {
+    .device-row {
+      align-items: stretch;
+      flex-wrap: wrap;
+    }
+
+    .device-row label {
+      flex-basis: calc(100% - 4ch);
+    }
+
+    .row-actions {
+      width: 100%;
+      justify-content: flex-end;
+    }
   }
 </style>

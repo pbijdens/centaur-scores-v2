@@ -55,6 +55,7 @@ export type ScoringRule = { type: 'total' | 'countKey'; keyId?: string }
 export type LiveScopeConfig = { scope: string; groupByCategoryIds: string[]; includeAverage: boolean; includeGroupScores: boolean; includeEqualizers: boolean; includePersonalBest: boolean }
 export type TemplateConfiguration = {
   categoryOrder: string[]
+  deviceNames: string[]
   keyboard: KeyboardKey[]
   disabledKeyRules: DisabledKeyRule[]
   scoringRules: ScoringRule[]

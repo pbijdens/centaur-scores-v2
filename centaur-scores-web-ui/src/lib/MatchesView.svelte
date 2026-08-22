@@ -71,6 +71,9 @@
       if (template) {
         const config = parseTemplateConfiguration(template.configurationJson)
         for (const scope of config.liveScopes) await api.addLiveScope(match.id, scope)
+        for (const deviceName of config.deviceNames.map((name) => name.trim()).filter(Boolean)) {
+          await api.addDevice(match.id, { name: deviceName })
+        }
       }
       newMatchName = ''
       newMatchDate = ''
@@ -143,6 +146,11 @@
 </section>
 
 <style>
+  .list-row .tag {
+    flex: 0 0 72px;
+    text-align: right;
+  }
+
   .list-row.past {
     opacity: .65;
   }

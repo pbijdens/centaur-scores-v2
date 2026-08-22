@@ -10,7 +10,7 @@
   let codes: Record<string, string> = {}
   let generation = 0
 
-  $: devices = match.devices ?? []
+  $: devices = [...(match.devices ?? [])].sort((a, b) => (a.sortOrder ?? Number.MAX_SAFE_INTEGER) - (b.sortOrder ?? Number.MAX_SAFE_INTEGER) || a.name.localeCompare(b.name))
   $: {
     tenantId
     match.id
