@@ -17,6 +17,12 @@ public sealed class PublicScoresController(ApplicationDbContext db) : Controller
     {
         var match = await db.Matches.AsNoTracking().Include(item => item.Participants).Include(item => item.Devices).SingleOrDefaultAsync(item => item.Id == matchId && item.TenantId == tenantId, cancellationToken);
         if (match is null) return NotFound();
-        return Ok(new { match, device = match.Devices.SingleOrDefault(item => item.Id == deviceId), participants = match.Participants.Where(item => item.DeviceId == deviceId || item.DeviceId == null) });
+        var participants = match.Participants
+            .Where(item => item.DeviceId == deviceId || item.DeviceId == null)
+            .OrderBy(item => item.DeviceId == deviceId ? 0 : 1)
+            .ThenBy(item => item.DeviceId == deviceId ? item.DeviceOrder : int.MaxValue)
+            .ThenBy(item => item.LastName)
+            .ToList();
+        return Ok(new { match, device = match.Devices.SingleOrDefault(item => item.Id == deviceId), participants });
     }
 }

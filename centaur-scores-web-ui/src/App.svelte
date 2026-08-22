@@ -271,7 +271,7 @@
         <MatchMetadataEditView {api} match={currentMatch} {categories} {participantLists} labels={t} onBack={() => navigate(`/matches/${currentMatch.id}`)} onSaved={() => navigate(`/matches/${currentMatch.id}`)} onDeleted={onMatchDeleted} />
       {:else if view === 'match-devices' && selectedMatch}
         {@const currentMatch = selectedMatch}
-        <MatchDevicesView {api} match={currentMatch} labels={t} onBack={() => navigate(`/matches/${currentMatch.id}`)} onChanged={refreshSelectedMatch} />
+        <MatchDevicesView {api} match={currentMatch} {categories} labels={t} onBack={() => navigate(`/matches/${currentMatch.id}`)} onChanged={refreshSelectedMatch} />
       {:else if view === 'match-participant' && selectedMatch && selectedParticipant}
         {@const currentMatch = selectedMatch}
         <MatchParticipantView {api} match={currentMatch} participant={selectedParticipant} {categories} {participantLists} labels={t} onBack={() => navigate(`/matches/${currentMatch.id}`)} onChanged={refreshSelectedMatch} onRemoved={() => navigate(`/matches/${currentMatch.id}`)} />

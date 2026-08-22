@@ -93,6 +93,7 @@ public sealed class MatchParticipant : TenantOwnedEntity
     public string? FederationNumber { get; set; }
     public Dictionary<Guid, int> Categories { get; set; } = [];
     public Guid? DeviceId { get; set; }
+    public int? DeviceOrder { get; set; }
     public List<ArrowScore> Scores { get; set; } = [];
 }
 
@@ -109,6 +110,7 @@ public sealed class ScoreDevice : TenantOwnedEntity
 {
     public Guid MatchId { get; init; }
     public string Name { get; set; } = "";
+    public int SortOrder { get; set; }
 }
 
 public sealed class LiveScoreScope : TenantOwnedEntity

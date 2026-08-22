@@ -29,10 +29,11 @@ export type MatchParticipant = {
   federationNumber?: string | null
   categories: Record<string, number>
   deviceId?: string | null
+  deviceOrder?: number | null
   scores?: ArrowScore[]
 }
 export type ArrowScore = { id: string; matchParticipantId: string; end: number; arrow: number; keyId: string; value: number }
-export type ScoreDevice = { id: string; matchId: string; name: string }
+export type ScoreDevice = { id: string; matchId: string; name: string; sortOrder?: number }
 export type LiveScoreScope = { id: string; matchId: string; scope: string; groupByCategoryIdsJson: string; includeAverage: boolean; includeGroupScores: boolean; includeEqualizers: boolean; includePersonalBest: boolean }
 export type Competition = { id: string; name: string; startDate: string; endDate: string; rounds?: unknown[]; roundCount?: number }
 export type Profile = { id: string; username: string; displayName?: string | null; email?: string | null; authorization: string }

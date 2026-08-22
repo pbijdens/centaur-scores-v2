@@ -17,6 +17,8 @@ public sealed record CreateMatchParticipantRequest(Guid? ParticipantListMemberId
 public sealed record EnterScoreRequest(int End, int Arrow, string KeyId, int Value);
 public sealed record CreateDeviceRequest(string Name);
 public sealed record AssignParticipantDeviceRequest(Guid? DeviceId);
+public sealed record ReorderDevicesRequest(List<Guid> DeviceIds);
+public sealed record ReorderDeviceParticipantsRequest(List<Guid> ParticipantIds);
 public sealed record CreateScopeRequest(string Scope, List<Guid> GroupByCategoryIds, bool IncludeAverage, bool IncludeGroupScores, bool IncludeEqualizers, bool IncludePersonalBest);
 public sealed record CreateCompetitionRequest(string Name, DateOnly StartDate, DateOnly EndDate, List<Guid> GroupByCategoryIds);
 public sealed record CreateRoundRequest(int Order, string ShortName, string LongName);

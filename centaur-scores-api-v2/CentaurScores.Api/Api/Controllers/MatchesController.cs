@@ -70,7 +70,7 @@ public sealed class MatchesController(ApplicationDbContext db, ITenantContext te
     }
 
     [HttpGet("{id:guid}/participants")]
-    public async Task<IActionResult> Participants(Guid id, CancellationToken cancellationToken) => Ok(await db.MatchParticipants.AsNoTracking().Include(item => item.Scores).Where(item => item.MatchId == id && item.TenantId == TenantId).OrderBy(item => item.LastName).ToListAsync(cancellationToken));
+    public async Task<IActionResult> Participants(Guid id, CancellationToken cancellationToken) => Ok(await db.MatchParticipants.AsNoTracking().Include(item => item.Scores).Where(item => item.MatchId == id && item.TenantId == TenantId).OrderBy(item => item.DeviceId).ThenBy(item => item.DeviceOrder).ThenBy(item => item.LastName).ToListAsync(cancellationToken));
 
     [HttpPost("{id:guid}/participants")]
     public async Task<IActionResult> AddParticipant(Guid id, CreateMatchParticipantRequest request, CancellationToken cancellationToken)
@@ -155,10 +155,28 @@ public sealed class MatchesController(ApplicationDbContext db, ITenantContext te
     {
         if (!CanManage) return Forbid();
         if (!await db.Matches.AnyAsync(item => item.Id == id && item.TenantId == TenantId, cancellationToken)) return NotFound();
-        var device = new ScoreDevice { Id = Guid.NewGuid(), TenantId = TenantId, MatchId = id, Name = request.Name };
+        var nextOrder = (await db.ScoreDevices.Where(item => item.MatchId == id && item.TenantId == TenantId).MaxAsync(item => (int?)item.SortOrder, cancellationToken) ?? -1) + 1;
+        var device = new ScoreDevice { Id = Guid.NewGuid(), TenantId = TenantId, MatchId = id, Name = request.Name, SortOrder = nextOrder };
         db.ScoreDevices.Add(device);
         await db.SaveChangesAsync(cancellationToken);
         return Created($"api/matches/{id}/devices/{device.Id}", device);
+    }
+
+    [HttpPut("{id:guid}/devices/order")]
+    public async Task<IActionResult> ReorderDevices(Guid id, ReorderDevicesRequest request, CancellationToken cancellationToken)
+    {
+        if (!CanManage) return Forbid();
+        var devices = await db.ScoreDevices.Where(item => item.MatchId == id && item.TenantId == TenantId).OrderBy(item => item.SortOrder).ToListAsync(cancellationToken);
+        if (request.DeviceIds.Count != devices.Count) return BadRequest(new { message = "All devices must be included." });
+        if (request.DeviceIds.Distinct().Count() != request.DeviceIds.Count) return BadRequest(new { message = "Duplicate device IDs are not allowed." });
+        var byId = devices.ToDictionary(item => item.Id, item => item);
+        for (var index = 0; index < request.DeviceIds.Count; index++)
+        {
+            if (!byId.TryGetValue(request.DeviceIds[index], out var device)) return BadRequest(new { message = "Unknown device ID in reorder request." });
+            device.SortOrder = index;
+        }
+        await db.SaveChangesAsync(cancellationToken);
+        return Ok(devices.OrderBy(item => item.SortOrder));
     }
 
     [HttpPost("{id:guid}/live-scopes")]
@@ -179,9 +197,55 @@ public sealed class MatchesController(ApplicationDbContext db, ITenantContext te
         var participant = await db.MatchParticipants.SingleOrDefaultAsync(item => item.Id == participantId && item.MatchId == id && item.TenantId == TenantId, cancellationToken);
         if (participant is null) return NotFound();
         if (request.DeviceId is { } deviceId && !await db.ScoreDevices.AnyAsync(item => item.Id == deviceId && item.MatchId == id && item.TenantId == TenantId, cancellationToken)) return NotFound();
+        if (request.DeviceId is null)
+        {
+            participant.DeviceId = null;
+            participant.DeviceOrder = null;
+            await db.SaveChangesAsync(cancellationToken);
+            return Ok(participant);
+        }
+
+        var isSameDevice = participant.DeviceId == request.DeviceId;
         participant.DeviceId = request.DeviceId;
+        if (!isSameDevice)
+        {
+            var nextOrder = (await db.MatchParticipants
+                .Where(item => item.MatchId == id && item.TenantId == TenantId && item.DeviceId == request.DeviceId)
+                .MaxAsync(item => (int?)item.DeviceOrder, cancellationToken) ?? -1) + 1;
+            participant.DeviceOrder = nextOrder;
+        }
+        else if (participant.DeviceOrder is null)
+        {
+            participant.DeviceOrder = 0;
+        }
         await db.SaveChangesAsync(cancellationToken);
         return Ok(participant);
+    }
+
+    [HttpPut("{id:guid}/devices/{deviceId:guid}/participants/order")]
+    public async Task<IActionResult> ReorderDeviceParticipants(Guid id, Guid deviceId, ReorderDeviceParticipantsRequest request, CancellationToken cancellationToken)
+    {
+        if (!CanManage) return Forbid();
+        if (!await db.ScoreDevices.AnyAsync(item => item.Id == deviceId && item.MatchId == id && item.TenantId == TenantId, cancellationToken)) return NotFound();
+
+        var assignedParticipants = await db.MatchParticipants
+            .Where(item => item.MatchId == id && item.TenantId == TenantId && item.DeviceId == deviceId)
+            .OrderBy(item => item.DeviceOrder)
+            .ThenBy(item => item.LastName)
+            .ToListAsync(cancellationToken);
+
+        if (request.ParticipantIds.Count != assignedParticipants.Count) return BadRequest(new { message = "All assigned participants must be included." });
+        if (request.ParticipantIds.Distinct().Count() != request.ParticipantIds.Count) return BadRequest(new { message = "Duplicate participant IDs are not allowed." });
+
+        var byId = assignedParticipants.ToDictionary(item => item.Id, item => item);
+        for (var index = 0; index < request.ParticipantIds.Count; index++)
+        {
+            if (!byId.TryGetValue(request.ParticipantIds[index], out var participant)) return BadRequest(new { message = "Unknown participant ID in reorder request." });
+            participant.DeviceOrder = index;
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+        return Ok(assignedParticipants.OrderBy(item => item.DeviceOrder));
     }
 
     [HttpDelete("{id:guid}/devices/{deviceId:guid}")]

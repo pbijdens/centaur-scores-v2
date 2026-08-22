@@ -99,6 +99,8 @@ JWTs are returned by `POST /api/auth/login` and contain the account and active t
 | `GET` | `/api/matches/{id}/results` | user | Return ranked match results with totals, averages, and groups. |
 | `GET` | `/api/matches/{id}/export.csv` | user | Download federation number, name, and total score CSV. |
 | `POST` | `/api/matches/{id}/devices` | manager | Add a score-entry device with `{ name }`. Which participants a device may select comes from the match's `deviceSelectionMode`, not the device itself. |
+| `PUT` | `/api/matches/{id}/devices/order` | manager | Persist device display/selection order with `{ deviceIds: Guid[] }` (all devices must be included). |
+| `PUT` | `/api/matches/{id}/devices/{deviceId}/participants/order` | manager | Persist the selected participant order for one device with `{ participantIds: Guid[] }` (all participants currently assigned to that device must be included). |
 | `DELETE` | `/api/matches/{id}/devices/{deviceId}` | manager | Remove a score-entry device. |
 | `POST` | `/api/matches/{id}/live-scopes` | manager | Configure a live score scope and display fields. |
 | `DELETE` | `/api/matches/{id}/live-scopes/{scopeId}` | manager | Remove a live score scope. |

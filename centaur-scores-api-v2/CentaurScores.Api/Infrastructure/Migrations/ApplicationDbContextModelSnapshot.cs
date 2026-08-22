@@ -449,6 +449,10 @@ namespace CentaurScores.Api.Infrastructure.Migrations
                         .HasColumnType("char(36)")
                         .HasColumnName("device_id");
 
+                    b.Property<int?>("DeviceOrder")
+                        .HasColumnType("int")
+                        .HasColumnName("device_order");
+
                     b.Property<string>("FederationNumber")
                         .HasColumnType("longtext")
                         .HasColumnName("federation_number");
@@ -509,6 +513,10 @@ namespace CentaurScores.Api.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("longtext")
                         .HasColumnName("name");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int")
+                        .HasColumnName("sort_order");
 
                     b.Property<Guid?>("ParticipantListId")
                         .HasColumnType("char(36)")

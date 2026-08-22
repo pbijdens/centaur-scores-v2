@@ -8,10 +8,23 @@
   export let labels: Record<string, string>
 
   let codes: Record<string, string> = {}
+  let generation = 0
 
   $: devices = match.devices ?? []
+  $: {
+    tenantId
+    match.id
+    devices
+    void generateCodes()
+  }
 
   async function generateCodes() {
+    const currentGeneration = ++generation
+    if (devices.length === 0) {
+      codes = {}
+      return
+    }
+
     const entries = await Promise.all(
       devices.map(async (device) => {
         const url = scorekeeperUrl(tenantId, match.id, device.id)
@@ -19,9 +32,9 @@
         return [device.id, dataUrl] as const
       })
     )
+    if (currentGeneration !== generation) return
     codes = Object.fromEntries(entries)
   }
-  generateCodes()
 </script>
 
 <svelte:head>
@@ -35,7 +48,11 @@
   {#each devices as device}
     <div class="qr-block">
       <p class="qr-match-name">{match.name}</p>
-      <img src={codes[device.id]} alt={device.name} />
+      {#if codes[device.id]}
+        <img src={codes[device.id]} alt={device.name} />
+      {:else}
+        <div class="qr-placeholder" aria-label="Loading QR code"></div>
+      {/if}
       <p class="qr-device-name">{device.name}</p>
     </div>
   {/each}
@@ -53,7 +70,7 @@
   .qr-page {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 24px;
+    gap: 256px;
     padding: 24px;
     max-width: 900px;
     margin: 0 auto;
@@ -91,9 +108,27 @@
     height: auto;
   }
 
+  .qr-placeholder {
+    width: 100%;
+    max-width: 320px;
+    aspect-ratio: 1;
+    border: 1px solid #bbb;
+    background: repeating-linear-gradient(
+      45deg,
+      #f2f2f2,
+      #f2f2f2 12px,
+      #e8e8e8 12px,
+      #e8e8e8 24px
+    );
+  }
+
   @media print {
     .qr-toolbar {
       display: none;
+    }
+
+    .qr-page {
+      gap: 56px;
     }
   }
 </style>

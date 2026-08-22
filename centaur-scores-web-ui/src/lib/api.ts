@@ -115,6 +115,14 @@ export class ApiClient {
     return this.request(`/api/matches/${matchId}/devices`, { method: 'POST', body: JSON.stringify(body) })
   }
 
+  reorderDevices(matchId: string, deviceIds: string[]) {
+    return this.request(`/api/matches/${matchId}/devices/order`, { method: 'PUT', body: JSON.stringify({ deviceIds }) })
+  }
+
+  reorderDeviceParticipants(matchId: string, deviceId: string, participantIds: string[]) {
+    return this.request(`/api/matches/${matchId}/devices/${deviceId}/participants/order`, { method: 'PUT', body: JSON.stringify({ participantIds }) })
+  }
+
   deleteDevice(matchId: string, deviceId: string) {
     return this.request(`/api/matches/${matchId}/devices/${deviceId}`, { method: 'DELETE' })
   }
