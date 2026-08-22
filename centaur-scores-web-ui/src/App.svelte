@@ -13,6 +13,7 @@
   import CompetitionsView from './lib/CompetitionsView.svelte'
   import HomeView from './lib/HomeView.svelte'
   import LoginView from './lib/LoginView.svelte'
+  import LiveScoringView from './lib/LiveScoringView.svelte'
   import MatchDetailView from './lib/MatchDetailView.svelte'
   import MatchDevicesView from './lib/MatchDevicesView.svelte'
   import MatchesView from './lib/MatchesView.svelte'
@@ -59,6 +60,8 @@
   let selectedTemplateId: string | null = null
   let selectedMatchId: string | null = null
   let selectedParticipantId: string | null = null
+  let narrowcastTenantId: string | null = null
+  let narrowcastScope: string | null = null
 
   $: t = translationsFor(language)
   $: isAdmin = profile?.authorization === 'Administrator'
@@ -146,6 +149,12 @@
     if (selectedMatchId) navigate(`/matches/${selectedMatchId}/participants/${participantId}`)
   }
 
+  function returnToSelectedMatch() {
+    if (!selectedMatchId) return
+    navigate(`/matches/${selectedMatchId}`)
+    window.location.reload()
+  }
+
   function onMatchDeleted() {
     navigate('/matches')
     loadMatchesList()
@@ -226,6 +235,8 @@
   function applyRouteResult(route: ReturnType<typeof resolveRoute>) {
     if (route.invalid) { navigate('/', true); return }
     view = route.view
+    narrowcastTenantId = route.view === 'narrowcast' ? route.tenantId ?? null : null
+    narrowcastScope = route.view === 'narrowcast' ? route.scope ?? null : null
     const matchScopedViews: View[] = ['match', 'match-metadata', 'match-devices', 'match-qr', 'match-participant']
     selectedMatchId = matchScopedViews.includes(route.view) ? route.matchId ?? null : null
     if (selectedMatchId) loadSelectedMatch(selectedMatchId)
@@ -245,13 +256,17 @@
     const handlePopState = () => applyRoute()
     window.addEventListener('popstate', handlePopState)
     applyRoute()
-    loadTenants()
-    if (loggedIn) loadData()
+    if (view !== 'narrowcast') {
+      loadTenants()
+      if (loggedIn) loadData()
+    }
     return () => window.removeEventListener('popstate', handlePopState)
   })
 </script>
 
-{#if view === 'match-qr' && selectedMatch}
+{#if view === 'narrowcast' && narrowcastTenantId && narrowcastScope}
+  <LiveScoringView tenantId={narrowcastTenantId} scope={narrowcastScope} />
+{:else if view === 'match-qr' && selectedMatch}
   <MatchQrCodesView match={selectedMatch} tenantId={tenant} labels={t} />
 {:else if !loggedIn}
   <LoginView bind:tenant {tenants} {tenantsLoading} {tenantsError} bind:username bind:password {loginError} {language} labels={t} onSubmit={signIn} onLanguageChange={setLanguage} />
@@ -274,7 +289,7 @@
         <MatchDevicesView {api} match={currentMatch} {categories} labels={t} onBack={() => navigate(`/matches/${currentMatch.id}`)} onChanged={refreshSelectedMatch} />
       {:else if view === 'match-participant' && selectedMatch && selectedParticipant}
         {@const currentMatch = selectedMatch}
-        <MatchParticipantView {api} match={currentMatch} participant={selectedParticipant} {categories} {participantLists} labels={t} onBack={() => navigate(`/matches/${currentMatch.id}`)} onChanged={refreshSelectedMatch} onRemoved={() => navigate(`/matches/${currentMatch.id}`)} />
+        <MatchParticipantView {api} match={currentMatch} participant={selectedParticipant} {categories} {participantLists} labels={t} onBack={returnToSelectedMatch} onChanged={refreshSelectedMatch} onRemoved={() => navigate(`/matches/${currentMatch.id}`)} />
       {:else if view === 'competitions'}
         <CompetitionsView {competitions} {language} labels={t} />
       {:else if view === 'profile'}

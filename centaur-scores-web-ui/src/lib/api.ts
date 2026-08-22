@@ -1,4 +1,4 @@
-import type { Account, Category, Competition, Match, MatchParticipant, MatchTemplate, ParticipantList, Profile, ScoreDevice, Tenant } from './types'
+import type { Account, Category, Competition, LiveScoringMatch, LiveScoringPage, Match, MatchParticipant, MatchTemplate, ParticipantList, Profile, ScoreDevice, Tenant } from './types'
 
 export const apiBase = import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:5080'
 
@@ -268,6 +268,18 @@ export async function fetchTenants(): Promise<Tenant[]> {
 
 export async function login(username: string, password: string, tenantId: string): Promise<{ token: string }> {
   const response = await fetch(`${apiBase}/api/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password, tenantId }) })
+  if (!response.ok) throw await readApiError(response)
+  return response.json()
+}
+
+export async function fetchLiveScoringMatches(tenantId: string, scope: string): Promise<LiveScoringMatch[]> {
+  const response = await fetch(`${apiBase}/live-scoring/match/${encodeURIComponent(tenantId)}/${encodeURIComponent(scope)}`)
+  if (!response.ok) throw await readApiError(response)
+  return response.json()
+}
+
+export async function fetchLiveScoringPage(tenantId: string, scope: string, matchId: string): Promise<LiveScoringPage> {
+  const response = await fetch(`${apiBase}/live-scoring/match/${encodeURIComponent(tenantId)}/${encodeURIComponent(scope)}/${encodeURIComponent(matchId)}`)
   if (!response.ok) throw await readApiError(response)
   return response.json()
 }

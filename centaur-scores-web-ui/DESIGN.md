@@ -237,6 +237,106 @@ At the top of the list, consistent with the other lists in the system there is a
 Note that errors from the UI should be coded, and the code should determine which text is shown so the UI can display an appropriate error message. This should also be done for login and documented in our memory both on this side as well as on the API side.
 
 
+#### UC17 - Live scoring
+
+Note: Two special endpoints, free of authorization, exists on the backend:
+GET /live-scoring/match/{tenant-id}/{scope} that returns a list of all active matches for that scope, for each match the match ID, the date and the name are returned.
+GET /live-scoring/match/{tenant-id}/{scope}/{match-id} that returns the live-score data for the match given the scope.
+
+As a user (or narrowcasting system) from a web-browser I can navigate to the web-ui at the relative url `/narrowcast/{tenant-id}/{scope}` where `{tenant-id}` identifies the tenant and `{scope}` is a text-string.
+
+When I do so, then the system will check if there are any currently live (active) matches that have rules for the specified scope.
+
+*START* The system will use the `GET /live-scoring/match/{tenant-id}/{scope}` endpoint to load the list of active matches.
+
+- If there are no matches then the system will display a simple message on a white background "There are currently no active sessions. Will check again in {time remaining} seconds." where {time remaining} starts at 30. When the timer reaches zero, will go to *START*, check again etc..
+- If there are one or more active matches the system will display a result page for each of those, one at a time, switching to the next one when the current page times out. 
+- The `GET /live-scoring/match/{tenant-id}/{scope}/{match-id}` endpoint will return how long the page should be displayed as well as a list of results to display.
+   - When the end of the list is reached, the system will go to *START*, re-load the list, display, and so on. 
+
+The result-page rendering:
+- A separate css class will be used for the .live-scoring page.
+- The result-page will be displayed full screen inside the browser window, it will always without scroll bars and will not be scrollable.
+- The page will have a white background.
+- At the bottom of the page there will be a "progress bar" of very limited height showing how much of the current page timeout has passed (no text)
+- At the top of the page there is a full width header, vertically filling exactly about 6% of the available vertical space.
+   - The header shows on the left the tenant logo and name
+   - The header shows on the right the match date
+   - The header shows in the middle the match's name 
+- When in landscape mode, the page will have 3 columns. When in portrait mode the page will have 2 columns.
+   - The fill-direction of the page is to first fill a column entirely then move to the next column
+   - A column will never end with a block header
+   - The page will be filled block by block. Each block is built as follows:
+      - The name of the block
+      - The entries are shown in multiple columns:
+         - Leftmost in a fixed-width column the entry position
+            - If the entry is marked as as `.needsTieBreaker` then the position number is followed by a *
+         - Then one, two or three lines of data; filling all available space horizontally
+            - Line 1 is rendered bold and shows `.line1`
+            - Line 2 is rendered in a smaller font, non-bold showing `.line2` or not shown then .line2 is empty.
+            - Line 3 is rendered in a smaller font, non-bold showing `.line3` or not shown then .line3 is empty.
+         - Then in a smaller font the `.average` - but only if not `null`
+         - Finally the `.score` value.
+     - A column must never end with a header.
+     - Headers with no entries are not rendered.
+   - Font sizes should be adjusted to the screen size so generally 50 entries with typiclaly 2 lines divided over 10 groups should fit on the screen.
+      - This means on portrait per column roughly 25 entries with 2 lines and 5 group headers and on landscape roughly 33 entries and 3 headers per column (so based on those numbers calculate font size, line height and block height for the entries, headers with whitespace)
+ - A data model sample for the score endpoint therefore is:
+   ```JSON
+   {
+      "timeout": "15",
+      "logo": "(the logo-image)",
+      "tenant": "Name of the Tenant",
+      "matchName": "Name of the Match",
+      "matchDate": "2027-09-01",
+      "blocks": [
+         {
+            "name": "Recurve, Dames, Klasse A",
+            "entries": {
+               {
+                  "position": 1,
+                  "needsTieBreaker": false,
+                  "line1": "Pieter-Bas IJdens",
+                  "line2": "270,187 | 8x10, 7x9",
+                  "average": 9.12,
+                  "arrows": 45,
+                  "score": 457
+               },
+               {
+                  "position": 2,
+                  "needsTieBreaker": true,
+                  "line1": "Bob IJdens",
+                  "line2": "270 180 | 9x10, 5x9",
+                  "line3": "Personal best",
+                  "average": 9.0,
+                  "arrows": 45,
+                  "score": 400
+               }
+            }
+         }
+      ]
+   }
+   ```
+
+The `/live-scoring/match/{tenant-id}/{scope}/{match-id}` endpoint should be built in such a way that it follows the rules defined for that live score template. The algorithm to get to the grouped entries should be:
+- For every participant, calculate their total score and their per-arrow average. 
+- Check the scope for which group categories to use, and create one group for each n-tupe of categories. The name of the group is the concatenation of category values, in the order the categories are put in the match metadata.
+- For each group, sort the scores according to the scoring rules for the match.
+   - Assign position numbers starting at 1 to the sorted results. We're always sorting on score and count descendingly.
+   - Do not pre-calculate all tie-breakers, instead only calculate a tie-breakers when you actually need them. 
+     When using a tie-breaker "remember it", so it can be added to the line2 output if requested in the scope configuration.
+   - When after applying all scoring rules archers are still at the same position in the sort, they will receive the same position in the results, BUT, needsTieBreaker will bet set to true.
+     In that case the next number is skipped, so if 3 people are in position 1, then the next position is position 4.
+- When creating the group entries:
+   - Set position
+   - Set needsTieBreaker
+   - Set line1 to the full name
+   - If "Include group score line" is set line 2 to the comma-space-separated concatenation of the group running totals
+   - If "Include equalizer line" is set add to line2 the equalizers used, so e.g. "(457 + 9x10)
+   - If include "Include personal best" line is set, then add to line 3 the static text "personal best is not supported yet" -- this is a feature we will add soon but not now.
+
+This way we should end up with a good looking results page that we can lightweight narrow-cast to the smart TV screens that we have for displaying the live scores.
+
 ### Advanced use cases, future work
 
 #### UCA1

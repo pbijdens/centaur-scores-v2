@@ -1,6 +1,6 @@
 import type { View } from './types'
 
-export type Route = { view: View; matchId?: string; tenantId?: string; accountId?: string; categoryId?: string; listId?: string; memberId?: string; templateId?: string; participantId?: string; invalid?: boolean }
+export type Route = { view: View; matchId?: string; tenantId?: string; scope?: string; accountId?: string; categoryId?: string; listId?: string; memberId?: string; templateId?: string; participantId?: string; invalid?: boolean }
 
 export function navigateTo(path: string, replace = false) {
   const normalizedPath = path || '/'
@@ -13,6 +13,9 @@ export function resolveRoute(path = location.pathname): Route {
   const segments = path.split('/').filter(Boolean)
   const section = segments[0]
   if (!section) return { view: 'home' }
+  if (section === 'narrowcast') {
+    return segments[1] && segments[2] ? { view: 'narrowcast', tenantId: segments[1], scope: segments[2] } : { view: 'home', invalid: true }
+  }
   if (section === 'matches') {
     if (!segments[1]) return { view: 'matches' }
     if (segments[2] === 'edit') return { view: 'match-metadata', matchId: segments[1] }

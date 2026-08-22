@@ -115,7 +115,7 @@ All column names, table names etc. must be lowercase making it possible to excha
     - include a line with "group scores" for the totals of grouped ends
     - include a line with equalizer values (when needed)
     - include a line with the current personal best as per-arrow average
-  - a live score device will query a special endpoint for results at http://internal-score-api-url:port/live-scores/{tenant-id}/{scope} or http://internal-score-api-url:port/live-scores/{tenant-id}/all
+  - a live score device will query the special endpoints at `http://internal-score-api-url:port/live-scoring/match/{tenant-id}/{scope}` and `http://internal-score-api-url:port/live-scoring/match/{tenant-id}/{scope}/{match-id}`
   - a match has a list of accounts that can manage it in addition to those users who already implicitly have those rightd
 
 ## Competitions
@@ -146,8 +146,8 @@ All column names, table names etc. must be lowercase making it possible to excha
 
 The API is JSON-based, and unless mentioned otherwise the endpoints need a valid logged in user (see below)
 
-- The backend API offers read-only unauthenticated endpoints providing the data needed for live score display via the http://internal-score-api-url:port/live-scores/{tenant-id}/{scope} and http://internal-score-api-url:port/live-score-api/{tenant-id}/all endpoints
-  - When multiple matches are open and configured, the endpoint includes the data for all those matches; it's up to the displaying system to decide how to handle that.
+- The backend API offers read-only unauthenticated endpoints providing the data needed for live score display via `http://internal-score-api-url:port/live-scoring/match/{tenant-id}/{scope}` and `http://internal-score-api-url:port/live-scoring/match/{tenant-id}/{scope}/{match-id}`.
+  - The first endpoint lists open matches configured for the tenant and scope; the second returns one match's live-scoring page.
 
 - The backend API offers unauthenticated endpoints for the score-keeping UI using the base path http://internal-score-api-url:port/scorekeeper/{tenantguid}/{matchguid}/{deviceguid}
   - There will be APIs for fetching the list of available participants (either via the source or from the match) with per participant an indication at which device that participant currently enters their scores

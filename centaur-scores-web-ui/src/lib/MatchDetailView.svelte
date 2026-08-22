@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { apiBase, type ApiClient } from './api'
+  import type { ApiClient } from './api'
   import { formatLocalDate } from './date'
   import { labelForError } from './errors'
   import { parseMatchKeyboardConfig } from './matchConfig'
@@ -21,9 +21,13 @@
   export let onOpenParticipant: (participantId: string) => void
 
   type ResultRow = { participantId: string; total: number }
+  type SortBy = 'name' | 'score'
+  type GroupBy = 'none' | 'category' | 'device'
 
-  let sortBy: 'name' | 'score' = 'name'
-  let groupBy: 'none' | 'category' | 'device' = 'none'
+  const storedSortBy = localStorage.getItem('centaur-match-sort-by')
+  const storedGroupBy = localStorage.getItem('centaur-match-group-by')
+  let sortBy: SortBy = storedSortBy === 'score' ? 'score' : 'name'
+  let groupBy: GroupBy = storedGroupBy === 'category' || storedGroupBy === 'device' ? storedGroupBy : 'none'
   let results: ResultRow[] = []
   let deleteError = ''
   let exportError = ''
@@ -43,7 +47,11 @@
   $: matchCategories = keyboardConfig.categoryOrder.map((id) => categories.find((category) => category.id === id)).filter((category): category is Category => !!category)
   $: assignedMemberIds = new Set(participants.map((participant) => participant.participantListMemberId).filter((id): id is string => !!id))
   $: sourceList = participantLists.find((list) => list.id === match.participantListId) ?? null
-  $: availableMembers = sourceList ? sourceList.members.filter((member) => member.isActive && !assignedMemberIds.has(member.id)) : []
+  $: availableMembers = sourceList
+    ? sourceList.members
+        .filter((member) => member.isActive && !assignedMemberIds.has(member.id))
+        .sort((a, b) => (a.fullName || a.lastName).localeCompare(b.fullName || b.lastName))
+    : []
   $: if (!sourceList) addMode = 'manual'
 
   function categoryLabel(participantCategories: Record<string, number>): string {
@@ -68,6 +76,16 @@
 
   function deviceName(deviceId: string | null | undefined): string {
     return devices.find((device) => device.id === deviceId)?.name ?? labels.unassignedGroup
+  }
+
+  function setSortBy(value: string) {
+    sortBy = value === 'score' ? 'score' : 'name'
+    localStorage.setItem('centaur-match-sort-by', sortBy)
+  }
+
+  function setGroupBy(value: string) {
+    groupBy = value === 'category' || value === 'device' ? value : 'none'
+    localStorage.setItem('centaur-match-group-by', groupBy)
   }
 
   $: sortedParticipants = [...participants].sort((a, b) => {
@@ -97,7 +115,7 @@
   loadResults()
 
   function openResultsScope(scope: string) {
-    window.open(`${apiBase}/live-scores/${tenantId}/${scope}`, '_blank')
+    window.open(`/narrowcast/${tenantId}/${encodeURIComponent(scope)}`, '_blank')
   }
 
   async function exportCsv() {
@@ -191,13 +209,13 @@
 <section class="panel section-gap">
   <div class="editor-row">
     <label>{labels.sortByLabel}
-      <select bind:value={sortBy}>
+      <select value={sortBy} on:change={(event) => setSortBy(event.currentTarget.value)}>
         <option value="name">{labels.sortByName}</option>
         <option value="score">{labels.sortByScore}</option>
       </select>
     </label>
     <label>{labels.groupByLabel}
-      <select bind:value={groupBy}>
+      <select value={groupBy} on:change={(event) => setGroupBy(event.currentTarget.value)}>
         <option value="none">{labels.groupByNone}</option>
         <option value="category">{labels.groupByCategory}</option>
         <option value="device">{labels.groupByDevice}</option>
@@ -249,10 +267,10 @@
     {#if group.key}<h2 class="group-heading">{group.key}</h2>{/if}
     <div class="list-panel">
       {#each group.items as participant}
-        <button class="list-row" on:click={() => onOpenParticipant(participant.id)}>
+        <button class="list-row match-participant-row" on:click={() => onOpenParticipant(participant.id)}>
           <span class="management-icon">◇</span>
-          <span><strong>{participant.fullName || participant.lastName}</strong>{#if categoryLabel(participant.categories)}<span class="member-categories"> ({categoryLabel(participant.categories)})</span>{/if}</span>
-          {#if sortBy === 'score'}<span class="tag">{participantTotal(participant.id)}</span>{/if}
+          <span class="participant-name"><strong>{participant.fullName || participant.lastName}</strong>{#if categoryLabel(participant.categories)}<span class="member-categories"> ({categoryLabel(participant.categories)})</span>{/if}</span>
+          <strong class="participant-score">{participantTotal(participant.id)}</strong>
           <span class="arrow">→</span>
         </button>
       {/each}
@@ -270,9 +288,17 @@
 
   .editor-actions {
     display: flex;
+    justify-content: flex-end;
     flex-wrap: wrap;
     gap: 12px;
     margin-top: 24px;
+  }
+
+  .editor-actions button,
+  .editor-actions select,
+  .editor-row button,
+  .editor-row select {
+    min-height: 44px;
   }
 
   .editor-row {
@@ -289,6 +315,66 @@
   .member-categories {
     color: var(--muted);
     font-weight: 400;
+  }
+
+  .match-participant-row {
+    display: grid;
+    grid-template-columns: 24px minmax(0, 1fr) minmax(5ch, 76px) 44px;
+    gap: 14px;
+  }
+
+  .participant-name {
+    min-width: 0;
+  }
+
+  .participant-score {
+    justify-self: stretch;
+    text-align: right;
+    font: 700 20px 'Space Grotesk', sans-serif;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .match-participant-row .arrow {
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    margin-left: 0;
+    border: 1px solid var(--line);
+    background: var(--paper);
+  }
+
+  @media (max-width: 720px) {
+    .editor-actions {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .editor-actions button,
+    .editor-actions select {
+      width: 100%;
+    }
+
+    .editor-row {
+      align-items: stretch;
+    }
+
+    .editor-row label {
+      flex: 1 1 130px;
+    }
+
+    .editor-row > button {
+      flex: 1 1 100%;
+    }
+
+    .match-participant-row {
+      grid-template-columns: 18px minmax(0, 1fr) minmax(4ch, 64px) 44px;
+      gap: 10px;
+    }
+
+    .participant-score {
+      font-size: 21px;
+    }
   }
 </style>
 

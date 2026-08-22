@@ -229,8 +229,7 @@
       for (const score of newScores) {
         await api.enterScore(match.id, participant.id, { end: score.end, arrow: score.arrow, keyId: score.keyId, value: score.value })
       }
-      await onChanged()
-      quickSetMessage = labels.templateSaved
+      window.location.reload()
     } catch (error) {
       quickSetError = labelForError(error, labels, 'templateSaveError')
     }

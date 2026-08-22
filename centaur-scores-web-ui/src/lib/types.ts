@@ -1,4 +1,4 @@
-export type View = 'home' | 'matches' | 'match' | 'match-metadata' | 'match-devices' | 'match-qr' | 'match-participant' | 'competitions' | 'participants' | 'participant-list' | 'participant' | 'categories' | 'category' | 'templates' | 'template' | 'accounts' | 'account' | 'profile' | 'tenants' | 'tenant'
+export type View = 'home' | 'matches' | 'match' | 'match-metadata' | 'match-devices' | 'match-qr' | 'match-participant' | 'competitions' | 'participants' | 'participant-list' | 'participant' | 'categories' | 'category' | 'templates' | 'template' | 'accounts' | 'account' | 'profile' | 'tenants' | 'tenant' | 'narrowcast'
 export type Language = 'en' | 'nl'
 export type Tenant = { id: string; name: string; logoUrl?: string | null }
 export type Match = {
@@ -35,6 +35,10 @@ export type MatchParticipant = {
 export type ArrowScore = { id: string; matchParticipantId: string; end: number; arrow: number; keyId: string; value: number }
 export type ScoreDevice = { id: string; matchId: string; name: string; sortOrder?: number }
 export type LiveScoreScope = { id: string; matchId: string; scope: string; groupByCategoryIdsJson: string; includeAverage: boolean; includeGroupScores: boolean; includeEqualizers: boolean; includePersonalBest: boolean }
+export type LiveScoringMatch = { id: string; date: string; name: string }
+export type LiveScoringEntry = { position: number; needsTieBreaker: boolean; line1: string; line2?: string | null; line3?: string | null; average?: number | null; arrows: number; score: number }
+export type LiveScoringBlock = { name: string; entries: LiveScoringEntry[] }
+export type LiveScoringPage = { timeout: number; logo?: string | null; tenant: string; matchName: string; matchDate: string; blocks: LiveScoringBlock[] }
 export type Competition = { id: string; name: string; startDate: string; endDate: string; rounds?: unknown[]; roundCount?: number }
 export type Profile = { id: string; username: string; displayName?: string | null; email?: string | null; authorization: string }
 export type Account = { id: string; username: string; displayName?: string | null; email?: string | null; authorization: string }

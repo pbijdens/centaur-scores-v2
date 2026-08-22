@@ -128,7 +128,8 @@ These endpoints intentionally do not require a JWT. They are intended for displa
 
 | Method | Path | Auth | Description |
 |---|---|---|---|
-| `GET` | `/live-scores/{tenantId}/{scope}` | none | Return all open matches and scores for a live display scope. |
+| `GET` | `/live-scoring/match/{tenantId}/{scope}` | none | List open matches configured for the tenant and live display scope. |
+| `GET` | `/live-scoring/match/{tenantId}/{scope}/{matchId}` | none | Return the configured grouped and ranked live-scoring page for one open match. |
 | `GET` | `/scorekeeper/{tenantId}/{matchId}/{deviceId}` | none | Return device configuration, selectable participants, and match data. |
 
 ## Example login
