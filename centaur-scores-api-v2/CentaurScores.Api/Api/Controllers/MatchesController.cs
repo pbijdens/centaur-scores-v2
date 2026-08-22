@@ -100,19 +100,30 @@ public sealed class MatchesController(ApplicationDbContext db, ITenantContext te
     [HttpPost("{id:guid}/participants/{participantId:guid}/scores")]
     public async Task<IActionResult> EnterScore(Guid id, Guid participantId, EnterScoreRequest request, CancellationToken cancellationToken)
     {
-        var participant = await db.MatchParticipants.Include(item => item.Scores).SingleOrDefaultAsync(item => item.Id == participantId && item.MatchId == id && item.TenantId == TenantId, cancellationToken);
+        var participant = await db.MatchParticipants.SingleOrDefaultAsync(item => item.Id == participantId && item.MatchId == id && item.TenantId == TenantId, cancellationToken);
         if (participant is null) return NotFound();
-        var score = participant.Scores.SingleOrDefault(item => item.End == request.End && item.Arrow == request.Arrow);
-        if (score is null)
+
+        var updated = await db.ArrowScores
+            .Where(item => item.MatchParticipantId == participantId && item.End == request.End && item.Arrow == request.Arrow && item.TenantId == TenantId)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(item => item.KeyId, request.KeyId)
+                .SetProperty(item => item.Value, request.Value), cancellationToken);
+        if (updated == 0)
         {
-            participant.Scores.Add(new ArrowScore { Id = Guid.NewGuid(), TenantId = TenantId, MatchParticipantId = participantId, End = request.End, Arrow = request.Arrow, KeyId = request.KeyId, Value = request.Value });
+            db.ArrowScores.Add(new ArrowScore
+            {
+                Id = Guid.NewGuid(),
+                TenantId = TenantId,
+                MatchParticipantId = participantId,
+                End = request.End,
+                Arrow = request.Arrow,
+                KeyId = request.KeyId,
+                Value = request.Value
+            });
+            await db.SaveChangesAsync(cancellationToken);
         }
-        else
-        {
-            score.KeyId = request.KeyId;
-            score.Value = request.Value;
-        }
-        await db.SaveChangesAsync(cancellationToken);
+
+        await db.Entry(participant).Collection(item => item.Scores).LoadAsync(cancellationToken);
         return Ok(scoring.Calculate(participant, (await db.Matches.FindAsync([id], cancellationToken))?.ArrowsPerEnd ?? 1, null));
     }
 

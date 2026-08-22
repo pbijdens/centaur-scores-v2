@@ -54,19 +54,48 @@
 
   function bestFillAssignments(total: number): KeyboardKey[] {
     const totalArrows = match.ends * match.arrowsPerEnd
-    const scoringKeys = availableKeys
-    if (scoringKeys.length === 0 || totalArrows === 0) return []
-    const sortedDesc = [...scoringKeys].sort((a, b) => b.value - a.value)
-    const lowestKey = [...scoringKeys].sort((a, b) => a.value - b.value)[0]
-    const maxValue = sortedDesc[0].value
-    const assignments: KeyboardKey[] = []
-    let remaining = total
-    for (let i = 0; i < totalArrows; i++) {
-      const arrowsLeft = totalArrows - i
-      const key = sortedDesc.find((candidate) => candidate.value <= remaining && remaining - candidate.value <= (arrowsLeft - 1) * maxValue) ?? lowestKey
-      assignments.push(key)
-      remaining -= key.value
+    if (totalArrows === 0 || total <= 0) return []
+
+    const orderedKeys = [...availableKeys]
+      .sort((a, b) => {
+        if (a.value !== b.value) return a.value - b.value
+
+        const aIsNumeric = /^[0-9]+$/.test(a.label.trim())
+        const bIsNumeric = /^[0-9]+$/.test(b.label.trim())
+
+        if (aIsNumeric !== bIsNumeric) return Number(bIsNumeric) - Number(aIsNumeric)
+        return 0
+      })
+
+    const uniqueScoreKeys: KeyboardKey[] = []
+    const seenScores = new Set<number>()
+    for (const key of orderedKeys) {
+      if (seenScores.has(key.value)) continue
+      seenScores.add(key.value)
+      uniqueScoreKeys.push(key)
     }
+
+    if (uniqueScoreKeys.length === 0) return []
+
+    const scoringKeys = [...uniqueScoreKeys].sort((a, b) => a.value - b.value) // ascending order
+    const assignments: KeyboardKey[] = []
+    let arrowsToSet = totalArrows
+    let pointsLeftToSet = total
+
+    while (arrowsToSet > 0) {
+      const averageTarget = pointsLeftToSet / arrowsToSet
+      const nextHigher = scoringKeys
+        .filter((key) => key.value > averageTarget)[0]
+
+      const selected = nextHigher ?? scoringKeys[scoringKeys.length - 1] // if no higher, pick the highest available
+      assignments.push(selected)
+
+      console.log('selected', selected, 'averageTarget', averageTarget, 'pointsLeftToSet', pointsLeftToSet, 'arrowsToSet', arrowsToSet)
+
+      pointsLeftToSet -= selected.value
+      arrowsToSet -= 1
+    }
+
     return assignments
   }
 
@@ -74,6 +103,7 @@
     quickSetError = ''
     quickSetMessage = ''
     const assignments = bestFillAssignments(quickTotal)
+    console.log('assignments', assignments);
     if (assignments.length === 0) { quickSetError = labels.templateSaveError; return }
     try {
       let index = 0
