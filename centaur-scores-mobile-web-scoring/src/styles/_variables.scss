@@ -1,0 +1,44 @@
+// Colors
+$color-bg: #f4f5f7;
+$color-surface: #ffffff;
+$color-text: #16202a;
+$color-text-muted: #4d5b68;
+$color-border: #d7dce1;
+$color-primary: #1c3b57;
+$color-primary-dark: #0f2436;
+
+$color-sync-ok: #1e7e34;
+$color-sync-pending: #e07c00;
+$color-sync-error: #c0392b;
+$color-sync-syncing: #d4a017;
+
+$color-danger: #c0392b;
+$color-danger-dark: #932d21;
+
+// Key colors from the API's ScorekeeperKey.color
+$key-yellow-bg: #f6c944;
+$key-yellow-fg: #3a2c00;
+$key-red-bg: #d9342b;
+$key-red-fg: #ffffff;
+$key-blue-bg: #2467c9;
+$key-blue-fg: #ffffff;
+$key-black-bg: #1b1b1b;
+$key-black-fg: #ffffff;
+$key-white-bg: #f6f6f6;
+$key-white-fg: #1b1b1b;
+
+// Typography - kept large for a 50+ audience
+$font-size-base: 18px;
+$font-size-small: 15px;
+$font-size-large: 22px;
+$font-size-xlarge: 28px;
+
+// Layout
+$header-height: 4rem;
+$header-height-tall: 6.5rem;
+$touch-target: 3rem;
+$radius: 0.6rem;
+$gap: 0.75rem;
+
+$breakpoint-tablet: 640px;
+$breakpoint-desktop: 1024px;

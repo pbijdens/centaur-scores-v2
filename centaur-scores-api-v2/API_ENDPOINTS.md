@@ -130,7 +130,13 @@ These endpoints intentionally do not require a JWT. They are intended for displa
 |---|---|---|---|
 | `GET` | `/live-scoring/match/{tenantId}/{scope}` | none | List open matches configured for the tenant and live display scope. |
 | `GET` | `/live-scoring/match/{tenantId}/{scope}/{matchId}` | none | Return the configured grouped and ranked live-scoring page for one open match. |
-| `GET` | `/scorekeeper/{tenantId}/{matchId}/{deviceId}` | none | Return device configuration, selectable participants, and match data. |
+| `GET` | `/scorekeeper/{tenantId}/{matchId}/{deviceId}` | none | Return the active device-specific match configuration and assigned participants. |
+| `PUT` | `/scorekeeper/{tenantId}/{matchId}/{deviceId}/participants` | none | Replace the device participant assignment and order, subject to match participant policies. |
+| `PUT` | `/scorekeeper/{tenantId}/{matchId}/{deviceId}/scores` | none | Apply optimistic score updates; returns `UPDATE_SCORE_CONFLICT` with per-participant conflicts when needed. |
+| `GET` | `/scorekeeper/{tenantId}/{matchId}/{deviceId}/participant-options` | none | Return unassigned, assigned, and potential participant lists. |
+| `GET` | `/scorekeeper/{tenantId}/{matchId}/{deviceId}/time` | none | Return the current server UTC time for device synchronization. |
+
+All scorekeeper endpoints require an existing tenant, open match, and device belonging to that match. A closed match returns HTTP 409 with `MATCH_NO_LONGER_ACTIVE`; unknown resources return HTTP 404. Calls are logged with the caller IP and route parameters.
 
 ## Example login
 

@@ -9,8 +9,10 @@ namespace CentaurScores.Api.Controllers;
 
 [ApiController]
 [AllowAnonymous]
-public sealed class PublicScoresController(ApplicationDbContext db, ILiveScoringService liveScoringService) : ControllerBase
+public sealed class PublicScoresController(ApplicationDbContext db, ILiveScoringService liveScoringService, IScorekeeperService? scorekeeperService = null, ILogger<PublicScoresController>? logger = null) : ControllerBase
 {
+    private IScorekeeperService ScorekeeperService => scorekeeperService ?? new ScorekeeperService(db);
+
     [HttpGet("live-scoring/match/{tenantId:guid}/{scope}")]
     public async Task<ActionResult<IReadOnlyList<LiveScoringMatch>>> LiveScoringMatches(Guid tenantId, string scope, CancellationToken cancellationToken)
     {
@@ -42,14 +44,57 @@ public sealed class PublicScoresController(ApplicationDbContext db, ILiveScoring
     [HttpGet("scorekeeper/{tenantId:guid}/{matchId:guid}/{deviceId:guid}")]
     public async Task<IActionResult> Scorekeeper(Guid tenantId, Guid matchId, Guid deviceId, CancellationToken cancellationToken)
     {
-        var match = await db.Matches.AsNoTracking().Include(item => item.Participants).Include(item => item.Devices).SingleOrDefaultAsync(item => item.Id == matchId && item.TenantId == tenantId, cancellationToken);
-        if (match is null) return NotFound();
-        var participants = match.Participants
-            .Where(item => item.DeviceId == deviceId || item.DeviceId == null)
-            .OrderBy(item => item.DeviceId == deviceId ? 0 : 1)
-            .ThenBy(item => item.DeviceId == deviceId ? item.DeviceOrder : int.MaxValue)
-            .ThenBy(item => item.LastName)
-            .ToList();
-        return Ok(new { match, device = match.Devices.SingleOrDefault(item => item.Id == deviceId), participants });
+        var context = await LoadScorekeeperContext(tenantId, matchId, deviceId, cancellationToken);
+        if (context is null) return NotFound();
+        if (!context.Match.IsOpen) return MatchNoLongerActive();
+        LogCall(nameof(Scorekeeper), tenantId, matchId, deviceId);
+        return Ok(await ScorekeeperService.GetMatchAsync(context, cancellationToken));
     }
+
+    [HttpPut("scorekeeper/{tenantId:guid}/{matchId:guid}/{deviceId:guid}/participants")]
+    public async Task<IActionResult> SetScorekeeperParticipants(Guid tenantId, Guid matchId, Guid deviceId, IReadOnlyList<ScorekeeperParticipantRequest> request, CancellationToken cancellationToken)
+    {
+        var context = await LoadScorekeeperContext(tenantId, matchId, deviceId, cancellationToken);
+        if (context is null) return NotFound();
+        if (!context.Match.IsOpen) return MatchNoLongerActive();
+        LogCall(nameof(SetScorekeeperParticipants), tenantId, matchId, deviceId, request);
+        var error = await ScorekeeperService.SetParticipantsAsync(context, request, cancellationToken);
+        return error is null ? NoContent() : Conflict(error);
+    }
+
+    [HttpPut("scorekeeper/{tenantId:guid}/{matchId:guid}/{deviceId:guid}/scores")]
+    public async Task<IActionResult> UpdateScorekeeperScores(Guid tenantId, Guid matchId, Guid deviceId, IReadOnlyList<ScorekeeperScoreUpdates> request, CancellationToken cancellationToken)
+    {
+        var context = await LoadScorekeeperContext(tenantId, matchId, deviceId, cancellationToken);
+        if (context is null) return NotFound();
+        if (!context.Match.IsOpen) return MatchNoLongerActive();
+        LogCall(nameof(UpdateScorekeeperScores), tenantId, matchId, deviceId, request);
+        var conflicts = await ScorekeeperService.UpdateScoresAsync(context, request, cancellationToken);
+        return conflicts.Count == 0 ? NoContent() : Conflict(new { error = new ApiError("UPDATE_SCORE_CONFLICT", "One or more score updates conflicted."), conflicts });
+    }
+
+    [HttpGet("scorekeeper/{tenantId:guid}/{matchId:guid}/{deviceId:guid}/participant-options")]
+    public async Task<IActionResult> ScorekeeperParticipantOptions(Guid tenantId, Guid matchId, Guid deviceId, CancellationToken cancellationToken)
+    {
+        var context = await LoadScorekeeperContext(tenantId, matchId, deviceId, cancellationToken);
+        if (context is null) return NotFound();
+        if (!context.Match.IsOpen) return MatchNoLongerActive();
+        LogCall(nameof(ScorekeeperParticipantOptions), tenantId, matchId, deviceId);
+        return Ok(await ScorekeeperService.GetParticipantOptionsAsync(context, cancellationToken));
+    }
+
+    [HttpGet("scorekeeper/{tenantId:guid}/{matchId:guid}/{deviceId:guid}/time")]
+    public async Task<IActionResult> ScorekeeperTime(Guid tenantId, Guid matchId, Guid deviceId, CancellationToken cancellationToken)
+    {
+        var context = await LoadScorekeeperContext(tenantId, matchId, deviceId, cancellationToken);
+        if (context is null) return NotFound();
+        if (!context.Match.IsOpen) return MatchNoLongerActive();
+        LogCall(nameof(ScorekeeperTime), tenantId, matchId, deviceId);
+        await Task.CompletedTask;
+        return Ok(new ScorekeeperTime(DateTimeOffset.UtcNow));
+    }
+
+    private async Task<ScorekeeperContext?> LoadScorekeeperContext(Guid tenantId, Guid matchId, Guid deviceId, CancellationToken cancellationToken) => await ScorekeeperService.FindAsync(tenantId, matchId, deviceId, cancellationToken);
+    private IActionResult MatchNoLongerActive() => Conflict(new ApiError("MATCH_NO_LONGER_ACTIVE", "The match is no longer active."));
+    private void LogCall(string operation, Guid tenantId, Guid matchId, Guid deviceId, object? parameters = null) => logger?.LogInformation("Public scorekeeper call {Operation} from {IpAddress}: tenantId={TenantId}, matchId={MatchId}, deviceId={DeviceId}, parameters={Parameters}", operation, HttpContext.Connection.RemoteIpAddress?.ToString(), tenantId, matchId, deviceId, parameters);
 }
