@@ -5,6 +5,9 @@ export const keyboardColors = ['Yellow', 'Red', 'Blue', 'Black', 'White'] as con
 export const deviceSelectionModes = ['restricted', 'list', 'list-and-free'] as const
 
 export const emptyTemplateConfiguration: TemplateConfiguration = {
+  ends: 10,
+  arrowsPerEnd: 3,
+  groupEnds: null,
   categoryOrder: [],
   deviceNames: [],
   keyboard: [],
@@ -19,6 +22,9 @@ export function parseTemplateConfiguration(json: string): TemplateConfiguration 
   try {
     const parsed = JSON.parse(json)
     return {
+      ends: typeof parsed.ends === 'number' && parsed.ends >= 1 ? parsed.ends : 10,
+      arrowsPerEnd: typeof parsed.arrowsPerEnd === 'number' && parsed.arrowsPerEnd >= 1 ? parsed.arrowsPerEnd : 3,
+      groupEnds: typeof parsed.groupEnds === 'number' && parsed.groupEnds >= 1 ? parsed.groupEnds : null,
       categoryOrder: Array.isArray(parsed.categoryOrder) ? parsed.categoryOrder : [],
       deviceNames: Array.isArray(parsed.deviceNames) ? parsed.deviceNames.filter((name: unknown): name is string => typeof name === 'string') : [],
       keyboard: Array.isArray(parsed.keyboard) ? parsed.keyboard : [],

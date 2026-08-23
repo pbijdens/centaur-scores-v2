@@ -174,6 +174,9 @@
 
 <section class="panel">
   <label>{labels.templateNameLabel}<input bind:value={name} /></label>
+  <label>{labels.endsLabel}<input type="number" min="1" bind:value={config.ends} /></label>
+  <label>{labels.arrowsPerEndLabel}<input type="number" min="1" bind:value={config.arrowsPerEnd} /></label>
+  <label>{labels.groupEndsLabel}<input type="number" min="1" bind:value={config.groupEnds} /></label>
   <label>{labels.participantListLabel}
     <select bind:value={participantListId}>
       <option value="">{labels.noParticipantList}</option>

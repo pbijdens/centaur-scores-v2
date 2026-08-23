@@ -47,6 +47,9 @@
     let participantListId: string | null = null
     let allowFreeParticipants = false
     let deviceSelectionMode = 'restricted'
+    let ends = 10
+    let arrowsPerEnd = 3
+    let groupEnds: number | null = null
     if (template) {
       const config = parseTemplateConfiguration(template.configurationJson)
       keyboardJson = JSON.stringify({ categoryOrder: config.categoryOrder, keyboard: config.keyboard, disabledKeyRules: config.disabledKeyRules })
@@ -54,6 +57,9 @@
       participantListId = template.participantListId ?? null
       allowFreeParticipants = template.allowFreeParticipants
       deviceSelectionMode = template.deviceSelectionMode
+      ends = config.ends
+      arrowsPerEnd = config.arrowsPerEnd
+      groupEnds = config.groupEnds
     }
     try {
       const match = await api.createMatch({
@@ -62,8 +68,9 @@
         isOpen: false,
         participantListId,
         deviceSelectionMode,
-        ends: 10,
-        arrowsPerEnd: 3,
+        ends,
+        arrowsPerEnd,
+        groupEnds,
         allowFreeParticipants,
         keyboardJson,
         scoringRulesJson
