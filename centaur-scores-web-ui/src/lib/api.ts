@@ -1,4 +1,4 @@
-import type { Account, Category, Competition, CompetitionResultsDocument, CompetitionRound, CompetitionScoreRule, LiveScoringMatch, LiveScoringPage, Match, MatchParticipant, MatchTemplate, ParticipantList, Profile, ScoreDevice, Tenant } from './types'
+import type { Account, Category, Competition, CompetitionResultsDocument, CompetitionRound, CompetitionScoreRule, Language, LiveScoringMatch, LiveScoringPage, Match, MatchParticipant, MatchTemplate, ParticipantList, Profile, ScoreDevice, Tenant } from './types'
 
 export const apiBase = import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:5080'
 
@@ -348,6 +348,12 @@ export async function fetchLiveScoringPage(tenantId: string, scope: string, matc
   return response.json()
 }
 
-export function scorekeeperUrl(tenantId: string, matchId: string, deviceId: string): string {
-  return `${apiBase}/scorekeeper/${tenantId}/${matchId}/${deviceId}`
+export function scorekeeperUrl(tenantId: string, matchId: string, deviceId: string, language: Language): string {
+  const apiUrl = `${apiBase}/scorekeeper/${tenantId}/${matchId}/${deviceId}`
+  const languageCode = language === 'nl' ? 'NL' : 'EN'
+  const base = typeof window === 'undefined' ? apiBase : window.location.origin
+  const scoresUrl = new URL('/scores', base)
+  scoresUrl.searchParams.set('api', apiUrl)
+  scoresUrl.searchParams.set('language', languageCode)
+  return scoresUrl.toString()
 }

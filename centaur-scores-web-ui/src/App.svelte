@@ -297,7 +297,7 @@
 {#if view === 'narrowcast' && narrowcastTenantId && narrowcastScope}
   <LiveScoringView tenantId={narrowcastTenantId} scope={narrowcastScope} />
 {:else if view === 'match-qr' && selectedMatch}
-  <MatchQrCodesView match={selectedMatch} tenantId={tenant} labels={t} />
+  <MatchQrCodesView match={selectedMatch} tenantId={tenant} {language} labels={t} />
 {:else if view === 'match-results-scope' && selectedMatchId && selectedResultsScope}
   <MatchResultsScopeView {api} matchId={selectedMatchId} scope={selectedResultsScope} {language} labels={t} />
 {:else if view === 'competition-results' && selectedCompetitionId}
