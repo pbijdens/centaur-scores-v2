@@ -1,0 +1,6 @@
+**
+!centaur-scores-api-v2/CentaurScores.Api/**
+!centaur-scores-docker-v2/images/api/entrypoint.sh
+!centaur-scores-docker-v2/images/api/logrotate.conf
+centaur-scores-api-v2/CentaurScores.Api/bin
+centaur-scores-api-v2/CentaurScores.Api/obj

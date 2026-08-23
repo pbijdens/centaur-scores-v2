@@ -1,0 +1,82 @@
+name: centaur-scores
+
+services:
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_PASSWORD_ROOT}
+      MYSQL_DATABASE: ${MYSQL_DATABASENAME}
+      MYSQL_USER: ${MYSQL_USERNAME_APP}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD_APP}
+    volumes:
+      - type: bind
+        source: ${VOLUMES_MYSQL}
+        target: /var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u${MYSQL_USERNAME_ROOT} -p${MYSQL_PASSWORD_ROOT} --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    networks:
+      - database
+
+  api:
+    image: centaur-scores-api-v2:local
+    build:
+      context: ..
+      dockerfile: centaur-scores-docker-v2/images/api/Dockerfile
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__Default: server=mysql;port=3306;database=${MYSQL_DATABASENAME};user=${MYSQL_USERNAME_APP};password=${MYSQL_PASSWORD_APP}
+      Jwt__Secret: ${JWT_SECRET:?JWT_SECRET must be set}
+    volumes:
+      - type: bind
+        source: ${VOLUMES_LOGS}
+        target: /var/log/centaur-scores
+    depends_on:
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+    networks:
+      - proxy
+      - database
+
+  gateway:
+    image: centaur-scores-gateway-v2:local
+    build:
+      context: ..
+      dockerfile: centaur-scores-docker-v2/images/gateway/Dockerfile
+      args:
+        VITE_API_BASE_URL: ${PUBLIC_API_URL}
+    restart: unless-stopped
+    environment:
+      PUBLIC_API_VDIR: ${PUBLIC_API_VDIR}
+      PUBLIC_APP_VDIR: ${PUBLIC_APP_VDIR}
+      NGINX_ENVSUBST_FILTER: ^(PUBLIC_API_VDIR|PUBLIC_APP_VDIR)$$
+    ports:
+      - "${NGINX_PUBLIC_PORT}:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
+    networks:
+      - proxy
+
+networks:
+  proxy:
+  database:
+    internal: true
