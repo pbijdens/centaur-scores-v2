@@ -292,10 +292,60 @@ public sealed class MatchesController(ApplicationDbContext db, ITenantContext te
     {
         var match = await db.Matches.AsNoTracking().Include(item => item.Participants).ThenInclude(item => item.Scores).SingleOrDefaultAsync(item => item.Id == id && item.TenantId == TenantId, cancellationToken);
         if (match is null) return NotFound();
-        var lines = new List<string> { "federation_number,full_name,total" };
-        lines.AddRange(match.Participants.Select(participant => $"{Csv(participant.FederationNumber)},{Csv(participant.FullName)},{participant.Scores.Sum(item => item.Value)}"));
+
+        var keyboard = ParseKeyboardConfiguration(match.KeyboardJson);
+        var categoryIds = keyboard.CategoryOrder.Distinct().ToList();
+        var categoriesById = await db.Categories.AsNoTracking()
+            .Include(item => item.Values)
+            .Where(item => item.TenantId == TenantId && categoryIds.Contains(item.Id))
+            .ToDictionaryAsync(item => item.Id, cancellationToken);
+        var categories = categoryIds.Where(categoriesById.ContainsKey).Select(id => categoriesById[id]).ToList();
+        var splitSize = match.GroupEnds is > 0 ? match.GroupEnds.Value : 1;
+        var splitCount = match.Ends > 0 ? (match.Ends + splitSize - 1) / splitSize : 0;
+
+        var headers = new List<string> { "federation_number", "full_name", "total" };
+        headers.AddRange(keyboard.Keyboard.Select(key => Csv(key.Label)));
+        headers.Add("Null");
+        headers.AddRange(Enumerable.Range(1, splitCount).Select(index => $"Split{index}"));
+        headers.AddRange(categories.Select(category => Csv(category.Name)));
+        headers.Add("lastname");
+
+        var lines = new List<string> { string.Join(",", headers) };
+        foreach (var participant in match.Participants)
+        {
+            var result = scoring.Calculate(participant, match.ArrowsPerEnd, match.GroupEnds);
+            var values = new List<string> { Csv(participant.FederationNumber), Csv(participant.FullName), result.Total.ToString() };
+            values.AddRange(keyboard.Keyboard.Select(key => participant.Scores.Count(score => score.KeyId == key.KeyId).ToString()));
+            values.Add(Math.Max(match.Ends * match.ArrowsPerEnd - participant.Scores.Count, 0).ToString());
+            values.AddRange(Enumerable.Range(1, splitCount).Select(index => result.GroupScores.GetValueOrDefault(index).ToString()));
+            values.AddRange(categories.Select(category => Csv(CategoryValueName(participant, category))));
+            values.Add(Csv(participant.LastName));
+            lines.Add(string.Join(",", values));
+        }
+
         return File(System.Text.Encoding.UTF8.GetBytes(string.Join("\n", lines)), "text/csv", $"{match.ShortCode ?? match.Name}.csv");
     }
 
+    private static KeyboardConfiguration ParseKeyboardConfiguration(string json)
+    {
+        try
+        {
+            return System.Text.Json.JsonSerializer.Deserialize<KeyboardConfiguration>(json, new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new([], []);
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            return new([], []);
+        }
+    }
+
+    private static string CategoryValueName(MatchParticipant participant, Category category)
+    {
+        if (!participant.Categories.TryGetValue(category.Id, out var valueId)) return "";
+        return category.Values.FirstOrDefault(value => value.ValueId == valueId)?.Name ?? valueId.ToString();
+    }
+
     private static string Csv(string? value) => $"\"{(value ?? "").Replace("\"", "\"\"")}\"";
+
+    private sealed record KeyboardConfiguration(List<Guid> CategoryOrder, List<KeyboardKey> Keyboard);
+    private sealed record KeyboardKey(string KeyId, string Label);
 }

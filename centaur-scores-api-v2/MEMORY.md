@@ -15,6 +15,7 @@ Specification: [DESIGN.md](../documentation/DESIGN.md)
 - Keep complex logic in application services instead of controllers.
 - Add concise code comments for non-obvious logic and important design choices.
 - Backend tests are in `CentaurScores.Api.Tests`.
+- Match CSV export follows `Match.KeyboardJson` order: keyboard key-count columns, missing-arrow `Null`, grouped-end `SplitN` totals, category values in `categoryOrder`, then last name. Keyboard key labels and category names/values are used as CSV text.
 - Client-actionable error responses (login, change-password, account creation) return a coded `ApiError { code, message }` body instead of a plain message, so the frontend can map `code` to a translated string. `message` is developer-facing only. See `Contracts.ApiError` and `API_ENDPOINTS.md` for the known codes; extend this pattern for new endpoints whose failures the UI needs to react to specifically.
 - `ParticipantListMember` has an `IsActive` flag (default `true`); `CreateParticipantRequest.IsActive` defaults to `true` when omitted. Added via the `AddParticipantMemberIsActive` migration.
 - `PublicScoresController` exposes unauthenticated `scorekeeper/{tenantId}/{matchId}/{deviceId}`, `live-scoring/match/{tenantId}/{scope}`, and `live-scoring/match/{tenantId}/{scope}/{matchId}` endpoints. Live scoring is tenant-scoped; the list includes only open matches configured for the scope, and the detail response is built by `LiveScoringService`.

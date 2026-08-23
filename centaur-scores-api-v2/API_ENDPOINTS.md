@@ -97,7 +97,7 @@ JWTs are returned by `POST /api/auth/login` and contain the account and active t
 | `PUT` | `/api/matches/{id}/participants/{participantId}/device` | manager | Assign/unassign the participant to a score device with `{ deviceId }` (`deviceId` may be `null`). Removes the participant from any other device's restricted list. |
 | `POST` | `/api/matches/{id}/participants/{participantId}/scores` | scorekeeper/user | Upsert one arrow score using `{ end, arrow, keyId, value }`. |
 | `GET` | `/api/matches/{id}/results` | user | Return ranked match results with totals, averages, and groups. |
-| `GET` | `/api/matches/{id}/export.csv` | user | Download federation number, name, and total score CSV. |
+| `GET` | `/api/matches/{id}/export.csv` | user | Download match results as CSV. After federation number, full name, and total, columns contain counts for each keyboard key in keyboard order, `Null` for unentered arrows, grouped-end totals as `Split1`, `Split2`, etc., category values in match category order, and last name. |
 | `POST` | `/api/matches/{id}/devices` | manager | Add a score-entry device with `{ name }`. Which participants a device may select comes from the match's `deviceSelectionMode`, not the device itself. |
 | `PUT` | `/api/matches/{id}/devices/order` | manager | Persist device display/selection order with `{ deviceIds: Guid[] }` (all devices must be included). |
 | `PUT` | `/api/matches/{id}/devices/{deviceId}/participants/order` | manager | Persist the selected participant order for one device with `{ participantIds: Guid[] }` (all participants currently assigned to that device must be included). |

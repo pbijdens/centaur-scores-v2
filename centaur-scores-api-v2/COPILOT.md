@@ -13,6 +13,7 @@ Read the system specification before changing behavior: [DESIGN.md](../documenta
 - Keep UTC for timestamps and use `DateOnly` for timezone-agnostic dates.
 - Put reusable business rules in application services and cover them with xUnit tests.
 - Keep complex logic in application services rather than controllers.
+- Keep match CSV export columns aligned with the ordered `keyboard` and `categoryOrder` arrays in `Match.KeyboardJson`; use `IScoringService` for grouped-end totals.
 - Document non-obvious code segments and important implementation choices with concise comments in the code.
 - Use migrations for schema changes; do not replace the database with an in-memory store.
 - Preserve the public live-score and scorekeeper endpoints described in the specification.
