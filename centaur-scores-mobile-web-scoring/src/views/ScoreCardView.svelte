@@ -10,7 +10,7 @@
     groupRunningTotal,
     runningTotalThroughEnd,
   } from '../lib/scoring';
-  import { matchData, navigate, screen } from '../lib/stores';
+  import { matchData, navigate, screen, switchToAdjacentParticipant } from '../lib/stores';
   import { recordScoreEdit } from '../lib/syncService';
   import type { ScorekeeperKey } from '../lib/types';
 
@@ -167,14 +167,9 @@
   }
 
   function switchParticipant(direction: number) {
-    const match = $matchData;
-    if (!match || !participant || match.participants.length < 2) return;
-    const idx = match.participants.findIndex((p) => p.matchParticipantId === participant!.matchParticipantId);
-    const count = match.participants.length;
-    const nextIdx = (idx + direction + count) % count;
     openEndIndex = null;
     focusedIndex = null;
-    navigate({ name: 'score-card', matchParticipantId: match.participants[nextIdx].matchParticipantId }, { replace: true });
+    switchToAdjacentParticipant(direction);
   }
 </script>
 

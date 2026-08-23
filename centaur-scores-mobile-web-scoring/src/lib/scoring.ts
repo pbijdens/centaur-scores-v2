@@ -69,3 +69,10 @@ export function firstNullIndex(match: ScorekeeperMatch, participant: Scorekeeper
   const index = participant.arrowScores.findIndex((s) => s === null);
   return index === -1 ? null : index;
 }
+
+// Picks who "Enter scores now" should jump to: the first participant with an
+// unscored arrow, or simply the first participant if everyone is fully scored.
+export function firstParticipantNeedingScore(match: ScorekeeperMatch): ScorekeeperMatchParticipant | null {
+  if (match.participants.length === 0) return null;
+  return match.participants.find((p) => firstNullIndex(match, p) !== null) ?? match.participants[0];
+}

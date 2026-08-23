@@ -87,6 +87,13 @@
       <input type="text" placeholder={$t('search')} bind:value={query} disabled={saving} />
     </div>
 
+    {#if $matchData?.allowCustomParticipants}
+      <button class="link-button add-unlisted" onclick={() => (mode = 'form')} disabled={saving}>
+        <Icon name="plus" size={18} />
+        {$t('addUnlistedParticipant')}
+      </button>
+    {/if}
+
     {#if loadingOptions}
       <p>{$t('loading')}</p>
     {:else}
@@ -129,12 +136,6 @@
         {/each}
       {/if}
     {/if}
-
-    {#if $matchData?.allowCustomParticipants}
-      <button class="button secondary add-unlisted" onclick={() => (mode = 'form')} disabled={saving}>
-        {$t('addUnlistedParticipant')}
-      </button>
-    {/if}
   {:else if $matchData}
     <h1>{$t('addUnlistedParticipant')}</h1>
     <ParticipantForm categories={$matchData.categories} {saving} onSave={saveUnlisted} onCancel={() => (mode = 'list')} />
@@ -151,14 +152,14 @@
     background: v.$color-surface;
     border: 2px solid v.$color-border;
     border-radius: v.$radius;
-    padding: 0.3rem 0.75rem;
+    padding: 0.15rem 0.75rem;
     margin-bottom: 1rem;
     color: v.$color-text-muted;
 
     input {
       flex: 1;
       border: none;
-      min-height: v.$touch-target;
+      min-height: 2.5rem;
       background: transparent;
       color: v.$color-text;
 
@@ -202,8 +203,20 @@
     color: v.$color-text-muted;
   }
 
+  .link-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    background: none;
+    border: none;
+    padding: 0.5rem 0.1rem;
+    color: v.$color-primary;
+    font-weight: 600;
+    font-size: v.$font-size-base;
+    text-decoration: underline;
+  }
+
   .add-unlisted {
-    width: 100%;
-    margin-top: 1.5rem;
+    margin-bottom: 1rem;
   }
 </style>

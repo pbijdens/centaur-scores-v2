@@ -19,8 +19,21 @@
     const onPopState = () => goToParent();
     window.addEventListener('popstate', onPopState);
 
+    // iOS Safari shrinks the visual viewport (not the layout viewport) when the
+    // on-screen keyboard opens, so a 100%-height layout ends up partly hidden
+    // behind the keyboard unless we size #app to the actual visible area.
+    const updateAppHeight = () => {
+      const height = window.visualViewport?.height ?? window.innerHeight;
+      document.documentElement.style.setProperty('--app-height', `${height}px`);
+    };
+    updateAppHeight();
+    window.visualViewport?.addEventListener('resize', updateAppHeight);
+    window.addEventListener('resize', updateAppHeight);
+
     return () => {
       window.removeEventListener('popstate', onPopState);
+      window.visualViewport?.removeEventListener('resize', updateAppHeight);
+      window.removeEventListener('resize', updateAppHeight);
       stopBackgroundSync();
     };
   });

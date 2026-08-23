@@ -4,7 +4,6 @@
       | 'home'
       | 'flag-nl'
       | 'flag-en'
-      | 'thumbs-up'
       | 'wifi'
       | 'error'
       | 'ellipsis'
@@ -36,8 +35,6 @@
     <path d="M2 4 22 20M22 4 2 20" stroke="#fff" stroke-width="2" />
     <path d="M12 4v16M2 12h20" stroke="#fff" stroke-width="3" />
     <path d="M12 4v16M2 12h20" stroke="#cf142b" stroke-width="1.4" />
-  {:else if name === 'thumbs-up'}
-    <path d="M7 11v9H4a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1h3Zm0 0 4.5-7a2 2 0 0 1 3.6 1.4L14 9h4.2a2 2 0 0 1 1.94 2.5l-1.6 6.5A2 2 0 0 1 16.6 20H10a3 3 0 0 1-3-3v-6Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" fill="currentColor" fill-opacity="0.08" />
   {:else if name === 'wifi'}
     <path d="M2 8.5a15 15 0 0 1 20 0M5.2 12a10.5 10.5 0 0 1 13.6 0M8.6 15.5a6 6 0 0 1 6.8 0" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
     <circle cx="12" cy="19" r="1.4" fill="currentColor" />

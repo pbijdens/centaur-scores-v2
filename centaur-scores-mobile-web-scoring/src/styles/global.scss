@@ -2,6 +2,7 @@
 
 :root {
   color-scheme: light;
+  --app-height: 100%;
 }
 
 * {
@@ -23,7 +24,10 @@ body {
 }
 
 #app {
+  // Kept in sync with the visual viewport (see App.svelte) so the layout
+  // never extends behind the iOS on-screen keyboard.
   height: 100%;
+  height: var(--app-height);
   display: flex;
   flex-direction: column;
 }

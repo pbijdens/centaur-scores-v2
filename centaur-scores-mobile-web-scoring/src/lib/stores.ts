@@ -1,4 +1,4 @@
-import { writable } from 'svelte/store';
+import { get, writable } from 'svelte/store';
 import { readJson, writeJson } from './storage';
 import type { Language, PendingUpdates, Screen, ScorekeeperMatch, SyncStatus, ScoreConflictEntry } from './types';
 
@@ -45,4 +45,18 @@ export function goToParent(): void {
 
 export function resetHistoryStack(): void {
   historyStack.length = 0;
+}
+
+/** Moves the score-card screen to the previous/next participant (direction -1/+1),
+ * cycling around the participant list. Shared by the header's Previous/Next
+ * buttons and ScoreCardView's swipe gesture so both stay in sync. */
+export function switchToAdjacentParticipant(direction: number): void {
+  const current = get(screen);
+  const match = get(matchData);
+  if (!match || current.name !== 'score-card' || match.participants.length < 2) return;
+  const idx = match.participants.findIndex((p) => p.matchParticipantId === current.matchParticipantId);
+  if (idx === -1) return;
+  const count = match.participants.length;
+  const nextIdx = (idx + direction + count) % count;
+  navigate({ name: 'score-card', matchParticipantId: match.participants[nextIdx].matchParticipantId }, { replace: true });
 }

@@ -1,9 +1,9 @@
 <script lang="ts">
   import Icon from './Icon.svelte';
-  import { language, matchData, navigate, pendingUpdates, screen, syncStatus } from '../lib/stores';
+  import { language, matchData, navigate, pendingUpdates, screen, switchToAdjacentParticipant, syncStatus } from '../lib/stores';
   import { forceSync } from '../lib/syncService';
   import { t } from '../lib/i18n';
-  import { totalScore } from '../lib/scoring';
+  import { firstParticipantNeedingScore, totalScore } from '../lib/scoring';
   import type { Language } from '../lib/types';
 
   let langMenuOpen = $state(false);
@@ -14,13 +14,19 @@
     if ($syncStatus === 'syncing') return { icon: 'ellipsis' as const, className: 'syncing' };
     if ($syncStatus === 'error') return { icon: 'error' as const, className: 'error' };
     if (hasPending) return { icon: 'wifi' as const, className: 'pending' };
-    return { icon: 'thumbs-up' as const, className: 'ok' };
+    return { icon: 'wifi' as const, className: 'ok' };
   });
 
   const scoreCardParticipant = $derived.by(() => {
     if ($screen.name !== 'score-card' || !$matchData) return null;
     return $matchData.participants.find((p) => p.matchParticipantId === $screen.matchParticipantId) ?? null;
   });
+
+  const showParticipantNav = $derived(
+    $screen.name === 'score-card' && !!scoreCardParticipant && ($matchData?.participants.length ?? 0) > 1,
+  );
+
+  const showEnterScoresNow = $derived($screen.name === 'home' && ($matchData?.participants.length ?? 0) > 0);
 
   function goHome() {
     navigate({ name: 'home' }, { resetStack: true });
@@ -35,6 +41,14 @@
   function selectLanguage(lang: Language) {
     language.set(lang);
     langMenuOpen = false;
+  }
+
+  function enterScoresNow() {
+    const match = $matchData;
+    if (!match) return;
+    const target = firstParticipantNeedingScore(match);
+    if (!target) return;
+    navigate({ name: 'score-card', matchParticipantId: target.matchParticipantId });
   }
 </script>
 
@@ -61,10 +75,25 @@
       {/if}
     </div>
 
-    <button class="sync-button {syncVisual.className}" onclick={onSyncTap} aria-label="Sync status">
-      <Icon name={syncVisual.icon} size={26} />
+    <button class="sync-icon {syncVisual.className}" onclick={onSyncTap} aria-label="Sync status">
+      <Icon name={syncVisual.icon} size={22} />
     </button>
   </div>
+
+  {#if showParticipantNav}
+    <div class="row nav-row">
+      <button class="link-button" onclick={() => switchToAdjacentParticipant(-1)}>
+        <Icon name="chevron-left" size={16} /> {$t('previous')}
+      </button>
+      <button class="link-button" onclick={() => switchToAdjacentParticipant(1)}>
+        {$t('next')} <Icon name="chevron-right" size={16} />
+      </button>
+    </div>
+  {:else if showEnterScoresNow}
+    <div class="row nav-row single">
+      <button class="button enter-scores" onclick={enterScoresNow}>{$t('enterScoresNow')}</button>
+    </div>
+  {/if}
 
   {#if scoreCardParticipant && $matchData}
     <div class="row participant-row">
@@ -158,26 +187,57 @@
     }
   }
 
-  .sync-button {
+  .sync-icon {
     flex-shrink: 0;
-    width: v.$touch-target;
-    height: v.$touch-target;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 0;
+    padding: 0;
     border: none;
-    border-radius: v.$radius;
-    color: #fff;
+    background: none;
 
     &.ok {
-      background: v.$color-sync-ok;
+      color: v.$color-sync-ok;
     }
     &.pending {
-      background: v.$color-sync-pending;
+      color: v.$color-sync-pending;
     }
     &.error {
-      background: v.$color-sync-error;
+      color: v.$color-sync-error;
     }
     &.syncing {
-      background: v.$color-sync-syncing;
+      color: v.$color-sync-syncing;
     }
+  }
+
+  .nav-row {
+    justify-content: space-between;
+    padding: 0.25rem 1rem;
+    gap: 1rem;
+
+    &.single {
+      justify-content: center;
+      padding: 0.5rem 1rem 0.75rem;
+    }
+  }
+
+  .enter-scores {
+    min-height: 2.6rem;
+    padding: 0.4rem 1.4rem;
+  }
+
+  .link-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    background: none;
+    border: none;
+    padding: 0.2rem;
+    color: v.$color-primary;
+    font-weight: 600;
+    font-size: v.$font-size-small;
+    text-decoration: underline;
   }
 
   .participant-row {

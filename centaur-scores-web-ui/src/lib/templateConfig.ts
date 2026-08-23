@@ -4,9 +4,10 @@ export const keyboardColors = ['Yellow', 'Red', 'Blue', 'Black', 'White'] as con
 
 export const deviceSelectionModes = ['restricted', 'list', 'list-and-free'] as const
 
+const defaultKeyboardColors = ['Yellow', 'Yellow', 'Red', 'Red', 'Blue', 'Blue', 'Black', 'Black', 'White', 'White'] as const
 const defaultKeyboard: KeyboardKey[] = [...Array.from({ length: 10 }, (_, index) => {
   const value = 10 - index
-  return { keyId: String(value), label: String(value), color: 'Yellow' as const, value }
+  return { keyId: String(value), label: String(value), color: defaultKeyboardColors[index], value }
 }), { keyId: 'M', label: 'M', color: 'White' as const, value: 0 }]
 
 export const emptyTemplateConfiguration: TemplateConfiguration = {

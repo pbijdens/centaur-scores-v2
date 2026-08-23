@@ -2,7 +2,7 @@ namespace CentaurScores.Api.Domain;
 
 public static class MatchDefaults
 {
-    public const string KeyboardJson = "{\"categoryOrder\":[],\"keyboard\":[{\"keyId\":\"10\",\"label\":\"10\",\"value\":10},{\"keyId\":\"9\",\"label\":\"9\",\"value\":9},{\"keyId\":\"8\",\"label\":\"8\",\"value\":8},{\"keyId\":\"7\",\"label\":\"7\",\"value\":7},{\"keyId\":\"6\",\"label\":\"6\",\"value\":6},{\"keyId\":\"5\",\"label\":\"5\",\"value\":5},{\"keyId\":\"4\",\"label\":\"4\",\"value\":4},{\"keyId\":\"3\",\"label\":\"3\",\"value\":3},{\"keyId\":\"2\",\"label\":\"2\",\"value\":2},{\"keyId\":\"1\",\"label\":\"1\",\"value\":1},{\"keyId\":\"M\",\"label\":\"M\",\"value\":0}]}";
+    public const string KeyboardJson = "{\"categoryOrder\":[],\"keyboard\":[{\"keyId\":\"10\",\"label\":\"10\",\"color\":\"Yellow\",\"value\":10},{\"keyId\":\"9\",\"label\":\"9\",\"color\":\"Yellow\",\"value\":9},{\"keyId\":\"8\",\"label\":\"8\",\"color\":\"Red\",\"value\":8},{\"keyId\":\"7\",\"label\":\"7\",\"color\":\"Red\",\"value\":7},{\"keyId\":\"6\",\"label\":\"6\",\"color\":\"Blue\",\"value\":6},{\"keyId\":\"5\",\"label\":\"5\",\"color\":\"Blue\",\"value\":5},{\"keyId\":\"4\",\"label\":\"4\",\"color\":\"Black\",\"value\":4},{\"keyId\":\"3\",\"label\":\"3\",\"color\":\"Black\",\"value\":3},{\"keyId\":\"2\",\"label\":\"2\",\"color\":\"White\",\"value\":2},{\"keyId\":\"1\",\"label\":\"1\",\"color\":\"White\",\"value\":1},{\"keyId\":\"M\",\"label\":\"M\",\"color\":\"White\",\"value\":0}]}";
 }
 
 public abstract class TenantOwnedEntity

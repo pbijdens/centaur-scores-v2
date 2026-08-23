@@ -62,6 +62,9 @@ const dict = {
     EN: 'This change is not allowed for this match.',
   },
   categoryRequired: { NL: 'Verplicht', EN: 'Required' },
+  previous: { NL: 'Vorige', EN: 'Previous' },
+  next: { NL: 'Volgende', EN: 'Next' },
+  enterScoresNow: { NL: 'Scores invoeren', EN: 'Enter scores' },
 } as const;
 
 export type TranslationKey = keyof typeof dict;
