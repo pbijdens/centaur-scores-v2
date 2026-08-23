@@ -3,7 +3,7 @@
   import { labelForError } from './errors'
   import { parseMatchKeyboardConfig, parseMatchScoringRules } from './matchConfig'
   import { deviceSelectionModes, keyboardColors } from './templateConfig'
-  import type { Category, Match, ParticipantList } from './types'
+  import type { Category, LiveScopeConfig, Match, ParticipantList } from './types'
 
   export let api: ApiClient
   export let match: Match
@@ -25,6 +25,15 @@
   let groupEnds = match.groupEnds ?? null
   let keyboardConfig = parseMatchKeyboardConfig(match.keyboardJson)
   let scoringRules = parseMatchScoringRules(match.scoringRulesJson)
+  let liveScopes: (LiveScopeConfig & { id: string })[] = (match.liveScopes ?? []).map((scope) => ({
+    id: scope.id,
+    scope: scope.scope,
+    groupByCategoryIds: parseGroupByCategoryIds(scope.groupByCategoryIdsJson),
+    includeAverage: scope.includeAverage,
+    includeGroupScores: scope.includeGroupScores,
+    includeEqualizers: scope.includeEqualizers,
+    includePersonalBest: scope.includePersonalBest
+  }))
   let saveMessage = ''
   let saveError = ''
   let deleteError = ''
@@ -106,6 +115,33 @@
     scoringRules = rules
   }
 
+  function parseGroupByCategoryIds(json: string): string[] {
+    try {
+      const parsed = JSON.parse(json)
+      return Array.isArray(parsed) ? parsed : []
+    } catch {
+      return []
+    }
+  }
+
+  function addLiveScope() {
+    liveScopes = [...liveScopes, { id: '', scope: '', groupByCategoryIds: [], includeAverage: false, includeGroupScores: false, includeEqualizers: false, includePersonalBest: false }]
+  }
+
+  function removeLiveScope(index: number) {
+    liveScopes = liveScopes.filter((_, currentIndex) => currentIndex !== index)
+  }
+
+  function toggleScopeCategory(scopeIndex: number, categoryId: string) {
+    liveScopes = liveScopes.map((scope, index) => {
+      if (index !== scopeIndex) return scope
+      const groupByCategoryIds = scope.groupByCategoryIds.includes(categoryId)
+        ? scope.groupByCategoryIds.filter((id) => id !== categoryId)
+        : [...scope.groupByCategoryIds, categoryId]
+      return { ...scope, groupByCategoryIds }
+    })
+  }
+
   async function save() {
     saveMessage = ''
     saveError = ''
@@ -124,6 +160,17 @@
         keyboardJson: JSON.stringify(keyboardConfig),
         scoringRulesJson: JSON.stringify(scoringRules)
       })
+      for (const scope of match.liveScopes ?? []) await api.deleteLiveScope(match.id, scope.id)
+      for (const scope of liveScopes) {
+        await api.addLiveScope(match.id, {
+          scope: scope.scope,
+          groupByCategoryIds: scope.groupByCategoryIds,
+          includeAverage: scope.includeAverage,
+          includeGroupScores: scope.includeGroupScores,
+          includeEqualizers: scope.includeEqualizers,
+          includePersonalBest: scope.includePersonalBest
+        })
+      }
       saveMessage = labels.matchSaved
       onSaved()
     } catch (error) {
@@ -276,6 +323,33 @@
     </div>
   {/each}
   <button class="primary" on:click={addScoringRule}>+ {labels.addScoringRule}</button>
+</section>
+
+<section class="panel section-gap">
+  <h2>{labels.liveScopesLabel}</h2>
+  <p class="muted">{labels.liveScopesHint}</p>
+  {#each liveScopes as scope, index}
+    <div class="editor-row wrap">
+      <label>{labels.scopeNameLabel}<input bind:value={scope.scope} /></label>
+      <div class="checkbox-grid">
+        <span class="muted">{labels.scopeGroupByLabel}:</span>
+        {#each categories as category}
+          <label class="checkbox-label">
+            <input type="checkbox" checked={scope.groupByCategoryIds.includes(category.id)} on:change={() => toggleScopeCategory(index, category.id)} />
+            {category.name}
+          </label>
+        {/each}
+      </div>
+      <div class="checkbox-grid">
+        <label class="checkbox-label"><input type="checkbox" bind:checked={scope.includeAverage} /> {labels.scopeIncludeAverage}</label>
+        <label class="checkbox-label"><input type="checkbox" bind:checked={scope.includeGroupScores} /> {labels.scopeIncludeGroupScores}</label>
+        <label class="checkbox-label"><input type="checkbox" bind:checked={scope.includeEqualizers} /> {labels.scopeIncludeEqualizers}</label>
+        <label class="checkbox-label"><input type="checkbox" bind:checked={scope.includePersonalBest} /> {labels.scopeIncludePersonalBest}</label>
+      </div>
+      <button class="icon-button" aria-label={labels.removeValue} on:click={() => removeLiveScope(index)}>🗑</button>
+    </div>
+  {/each}
+  <button class="primary" on:click={addLiveScope}>+ {labels.addLiveScope}</button>
 </section>
 
 <section class="panel section-gap">
