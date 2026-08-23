@@ -10,6 +10,9 @@
   export let onDeleted: () => void
   export let onBack: () => void
 
+  let categoryName = category.name
+  let categoryMessage = ''
+  let categoryError = ''
   let showAddValueForm = false
   let newValueName = ''
   let valueError = ''
@@ -18,6 +21,19 @@
   let editValueName = ''
 
   $: sortedValues = [...category.values].sort((a, b) => a.name.localeCompare(b.name))
+
+  async function submitEditCategory() {
+    if (!categoryName.trim()) return
+    categoryMessage = ''
+    categoryError = ''
+    try {
+      await api.updateCategory(category.id, categoryName.trim())
+      categoryMessage = labels.categorySaved
+      onChanged()
+    } catch (error) {
+      categoryError = labelForError(error, labels, 'categorySaveError')
+    }
+  }
 
   async function submitAddValue() {
     if (!newValueName.trim()) return
@@ -76,6 +92,14 @@
   <div><p class="eyebrow">{labels.eyebrowCategoryDetail}</p><h1>{category.name}</h1></div>
 </div>
 <section class="panel">
+  <form class="inline-form" on:submit|preventDefault={submitEditCategory}>
+    <label>{labels.categoryNameLabel}<input bind:value={categoryName} /></label>
+    <button class="primary" type="submit" disabled={!categoryName.trim() || categoryName.trim() === category.name}>{labels.save}</button>
+  </form>
+  {#if categoryError}<p class="error">{categoryError}</p>{/if}
+  {#if categoryMessage}<p class="success">{categoryMessage}</p>{/if}
+</section>
+<section class="panel section-gap">
   <h2>{labels.categoryValues}</h2>
   <section class="list-panel">
     {#if sortedValues.length === 0}<p class="empty-state">{labels.emptyState}</p>{/if}

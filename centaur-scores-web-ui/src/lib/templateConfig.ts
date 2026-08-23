@@ -1,8 +1,13 @@
-import type { TemplateConfiguration } from './types'
+import type { KeyboardKey, TemplateConfiguration } from './types'
 
 export const keyboardColors = ['Yellow', 'Red', 'Blue', 'Black', 'White'] as const
 
 export const deviceSelectionModes = ['restricted', 'list', 'list-and-free'] as const
+
+const defaultKeyboard: KeyboardKey[] = [...Array.from({ length: 10 }, (_, index) => {
+  const value = 10 - index
+  return { keyId: String(value), label: String(value), color: 'Yellow' as const, value }
+}), { keyId: 'M', label: 'M', color: 'White' as const, value: 0 }]
 
 export const emptyTemplateConfiguration: TemplateConfiguration = {
   ends: 10,
@@ -10,10 +15,10 @@ export const emptyTemplateConfiguration: TemplateConfiguration = {
   groupEnds: null,
   categoryOrder: [],
   deviceNames: [],
-  keyboard: [],
+  keyboard: defaultKeyboard,
   disabledKeyRules: [],
   scoringRules: [{ type: 'total' }],
-  liveScopes: []
+  liveScopes: [{ scope: 'all', groupByCategoryIds: [], includeAverage: true, includeGroupScores: false, includeEqualizers: true, includePersonalBest: false }]
 }
 
 export const defaultTemplateConfigurationJson = JSON.stringify(emptyTemplateConfiguration)

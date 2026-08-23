@@ -7,12 +7,13 @@ public sealed record UpdateAccountRequest(string Username, string? Password, str
 public sealed record UpdateProfileRequest(string? DisplayName, string? Email);
 public sealed record ChangePasswordRequest(string CurrentPassword, string NewPassword);
 public sealed record CreateCategoryRequest(string Name);
+public sealed record UpdateCategoryRequest(string Name);
 public sealed record CreateCategoryValueRequest(int ValueId, string Name);
 public sealed record UpdateCategoryValueRequest(string Name);
 public sealed record CreateParticipantListRequest(string Name, bool IsActive);
 public sealed record CreateParticipantRequest(string LastName, string FullName, string? FederationNumber, Dictionary<Guid, int> Categories, bool IsActive = true);
-public sealed record CreateTemplateRequest(string Name, Guid? ParticipantListId, bool AllowFreeParticipants, string DeviceSelectionMode, string ConfigurationJson);
-public sealed record CreateMatchRequest(string Name, DateOnly Date, string? ShortCode, bool IsOpen, Guid? ParticipantListId, string DeviceSelectionMode, int Ends, int ArrowsPerEnd, int? GroupEnds, bool AllowFreeParticipants, string KeyboardJson, string ScoringRulesJson);
+public sealed record CreateTemplateRequest(string Name, Guid? ParticipantListId, bool AllowFreeParticipants = true, string DeviceSelectionMode = "list-and-free", string ConfigurationJson = "");
+public sealed record CreateMatchRequest(string Name, DateOnly Date, string? ShortCode, bool IsOpen, Guid? ParticipantListId, string DeviceSelectionMode, int Ends, int ArrowsPerEnd, int? GroupEnds, bool AllowFreeParticipants = true, string KeyboardJson = "", string ScoringRulesJson = "[]");
 public sealed record CreateMatchParticipantRequest(Guid? ParticipantListMemberId, string LastName, string FullName, string? FederationNumber, Dictionary<Guid, int> Categories);
 public sealed record EnterScoreRequest(int End, int Arrow, string KeyId, int Value);
 public sealed record CreateDeviceRequest(string Name);

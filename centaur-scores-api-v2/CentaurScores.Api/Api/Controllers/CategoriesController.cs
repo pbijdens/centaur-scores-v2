@@ -23,6 +23,17 @@ public sealed class CategoriesController(ApplicationDbContext db, ITenantContext
         return Created($"api/categories/{category.Id}", category);
     }
 
+    [HttpPut("{categoryId:guid}")]
+    public async Task<IActionResult> Update(Guid categoryId, UpdateCategoryRequest request, CancellationToken cancellationToken)
+    {
+        if (!CanManage) return Forbid();
+        var category = await db.Categories.SingleOrDefaultAsync(item => item.Id == categoryId && item.TenantId == TenantId, cancellationToken);
+        if (category is null) return NotFound();
+        category.Name = request.Name;
+        await db.SaveChangesAsync(cancellationToken);
+        return Ok(category);
+    }
+
     [HttpPost("{categoryId:guid}/values")]
     public async Task<IActionResult> AddValue(Guid categoryId, CreateCategoryValueRequest request, CancellationToken cancellationToken)
     {

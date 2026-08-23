@@ -1,5 +1,10 @@
 namespace CentaurScores.Api.Domain;
 
+public static class MatchDefaults
+{
+    public const string KeyboardJson = "{\"categoryOrder\":[],\"keyboard\":[{\"keyId\":\"10\",\"label\":\"10\",\"value\":10},{\"keyId\":\"9\",\"label\":\"9\",\"value\":9},{\"keyId\":\"8\",\"label\":\"8\",\"value\":8},{\"keyId\":\"7\",\"label\":\"7\",\"value\":7},{\"keyId\":\"6\",\"label\":\"6\",\"value\":6},{\"keyId\":\"5\",\"label\":\"5\",\"value\":5},{\"keyId\":\"4\",\"label\":\"4\",\"value\":4},{\"keyId\":\"3\",\"label\":\"3\",\"value\":3},{\"keyId\":\"2\",\"label\":\"2\",\"value\":2},{\"keyId\":\"1\",\"label\":\"1\",\"value\":1},{\"keyId\":\"M\",\"label\":\"M\",\"value\":0}]}";
+}
+
 public abstract class TenantOwnedEntity
 {
     public Guid Id { get; init; }
@@ -60,9 +65,9 @@ public sealed class MatchTemplate : TenantOwnedEntity
 {
     public string Name { get; set; } = "";
     public Guid? ParticipantListId { get; set; }
-    public bool AllowFreeParticipants { get; set; }
-    public string DeviceSelectionMode { get; set; } = "restricted";
-    public string ConfigurationJson { get; set; } = "{}";
+    public bool AllowFreeParticipants { get; set; } = true;
+    public string DeviceSelectionMode { get; set; } = "list-and-free";
+    public string ConfigurationJson { get; set; } = MatchDefaults.KeyboardJson;
 }
 
 public sealed class Match : TenantOwnedEntity
@@ -72,12 +77,12 @@ public sealed class Match : TenantOwnedEntity
     public string? ShortCode { get; set; }
     public bool IsOpen { get; set; }
     public Guid? ParticipantListId { get; set; }
-    public string DeviceSelectionMode { get; set; } = "restricted";
+    public string DeviceSelectionMode { get; set; } = "list-and-free";
     public int Ends { get; set; }
     public int ArrowsPerEnd { get; set; }
     public int? GroupEnds { get; set; }
-    public bool AllowFreeParticipants { get; set; }
-    public string KeyboardJson { get; set; } = "[]";
+    public bool AllowFreeParticipants { get; set; } = true;
+    public string KeyboardJson { get; set; } = MatchDefaults.KeyboardJson;
     public string ScoringRulesJson { get; set; } = "[]";
     public List<MatchParticipant> Participants { get; set; } = [];
     public List<ScoreDevice> Devices { get; set; } = [];

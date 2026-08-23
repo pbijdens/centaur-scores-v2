@@ -60,6 +60,7 @@ JWTs are returned by `POST /api/auth/login` and contain the account and active t
 |---|---|---|---|
 | `GET` | `/api/categories` | user | List categories and their values alphabetically. |
 | `POST` | `/api/categories` | manager | Create a category. |
+| `PUT` | `/api/categories/{categoryId}` | manager | Rename a category with `{ name }`. |
 | `POST` | `/api/categories/{categoryId}/values` | manager | Add a `{ valueId, name }` category value. |
 | `PUT` | `/api/categories/{categoryId}/values/{valueId}` | manager | Rename a category value with `{ name }`. |
 | `DELETE` | `/api/categories/{categoryId}/values/{valueId}` | manager | Remove a category value. |

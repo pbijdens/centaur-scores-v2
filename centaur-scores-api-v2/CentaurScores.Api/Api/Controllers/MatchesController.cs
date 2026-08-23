@@ -17,7 +17,7 @@ public sealed class MatchesController(ApplicationDbContext db, ITenantContext te
     public async Task<IActionResult> Create(CreateMatchRequest request, CancellationToken cancellationToken)
     {
         if (!CanManage) return Forbid();
-        var match = new Match { Id = Guid.NewGuid(), TenantId = TenantId, Name = request.Name, Date = request.Date, ShortCode = request.ShortCode, IsOpen = request.IsOpen, ParticipantListId = request.ParticipantListId, DeviceSelectionMode = request.DeviceSelectionMode, Ends = request.Ends, ArrowsPerEnd = request.ArrowsPerEnd, GroupEnds = request.GroupEnds, AllowFreeParticipants = request.AllowFreeParticipants, KeyboardJson = request.KeyboardJson, ScoringRulesJson = request.ScoringRulesJson };
+        var match = new Match { Id = Guid.NewGuid(), TenantId = TenantId, Name = request.Name, Date = request.Date, ShortCode = request.ShortCode, IsOpen = request.IsOpen, ParticipantListId = request.ParticipantListId, DeviceSelectionMode = string.IsNullOrWhiteSpace(request.DeviceSelectionMode) ? "list-and-free" : request.DeviceSelectionMode, Ends = request.Ends, ArrowsPerEnd = request.ArrowsPerEnd, GroupEnds = request.GroupEnds, AllowFreeParticipants = request.AllowFreeParticipants, KeyboardJson = string.IsNullOrWhiteSpace(request.KeyboardJson) ? MatchDefaults.KeyboardJson : request.KeyboardJson, ScoringRulesJson = request.ScoringRulesJson };
         db.Matches.Add(match);
         await db.SaveChangesAsync(cancellationToken);
         return CreatedAtAction(nameof(Get), new { id = match.Id }, match);

@@ -45,8 +45,8 @@
     let keyboardJson = defaultMatchKeyboardJson
     let scoringRulesJson = defaultMatchScoringRulesJson
     let participantListId: string | null = null
-    let allowFreeParticipants = false
-    let deviceSelectionMode = 'restricted'
+    let allowFreeParticipants = true
+    let deviceSelectionMode = 'list-and-free'
     let ends = 10
     let arrowsPerEnd = 3
     let groupEnds: number | null = null
@@ -81,6 +81,15 @@
         for (const deviceName of config.deviceNames.map((name) => name.trim()).filter(Boolean)) {
           await api.addDevice(match.id, { name: deviceName })
         }
+      } else {
+        await api.addLiveScope(match.id, {
+          scope: 'all',
+          groupByCategoryIds: [],
+          includeAverage: true,
+          includeGroupScores: false,
+          includeEqualizers: true,
+          includePersonalBest: false
+        })
       }
       newMatchName = ''
       newMatchDate = ''

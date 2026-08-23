@@ -11,9 +11,22 @@ namespace CentaurScores.Api.Infrastructure.Migrations
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             // Untracked column from outside the EF model; NOT NULL with no default blocked every match insert.
-            migrationBuilder.DropColumn(
-                name: "participant_count",
-                table: "matches");
+            migrationBuilder.Sql("""
+                SET @drop_sql = IF(
+                    EXISTS(
+                        SELECT 1
+                        FROM information_schema.columns
+                        WHERE table_schema = DATABASE()
+                          AND table_name = 'matches'
+                          AND column_name = 'participant_count'
+                    ),
+                    'ALTER TABLE `matches` DROP COLUMN `participant_count`',
+                    'DO 0'
+                );
+                PREPARE drop_statement FROM @drop_sql;
+                EXECUTE drop_statement;
+                DEALLOCATE PREPARE drop_statement;
+                """);
         }
 
         /// <inheritdoc />

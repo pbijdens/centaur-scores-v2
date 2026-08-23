@@ -2,7 +2,11 @@ import type { DisabledKeyRule, KeyboardKey, ScoringRule } from './types'
 
 export type MatchKeyboardConfig = { categoryOrder: string[]; keyboard: KeyboardKey[]; disabledKeyRules: DisabledKeyRule[] }
 
-const emptyKeyboardConfig: MatchKeyboardConfig = { categoryOrder: [], keyboard: [], disabledKeyRules: [] }
+const defaultKeyboard: KeyboardKey[] = [...Array.from({ length: 10 }, (_, index) => {
+  const value = 10 - index
+  return { keyId: String(value), label: String(value), color: 'Yellow' as const, value }
+}), { keyId: 'M', label: 'M', color: 'White' as const, value: 0 }]
+const emptyKeyboardConfig: MatchKeyboardConfig = { categoryOrder: [], keyboard: defaultKeyboard, disabledKeyRules: [] }
 const defaultScoringRules: ScoringRule[] = [{ type: 'total' }]
 
 export const defaultMatchKeyboardJson = JSON.stringify(emptyKeyboardConfig)
