@@ -8,10 +8,10 @@ using Microsoft.EntityFrameworkCore;
 namespace CentaurScores.Api.Controllers;
 
 [Route("api/matches")]
-public sealed class MatchesController(ApplicationDbContext db, ITenantContext tenantContext, IScoringService scoring) : ApiControllerBase(tenantContext)
+public sealed class MatchesController(ApplicationDbContext db, ITenantContext tenantContext, IScoringService scoring, ILiveScoringService liveScoringService) : ApiControllerBase(tenantContext)
 {
     [HttpGet]
-    public async Task<IActionResult> List(CancellationToken cancellationToken) => Ok(await db.Matches.AsNoTracking().Include(item => item.Participants).Where(item => item.TenantId == TenantId).OrderByDescending(item => item.IsOpen).ThenBy(item => item.Date).ToListAsync(cancellationToken));
+    public async Task<IActionResult> List(CancellationToken cancellationToken) => Ok(await db.Matches.AsNoTracking().Include(item => item.Participants).Include(item => item.LiveScopes).Where(item => item.TenantId == TenantId).OrderByDescending(item => item.IsOpen).ThenBy(item => item.Date).ToListAsync(cancellationToken));
 
     [HttpPost]
     public async Task<IActionResult> Create(CreateMatchRequest request, CancellationToken cancellationToken)
@@ -148,6 +148,23 @@ public sealed class MatchesController(ApplicationDbContext db, ITenantContext te
     {
         var match = await db.Matches.Include(item => item.Participants).ThenInclude(item => item.Scores).SingleOrDefaultAsync(item => item.Id == id && item.TenantId == TenantId, cancellationToken);
         return match is null ? NotFound() : Ok(scoring.Rank(match.Participants, match));
+    }
+
+    // Static equivalent of the public narrowcast page for a single, specific match/scope, regardless of IsOpen.
+    [HttpGet("{id:guid}/live-scoring/{scope}")]
+    public async Task<IActionResult> LiveScoringForScope(Guid id, string scope, CancellationToken cancellationToken)
+    {
+        var match = await db.Matches.AsNoTracking()
+            .Include(item => item.Participants).ThenInclude(item => item.Scores)
+            .Include(item => item.LiveScopes)
+            .SingleOrDefaultAsync(item => item.Id == id && item.TenantId == TenantId, cancellationToken);
+        var liveScope = match?.LiveScopes.SingleOrDefault(item => item.Scope == scope);
+        if (match is null || liveScope is null) return NotFound();
+
+        var tenant = await db.Tenants.AsNoTracking().SingleOrDefaultAsync(item => item.Id == TenantId, cancellationToken);
+        if (tenant is null) return NotFound();
+        var categories = await db.Categories.AsNoTracking().Include(item => item.Values).Where(item => item.TenantId == TenantId).ToListAsync(cancellationToken);
+        return Ok(new LiveScoringPage(15, tenant.LogoUrl, tenant.Name, match.Name, match.Date, liveScoringService.BuildBlocks(match, liveScope, categories)));
     }
 
     [HttpPost("{id:guid}/devices")]

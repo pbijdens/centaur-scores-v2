@@ -171,6 +171,10 @@ export class ApiClient {
     return this.request(`/api/matches/${matchId}/results`)
   }
 
+  fetchMatchLiveScoringPage(matchId: string, scope: string): Promise<LiveScoringPage> {
+    return this.request(`/api/matches/${matchId}/live-scoring/${encodeURIComponent(scope)}`)
+  }
+
   addDevice(matchId: string, body: { name: string }): Promise<ScoreDevice> {
     return this.request(`/api/matches/${matchId}/devices`, { method: 'POST', body: JSON.stringify(body) })
   }

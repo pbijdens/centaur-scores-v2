@@ -22,6 +22,7 @@
   import MatchMetadataEditView from './lib/MatchMetadataEditView.svelte'
   import MatchParticipantView from './lib/MatchParticipantView.svelte'
   import MatchQrCodesView from './lib/MatchQrCodesView.svelte'
+  import MatchResultsScopeView from './lib/MatchResultsScopeView.svelte'
   import ParticipantListDetailView from './lib/ParticipantListDetailView.svelte'
   import ParticipantListsView from './lib/ParticipantListsView.svelte'
   import ParticipantMemberView from './lib/ParticipantMemberView.svelte'
@@ -66,6 +67,7 @@
   let selectedCompetition: Competition | null = null
   let narrowcastTenantId: string | null = null
   let narrowcastScope: string | null = null
+  let selectedResultsScope: string | null = null
 
   $: t = translationsFor(language)
   $: isAdmin = profile?.authorization === 'Administrator'
@@ -260,7 +262,8 @@
     view = route.view
     narrowcastTenantId = route.view === 'narrowcast' ? route.tenantId ?? null : null
     narrowcastScope = route.view === 'narrowcast' ? route.scope ?? null : null
-    const matchScopedViews: View[] = ['match', 'match-metadata', 'match-devices', 'match-qr', 'match-participant']
+    selectedResultsScope = route.view === 'match-results-scope' ? route.scope ?? null : null
+    const matchScopedViews: View[] = ['match', 'match-metadata', 'match-devices', 'match-qr', 'match-results-scope', 'match-participant']
     selectedMatchId = matchScopedViews.includes(route.view) ? route.matchId ?? null : null
     if (selectedMatchId) loadSelectedMatch(selectedMatchId)
     else selectedMatch = null
@@ -295,6 +298,8 @@
   <LiveScoringView tenantId={narrowcastTenantId} scope={narrowcastScope} />
 {:else if view === 'match-qr' && selectedMatch}
   <MatchQrCodesView match={selectedMatch} tenantId={tenant} labels={t} />
+{:else if view === 'match-results-scope' && selectedMatchId && selectedResultsScope}
+  <MatchResultsScopeView {api} matchId={selectedMatchId} scope={selectedResultsScope} {language} labels={t} />
 {:else if view === 'competition-results' && selectedCompetitionId}
   <CompetitionResultsView {api} competitionId={selectedCompetitionId} tenantLogoUrl={currentTenant?.logoUrl} {language} labels={t} />
 {:else if !loggedIn}
@@ -304,12 +309,12 @@
     <AppHeader {username} {language} {view} labels={t} tenantName={currentTenant?.name} tenantLogoUrl={currentTenant?.logoUrl} onNavigate={navigate} onLanguageChange={setLanguage} onLogout={signOut} />
     <main class="content">
       {#if view === 'home'}
-        <HomeView {matches} {competitions} {language} labels={t} quickLinks={homeQuickLinks} onOpenMatch={openMatch} onNavigate={navigate} onDeactivateAll={deactivateAllMatches} />
+        <HomeView {matches} {competitions} tenantId={tenant} {language} labels={t} quickLinks={homeQuickLinks} onOpenMatch={openMatch} onNavigate={navigate} onDeactivateAll={deactivateAllMatches} />
       {:else if view === 'matches'}
         <MatchesView {api} {matches} {templates} {language} labels={t} onOpenMatch={openMatch} onChanged={loadMatchesList} />
       {:else if view === 'match' && selectedMatch}
         {@const currentMatch = selectedMatch}
-        <MatchDetailView {api} match={currentMatch} {categories} {participantLists} tenantId={tenant} {language} labels={t} onBack={() => navigate('/matches')} onToggleOpen={toggleSelectedMatch} onChanged={refreshSelectedMatch} onDeleted={onMatchDeleted} onEditMetadata={() => navigate(`/matches/${currentMatch.id}/edit`)} onManageDevices={() => navigate(`/matches/${currentMatch.id}/devices`)} onOpenParticipant={openParticipant} />
+        <MatchDetailView {api} match={currentMatch} {categories} {participantLists} {language} labels={t} onBack={() => navigate('/matches')} onToggleOpen={toggleSelectedMatch} onChanged={refreshSelectedMatch} onDeleted={onMatchDeleted} onEditMetadata={() => navigate(`/matches/${currentMatch.id}/edit`)} onManageDevices={() => navigate(`/matches/${currentMatch.id}/devices`)} onOpenParticipant={openParticipant} />
       {:else if view === 'match-metadata' && selectedMatch}
         {@const currentMatch = selectedMatch}
         <MatchMetadataEditView {api} match={currentMatch} {categories} {participantLists} labels={t} onBack={() => navigate(`/matches/${currentMatch.id}`)} onSaved={() => navigate(`/matches/${currentMatch.id}`)} onDeleted={onMatchDeleted} />

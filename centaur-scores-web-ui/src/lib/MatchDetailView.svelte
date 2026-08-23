@@ -9,7 +9,6 @@
   export let match: Match
   export let categories: Category[]
   export let participantLists: ParticipantList[]
-  export let tenantId: string
   export let language: Language
   export let labels: Record<string, string>
   export let onBack: () => void
@@ -116,10 +115,6 @@
   }
   $: if (match.id) loadResults()
 
-  function openResultsScope(scope: string) {
-    window.open(`/narrowcast/${tenantId}/${encodeURIComponent(scope)}`, '_blank')
-  }
-
   async function exportCsv() {
     exportError = ''
     try {
@@ -200,7 +195,7 @@
   <button class="primary" on:click={() => window.open(`/matches/${match.id}/qr`, '_blank')}>{labels.viewQrCodes}</button>
   <button class="primary" on:click={exportCsv}>{labels.exportCsv}</button>
   {#if liveScopes.length > 0}
-    <select on:change={(event) => { if (event.currentTarget.value) { openResultsScope(event.currentTarget.value); event.currentTarget.value = '' } }}>
+    <select on:change={(event) => { if (event.currentTarget.value) { window.open(`/matches/${match.id}/results/${encodeURIComponent(event.currentTarget.value)}`, '_blank'); event.currentTarget.value = '' } }}>
       <option value="">{labels.resultsLabel}</option>
       {#each liveScopes as scope}<option value={scope.scope}>{scope.scope}</option>{/each}
     </select>

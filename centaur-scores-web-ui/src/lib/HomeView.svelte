@@ -4,12 +4,25 @@
 
   export let matches: Match[]
   export let competitions: Competition[]
+  export let tenantId: string
   export let language: Language
   export let labels: Record<string, string>
   export let quickLinks: [string, string][]
   export let onOpenMatch: (match: Match) => void
   export let onNavigate: (path: string) => void
   export let onDeactivateAll: () => void
+
+  function localToday(): string {
+    const now = new Date()
+    return new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 10)
+  }
+
+  $: today = localToday()
+  $: narrowcastScopes = [...new Set(
+    matches
+      .filter((match) => match.isOpen || match.date >= today)
+      .flatMap((match) => (match.liveScopes ?? []).map((scope) => scope.scope))
+  )].sort((a, b) => a.localeCompare(b))
 </script>
 
 <div class="page-intro">
@@ -55,6 +68,22 @@
         <span class="arrow">→</span>
       </button>
     {/each}
+  </section>
+  <section class="panel wide">
+    <div class="panel-heading">
+      <div><p class="eyebrow">{labels.eyebrowLive}</p><h2>{labels.narrowcastLinksLabel}</h2><p class="muted">{labels.narrowcastLinksHint}</p></div>
+    </div>
+    {#if narrowcastScopes.length === 0}
+      <p class="muted">{labels.noNarrowcastLinks}</p>
+    {:else}
+      {#each narrowcastScopes as scope}
+        <button class="match-row" on:click={() => window.open(`/narrowcast/${tenantId}/${encodeURIComponent(scope)}`, '_blank')}>
+          <span class="competition-icon">▶</span>
+          <span><strong>{scope}</strong><small>{`/narrowcast/${tenantId}/${scope}`}</small></span>
+          <span class="arrow">→</span>
+        </button>
+      {/each}
+    {/if}
   </section>
 </div>
 <div class="quick-links">

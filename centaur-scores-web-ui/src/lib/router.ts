@@ -21,6 +21,7 @@ export function resolveRoute(path = location.pathname): Route {
     if (segments[2] === 'edit') return { view: 'match-metadata', matchId: segments[1] }
     if (segments[2] === 'devices') return { view: 'match-devices', matchId: segments[1] }
     if (segments[2] === 'qr') return { view: 'match-qr', matchId: segments[1] }
+    if (segments[2] === 'results' && segments[3]) return { view: 'match-results-scope', matchId: segments[1], scope: decodeURIComponent(segments[3]) }
     if (segments[2] === 'participants' && segments[3]) return { view: 'match-participant', matchId: segments[1], participantId: segments[3] }
     return { view: 'match', matchId: segments[1] }
   }

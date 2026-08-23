@@ -1,4 +1,4 @@
-export type View = 'home' | 'matches' | 'match' | 'match-metadata' | 'match-devices' | 'match-qr' | 'match-participant' | 'competitions' | 'competition' | 'competition-results' | 'participants' | 'participant-list' | 'participant' | 'categories' | 'category' | 'templates' | 'template' | 'accounts' | 'account' | 'profile' | 'tenants' | 'tenant' | 'narrowcast'
+export type View = 'home' | 'matches' | 'match' | 'match-metadata' | 'match-devices' | 'match-qr' | 'match-results-scope' | 'match-participant' | 'competitions' | 'competition' | 'competition-results' | 'participants' | 'participant-list' | 'participant' | 'categories' | 'category' | 'templates' | 'template' | 'accounts' | 'account' | 'profile' | 'tenants' | 'tenant' | 'narrowcast'
 export type Language = 'en' | 'nl'
 export type Tenant = { id: string; name: string; logoUrl?: string | null }
 export type Match = {
