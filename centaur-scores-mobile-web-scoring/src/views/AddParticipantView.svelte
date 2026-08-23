@@ -15,6 +15,15 @@
   let options = $state<ParticipantOptionsResponse | null>(null);
   let loadingOptions = $state(true);
   let saving = $state(false);
+  let viewEl = $state<HTMLElement | null>(null);
+
+  function onSearchFocus() {
+    // Reset scroll so the sticky search bar and the first result land at a
+    // predictable spot instead of wherever the browser's own
+    // scroll-focused-input-into-view behavior happens to leave them - on
+    // mobile that can otherwise push the first result behind the keyboard.
+    viewEl?.scrollTo({ top: 0 });
+  }
 
   onMount(async () => {
     const base = get(apiBase);
@@ -79,12 +88,14 @@
   }
 </script>
 
-<div class="view">
+<div class="view" bind:this={viewEl}>
   {#if mode === 'list'}
-    <h1>{$t('addParticipant')}</h1>
+    {#if !query}
+      <h1>{$t('addParticipant')}</h1>
+    {/if}
     <div class="search">
       <Icon name="search" size={22} />
-      <input type="text" placeholder={$t('search')} bind:value={query} disabled={saving} />
+      <input type="text" placeholder={$t('search')} bind:value={query} disabled={saving} onfocus={onSearchFocus} />
     </div>
 
     {#if $matchData?.allowCustomParticipants}
@@ -146,6 +157,9 @@
   @use '../styles/variables' as v;
 
   .search {
+    position: sticky;
+    top: 0.35rem;
+    z-index: 5;
     display: flex;
     align-items: center;
     gap: 0.5rem;
@@ -153,7 +167,7 @@
     border: 2px solid v.$color-border;
     border-radius: v.$radius;
     padding: 0.15rem 0.75rem;
-    margin-bottom: 1rem;
+    margin-bottom: 0.5rem;
     color: v.$color-text-muted;
 
     input {
@@ -209,7 +223,7 @@
     gap: 0.4rem;
     background: none;
     border: none;
-    padding: 0.5rem 0.1rem;
+    padding: 0.2rem 0.1rem;
     color: v.$color-primary;
     font-weight: 600;
     font-size: v.$font-size-base;
@@ -217,6 +231,6 @@
   }
 
   .add-unlisted {
-    margin-bottom: 1rem;
+    margin-bottom: 0.5rem;
   }
 </style>
