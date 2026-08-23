@@ -64,3 +64,8 @@ export function firstNullIndexInEnd(match: ScorekeeperMatch, participant: Scorek
   }
   return null;
 }
+
+export function firstNullIndex(match: ScorekeeperMatch, participant: ScorekeeperMatchParticipant): number | null {
+  const index = participant.arrowScores.findIndex((s) => s === null);
+  return index === -1 ? null : index;
+}

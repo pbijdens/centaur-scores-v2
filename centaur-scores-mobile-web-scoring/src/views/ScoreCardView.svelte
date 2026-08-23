@@ -5,6 +5,7 @@
     availableKeys,
     endArrows,
     endTotal,
+    firstNullIndex,
     firstNullIndexInEnd,
     groupRunningTotal,
     runningTotalThroughEnd,
@@ -34,6 +35,23 @@
     if (openEndIndex !== null && keyboardEl) {
       keyboardEl.scrollIntoView({ block: 'end', behavior: 'smooth' });
     }
+  });
+
+  // Whenever this view is (re)activated for a participant - on first mount or after a
+  // swipe switches to another participant - jump to their first unscored arrow.
+  let autoFocusedParticipantId: string | null = null;
+  $effect(() => {
+    if (currentScreen.name !== 'score-card' || !$matchData || !participant) return;
+    if (participant.matchParticipantId === autoFocusedParticipantId) return;
+    autoFocusedParticipantId = participant.matchParticipantId;
+    const idx = firstNullIndex($matchData, participant);
+    if (idx === null) {
+      openEndIndex = null;
+      focusedIndex = null;
+      return;
+    }
+    openEndIndex = Math.floor(idx / $matchData.arrowsPerEnd);
+    focusedIndex = idx;
   });
 
   function updateLocalArrow(matchParticipantId: string, index: number, value: string | null) {
