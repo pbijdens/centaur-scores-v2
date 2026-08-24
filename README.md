@@ -6,4 +6,4 @@
 - The new web application is in `./centaur-scores-web-ui`
 - The new web score application is in `./centaur-scores-web-scores`
 - The .NET Management API is in `./centaur-scores-api-v2`
-
+- All debug scripts go into `./scripts`
