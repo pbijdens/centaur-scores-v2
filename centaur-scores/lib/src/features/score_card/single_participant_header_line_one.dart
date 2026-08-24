@@ -1,13 +1,13 @@
-import 'package:centaur_scores/src/features/participants/participants_view.dart';
+import 'package:centaur_scores/src/repository/app_navigator.dart';
 import 'package:centaur_scores/src/style/style_helper.dart';
 import 'package:flutter/material.dart';
 
-import '../../model/match_model.dart';
-import '../../model/participant_model.dart';
+import '../../model/scorekeeper_match.dart';
+import '../../model/scorekeeper_match_participant.dart';
 
 class SingleParticipantHeaderLineOne extends StatelessWidget {
-  final MatchModel model;
-  final ParticipantModel participant;
+  final ScorekeeperMatch model;
+  final ScorekeeperMatchParticipant participant;
   final int index;
 
   const SingleParticipantHeaderLineOne(
@@ -18,18 +18,13 @@ class SingleParticipantHeaderLineOne extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Build a Form widget using the _formKey created above.
     return InkWell(
       onTap: () {
-        Navigator.pushReplacement(
-            context,
-            MaterialPageRoute<void>(
-              builder: (BuildContext context) => const ParticipantsView(),
-            ));
+        AppNavigator().navigate(const HomeScreen(), resetStack: true);
       },
       child: SizedBox(
           width: StyleHelper.scoreCardColumnWidth(context, model),
-          height: StyleHelper.scLine1Height,
+          height: StyleHelper.scLine1Height(context),
           child: Container(
               alignment: Alignment.topLeft,
               color: StyleHelper.colorForColumn(index),
@@ -38,7 +33,7 @@ class SingleParticipantHeaderLineOne extends StatelessWidget {
                   child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(participant.name ?? "-",
+                        Text(participant.name,
                             textAlign: TextAlign.left,
                             style: StyleHelper
                                 .scoreFormHeaderParticipantNameTextStyle(

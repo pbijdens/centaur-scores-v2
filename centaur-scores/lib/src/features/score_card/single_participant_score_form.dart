@@ -1,14 +1,15 @@
-import 'package:centaur_scores/src/model/end_model.dart';
 import 'package:centaur_scores/src/style/style_helper.dart';
 import 'package:centaur_scores/src/features/score_card/scores_viewmodel.dart';
 import 'package:flutter/material.dart';
 
-import '../../model/match_model.dart';
-import '../../model/participant_model.dart';
+import '../../model/scorekeeper_key.dart';
+import '../../model/scorekeeper_match.dart';
+import '../../model/scorekeeper_match_participant.dart';
+import '../../scoring/scoring.dart' as scoring;
 
 class SingeParticipantScoreForm extends StatelessWidget {
-  final MatchModel _model;
-  final ParticipantModel _participant;
+  final ScorekeeperMatch _model;
+  final ScorekeeperMatchParticipant _participant;
   final int _index;
   final Function(BuildContext context, int endNo, int? arrowNo) _onSelect;
   final ScoresViewmodel viewModel;
@@ -17,8 +18,8 @@ class SingeParticipantScoreForm extends StatelessWidget {
   const SingeParticipantScoreForm(
       {super.key,
       required this.viewModel,
-      required ParticipantModel participant,
-      required MatchModel model,
+      required ScorekeeperMatchParticipant participant,
+      required ScorekeeperMatch model,
       required Function(BuildContext context, int endNo, int? arrowNo) onSelect,
       required int index,
       required GlobalKey scrollKey})
@@ -30,7 +31,6 @@ class SingeParticipantScoreForm extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Build a Form widget using the _formKey created above.
     return Container(
         color: StyleHelper.colorForScoreForm(_index),
         child: SizedBox(
@@ -43,11 +43,18 @@ class SingeParticipantScoreForm extends StatelessWidget {
                         children: buildScoreRows(context))))));
   }
 
+  ScorekeeperKey? _keyFor(String? id) {
+    if (id == null) return null;
+    for (final key in _model.keyboard) {
+      if (key.id == id) return key;
+    }
+    return null;
+  }
+
   List<Widget> buildScoreRows(BuildContext context) {
     List<Widget> result = [];
-    int subtotal = 0;
-    for (var endNo = 0; endNo < _model.numberOfEnds; endNo++) {
-      subtotal += _participant.ends[endNo].score ?? 0;
+    for (var endNo = 0; endNo < _model.ends; endNo++) {
+      final subtotal = scoring.runningTotalThroughEnd(_model, _participant, endNo);
 
       result.add(SizedBox(
         width: StyleHelper.scoreCardColumnWidth(context, _model),
@@ -65,21 +72,19 @@ class SingeParticipantScoreForm extends StatelessWidget {
                       viewModel.editingEnd == endNo
                   ? Row(
                       key: _scrollKey,
-                      children: buildScoreRow(
-                          context, endNo, _participant.ends[endNo], subtotal))
-                  : Row(
-                      children: buildScoreRow(
-                          context, endNo, _participant.ends[endNo], subtotal)),
+                      children: buildScoreRow(context, endNo, subtotal))
+                  : Row(children: buildScoreRow(context, endNo, subtotal)),
             )),
       ));
     }
     return result;
   }
 
-  List<Widget> buildScoreRow(
-      BuildContext context, int endNo, EndModel end, int subtotal) {
+  List<Widget> buildScoreRow(BuildContext context, int endNo, int subtotal) {
     List<Widget> result = [];
-    int? endscore;
+    final endArrows = scoring.endArrows(_model, _participant, endNo);
+    final anyShot = endArrows.any((a) => a != null);
+    final int? endScore = anyShot ? scoring.endTotal(_model, _participant, endNo) : null;
 
     result.add(SizedBox(
         width: StyleHelper.endNumberWidth,
@@ -95,11 +100,11 @@ class SingeParticipantScoreForm extends StatelessWidget {
     double inset = q.size.height > 600 ? 4 : 2;
 
     for (int arrowNo = 0; arrowNo < _model.arrowsPerEnd; arrowNo++) {
-      int? arrowScore = _participant.ends[endNo].arrows[arrowNo];
-      if (arrowScore != null) {
-        endscore ??= 0;
-        endscore += arrowScore;
-      }
+      final keyId = endArrows[arrowNo];
+      final key = _keyFor(keyId);
+      final colorValue = keyId != null ? scoring.keyValue(_model, keyId) : null;
+      final label = keyId == null ? '-' : (key?.label ?? keyId);
+
       bool isSelected = viewModel.activeKeyboard == _index &&
           viewModel.editingEnd == endNo &&
           arrowNo == viewModel.editingArrow;
@@ -120,14 +125,14 @@ class SingeParticipantScoreForm extends StatelessWidget {
                         alignment: Alignment.center,
                         color: isSelected
                             ? StyleHelper.colorForButtonSelected(context)
-                            : StyleHelper.colorForButton(context, arrowScore),
-                        child: Text('${arrowScore ?? "-"}',
+                            : StyleHelper.colorForButton(context, colorValue),
+                        child: Text(label,
                             style: isSelected
                                 ? StyleHelper
                                     .scoreFormArrowScoreTextStyleSelected(
                                         context)
                                 : StyleHelper.scoreFormArrowScoreTextStyle(
-                                    context, arrowScore)),
+                                    context, colorValue)),
                       )))));
       result.add(box);
     }
@@ -139,18 +144,18 @@ class SingeParticipantScoreForm extends StatelessWidget {
         child: Container(
           alignment: Alignment.center,
           color: Colors.transparent,
-          child: Text('${endscore ?? "-"}',
+          child: Text('${endScore ?? "-"}',
               style: StyleHelper.scoreFormEndTotalTextStyle(context)),
         )));
 
-    // arrow total
+    // running total through this end
     result.add(SizedBox(
         width: StyleHelper.subTotalWidth,
         height: StyleHelper.preferredCellHeight(context, _model),
         child: Container(
           alignment: Alignment.center,
           color: Colors.transparent,
-          child: Text('${endscore != null ? subtotal : "-"}',
+          child: Text('${endScore != null ? subtotal : "-"}',
               style: StyleHelper.scoreFormEndTotalTextStyle(context)),
         )));
 

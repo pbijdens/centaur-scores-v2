@@ -1,7 +1,7 @@
-import 'package:centaur_scores/src/model/score_button_definition.dart';
 import 'package:flutter/material.dart';
 
-import '../model/match_model.dart';
+import '../model/scorekeeper_key.dart';
+import '../model/scorekeeper_match.dart';
 
 class StyleHelper {
   static const double endNumberWidth = 25;
@@ -9,17 +9,32 @@ class StyleHelper {
   static const double subTotalWidth = 45;
   static const double scFixedWidth =
       endNumberWidth + endTotalWidth + subTotalWidth;
-  static const double scLine1Height = 40;
-  static const double scLine2Height = 30;
-  static const double scFooterHeight = 55;
-  static const double scVerticalOverhead = 175 + scFooterHeight;
 
-  static double scale(BuildContext context) => 1.1;
+  // These grow with `scale()` because the text/icons they contain do too -
+  // they used to be fixed pixel heights, which is why the header/footer rows
+  // started overrunning their bounding boxes (debug overrun errors) once
+  // `scale()` became device-size-aware instead of a flat 1.1.
+  static double scLine1Height(BuildContext context) => 40 * scale(context);
+  static double scLine2Height(BuildContext context) => 30 * scale(context);
+  static double scFooterHeight(BuildContext context) => 55 * scale(context);
+  static double scVerticalOverhead(BuildContext context) =>
+      (175 * scale(context)) + scFooterHeight(context);
+
+  /// Text/control scale factor, driven by the device's shortest logical-
+  /// pixel side so tablets (and other high-resolution/large-screen devices)
+  /// get noticeably bigger text, icons and touch targets than phones,
+  /// which keep the scale this app has always shipped at.
+  static double scale(BuildContext context) {
+    final shortestSide = MediaQuery.of(context).size.shortestSide;
+    if (shortestSide >= 900) return 1.6; // large tablets
+    if (shortestSide >= 600) return 1.35; // small tablets / large-screen devices
+    return 1.1; // phones
+  }
 
   static double min(double a, double b) => a < b ? a : b;
   static double max(double a, double b) => a > b ? a : b;
 
-  static double preferredCellWidth(BuildContext context, MatchModel model) {
+  static double preferredCellWidth(BuildContext context, ScorekeeperMatch model) {
     MediaQueryData q = MediaQuery.of(context);
     double screenWidth = q.size.width;
     double singleColumnPreferredWidth = screenWidth / 4.0;
@@ -34,10 +49,10 @@ class StyleHelper {
     return (finalColumnWidth - scFixedWidth) / model.arrowsPerEnd;
   }
 
-  static double preferredCellHeight(BuildContext context, MatchModel model) {
+  static double preferredCellHeight(BuildContext context, ScorekeeperMatch model) {
     MediaQueryData q = MediaQuery.of(context);
-    int endsToShow = model.numberOfEnds > 10 ? 12 : model.numberOfEnds;
-    double result = (q.size.height - scVerticalOverhead) / endsToShow;
+    int endsToShow = model.ends > 10 ? 12 : model.ends;
+    double result = (q.size.height - scVerticalOverhead(context)) / endsToShow;
     if (result < 30) {
       result = 30;
     } else if (result > 55) {
@@ -46,18 +61,18 @@ class StyleHelper {
     return result;
   }
 
-  static double childAspectRatio(BuildContext context, MatchModel model) => 2;
+  static double childAspectRatio(BuildContext context, ScorekeeperMatch model) => 2;
 
   static double childAspectRatioForEditor(
-          BuildContext context, MatchModel model) =>
+          BuildContext context, ScorekeeperMatch model) =>
       2;
 
-  static double scoreCardColumnWidth(BuildContext context, MatchModel model) {
+  static double scoreCardColumnWidth(BuildContext context, ScorekeeperMatch model) {
     return (preferredCellWidth(context, model) * model.arrowsPerEnd) +
         scFixedWidth;
   }
 
-  static double scoreCardRowHeight(BuildContext context, MatchModel model) {
+  static double scoreCardRowHeight(BuildContext context, ScorekeeperMatch model) {
     return preferredCellHeight(context, model);
   }
 
@@ -160,29 +175,29 @@ class StyleHelper {
 
   static TextStyle? nextPrevEndEndNoTextStyle(BuildContext context) =>
       baseTextStyle(context)
-          ?.apply(fontSizeFactor: scale(context) * 0.9, color: Colors.black54);
+          ?.apply(fontSizeFactor: 0.9, color: Colors.black54);
 
   static TextStyle? nextPrevEndArrowScoreTextStyle(BuildContext context) =>
       baseTextStyle(context)
-          ?.apply(fontSizeFactor: scale(context) * 0.9, color: Colors.black54);
+          ?.apply(fontSizeFactor: 0.9, color: Colors.black54);
 
   static TextStyle? nextPrevEndEndScoreTextStyle(BuildContext context) =>
       baseTextStyle(context)
-          ?.apply(fontSizeFactor: scale(context) * 0.9, color: Colors.black54);
+          ?.apply(fontSizeFactor: 0.9, color: Colors.black54);
 
   static TextStyle? endEditorEndNoTextStyle(BuildContext context) =>
       baseTextStyle(context)?.apply(
-          fontSizeFactor: scale(context) * 0.9,
+          fontSizeFactor: 0.9,
           fontWeightDelta: 0,
           color: Colors.black54);
 
   static TextStyle? endEditorArrowScoreTextStyle(BuildContext context) =>
       baseTextStyle(context)
-          ?.apply(fontSizeFactor: scale(context) * 1.1, fontWeightDelta: 0);
+          ?.apply(fontSizeFactor: 1.1, fontWeightDelta: 0);
 
   static TextStyle? endEditorEndTotalTextStyle(BuildContext context) =>
       baseTextStyle(context)?.apply(
-          fontSizeFactor: scale(context) * 0.9,
+          fontSizeFactor: 0.9,
           fontWeightDelta: 0,
           color: Colors.black54);
 
@@ -190,24 +205,24 @@ class StyleHelper {
       baseTextStyle(context);
 
   static TextStyle? endEditorTopHeaderTextStyle(BuildContext context) =>
-      baseTextStyle(context)?.apply(fontSizeFactor: scale(context) * 1);
+      baseTextStyle(context)?.apply(fontSizeFactor: 1);
 
   static TextStyle? endEditorTopHeaderBoldTextStyle(BuildContext context) =>
       endEditorTopHeaderTextStyle(context)?.apply(fontWeightDelta: 4);
 
   static TextStyle? editorParticipantNameHeader(BuildContext context) =>
-      baseTextStyle(context)?.apply(fontSizeFactor: scale(context) * 1.1);
+      baseTextStyle(context)?.apply(fontSizeFactor: 1.1);
 
   static TextStyle? keypadTextStyle(BuildContext context) =>
-      baseTextStyle(context)?.apply(fontSizeFactor: scale(context) * 1.1);
+      baseTextStyle(context)?.apply(fontSizeFactor: 1.1);
 
   static TextStyle? keypadTextStyleSmall(BuildContext context, String label) =>
       label.length >= 3
-          ? baseTextStyle(context)?.apply(fontSizeFactor: scale(context) * 0.8)
-          : baseTextStyle(context)?.apply(fontSizeFactor: scale(context) * 1.1);
+          ? baseTextStyle(context)?.apply(fontSizeFactor: 0.8)
+          : baseTextStyle(context)?.apply(fontSizeFactor: 1.1);
 
   static TextStyle? scoreFormFooterTextStyle(BuildContext context) =>
-      baseTextStyle(context)?.apply(fontSizeFactor: scale(context) * 1.1);
+      baseTextStyle(context)?.apply(fontSizeFactor: 1.1);
 
   static TextStyle? scoreFormHeaderParticipantNameTextStyle(
           BuildContext context) =>
@@ -241,23 +256,23 @@ class StyleHelper {
 
   static TextStyle? noMoreEndsTextStyle(BuildContext context) =>
       baseTextStyle(context)
-          ?.apply(fontSizeFactor: scale(context) * 0.9, color: Colors.black54);
+          ?.apply(fontSizeFactor: 0.9, color: Colors.black54);
 
   static TextStyle? participantEntryHeading1TextStyle(BuildContext context) =>
       baseTextStyle(context)?.apply(
-          fontSizeFactor: scale(context) * 1.1,
+          fontSizeFactor: 1.1,
           fontWeightDelta: 2,
           color: Colors.black87);
 
   static TextStyle? participantEntryLabelTextStyle(BuildContext context) =>
       baseTextStyle(context)?.apply(
-          fontSizeFactor: scale(context) * 0.9,
+          fontSizeFactor: 0.9,
           fontWeightDelta: 2,
           color: Colors.black87);
 
   static TextStyle? participantNameTextStyle(BuildContext context) =>
       baseTextStyle(context)?.apply(
-          fontSizeFactor: scale(context) * 1,
+          fontSizeFactor: 1,
           fontWeightDelta: 1,
           color: Colors.black87);
 
@@ -280,8 +295,8 @@ class StyleHelper {
     return hslLight.toColor();
   }
 
-  static double keyboardButtonRowHeight(BuildContext context, MatchModel match,
-      int buttonsPerRow, List<ScoreButtonDefinition> keys) {
+  static double keyboardButtonRowHeight(BuildContext context, ScorekeeperMatch match,
+      int buttonsPerRow, List<ScorekeeperKey> keys) {
     MediaQueryData q = MediaQuery.of(context);
     double result;
     if (q.size.height > 600) {
