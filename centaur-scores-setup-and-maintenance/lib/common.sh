@@ -161,6 +161,13 @@ atomic_symlink() {
     local target="$1" link="$2"
     local tmp="${link}.new.$$"
     ln -sfn "${target}" "${tmp}"
+    # mv -T refuses to overwrite an existing plain directory with a symlink.
+    # That should never be the steady-state case (link is always a symlink
+    # once a slot has been deployed at least once) but clear it defensively
+    # if it somehow is one, so this self-heals instead of failing.
+    if [[ -e "${link}" && ! -L "${link}" ]]; then
+        rm -rf "${link}"
+    fi
     mv -Tf "${tmp}" "${link}"
 }
 

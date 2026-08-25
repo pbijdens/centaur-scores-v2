@@ -20,13 +20,11 @@ if [[ ! -f "${STATE_DIR}/candidate-weight" ]]; then
 fi
 chown -R "${CENTAUR_SERVICE_USER}:${CENTAUR_SERVICE_GROUP}" "${STATE_DIR}"
 
-# placeholder release dirs so nginx has something to point at before the
-# first deploy (setup/10-initial-deploy.sh replaces these with real symlinks)
-for component in api web-ui scoring; do
-    for slot in blue green; do
-        [[ -e "${RELEASES_DIR}/${component}/${slot}" ]] || install -d -o "${CENTAUR_SERVICE_USER}" -g "${CENTAUR_SERVICE_GROUP}" "${RELEASES_DIR}/${component}/${slot}"
-    done
-done
+# Deliberately not pre-creating releases/<component>/<slot> here: nginx
+# tolerates a root/alias pointing at a path that doesn't exist yet (it just
+# 404s until update/deploy.sh creates the real symlink), and pre-creating
+# them as plain directories would block deploy.sh's atomic symlink swap
+# later (mv -T refuses to overwrite a real directory with a symlink).
 
 # --- app secrets / env files, root:service-group readable only -------------
 install -d -m 0750 -o root -g "${CENTAUR_SERVICE_GROUP}" /etc/centaur-scores
