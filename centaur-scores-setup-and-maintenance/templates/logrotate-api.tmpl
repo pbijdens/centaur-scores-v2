@@ -1,0 +1,10 @@
+${CENTAUR_LOG_DIR}/api-*.log {
+    size ${LOG_MAX_FILE_SIZE}
+    maxage ${LOG_RETENTION_DAYS}
+    rotate 1000
+    missingok
+    notifempty
+    compress
+    delaycompress
+    copytruncate
+}

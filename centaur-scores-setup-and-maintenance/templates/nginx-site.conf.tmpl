@@ -1,0 +1,45 @@
+# Managed by centaur-scores-setup-and-maintenance.
+#
+# IMPORTANT: after setup/09-obtain-tls-certificate.sh has run, certbot has
+# added a "listen 443 ssl;" server block (and an https redirect) to this
+# file. Do not blindly re-render this file after that point - it will wipe
+# out certbot's changes. Routine traffic-split changes only touch
+# /etc/nginx/conf.d/centaur-scores-upstreams.conf via update/set-traffic.sh,
+# update/promote.sh and update/rollback.sh, and never touch this file.
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name ${PUBLIC_HOSTNAME};
+    absolute_redirect off;
+
+    access_log ${CENTAUR_LOG_DIR}/nginx-access.log;
+    error_log  ${CENTAUR_LOG_DIR}/nginx-error.log;
+
+    # Sticky assignment: pin this visitor to the blue/green variant chosen in
+    # centaur-scores-upstreams.conf for 30 days so their session never flips
+    # mid-way between the two versions.
+    add_header Set-Cookie "csv_slot=$centaur_scores_variant; Path=/; Max-Age=2592000; SameSite=Lax" always;
+
+    root $centaur_scores_webroot;
+    index index.html;
+
+    location ^~ ${PUBLIC_API_VDIR} {
+        proxy_pass $centaur_scores_api_upstream/;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location ^~ ${PUBLIC_APP_VDIR} {
+        alias $centaur_scores_scoringroot/;
+        try_files $uri $uri/ ${PUBLIC_APP_VDIR}index.html;
+    }
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}

@@ -1,0 +1,25 @@
+[Unit]
+Description=CentaurScores API (${SLOT} slot)
+After=network.target mariadb.service
+Wants=mariadb.service
+
+[Service]
+Type=simple
+User=${CENTAUR_SERVICE_USER}
+Group=${CENTAUR_SERVICE_GROUP}
+WorkingDirectory=${CENTAUR_BASE_DIR}/releases/api/${SLOT}
+EnvironmentFile=/etc/centaur-scores/common.env
+EnvironmentFile=/etc/centaur-scores/api-${SLOT}.env
+ExecStart=/usr/local/bin/dotnet ${CENTAUR_BASE_DIR}/releases/api/${SLOT}/CentaurScores.Api.dll
+Restart=on-failure
+RestartSec=5
+StandardOutput=append:${CENTAUR_LOG_DIR}/api-${SLOT}.log
+StandardError=append:${CENTAUR_LOG_DIR}/api-${SLOT}.log
+SyslogIdentifier=centaur-scores-api-${SLOT}
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=${CENTAUR_LOG_DIR}
+
+[Install]
+WantedBy=multi-user.target
