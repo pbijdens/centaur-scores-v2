@@ -8,11 +8,11 @@ part of 'settings_model.dart';
 
 SettingsModel _$SettingsModelFromJson(Map<String, dynamic> json) =>
     SettingsModel()
-      ..deviceID = json['deviceID'] as String
-      ..serverURL = json['serverURL'] as String;
+      ..apiBaseUrl = json['apiBaseUrl'] as String?
+      ..language = json['language'] as String? ?? 'NL';
 
 Map<String, dynamic> _$SettingsModelToJson(SettingsModel instance) =>
     <String, dynamic>{
-      'deviceID': instance.deviceID,
-      'serverURL': instance.serverURL,
+      'apiBaseUrl': instance.apiBaseUrl,
+      'language': instance.language,
     };

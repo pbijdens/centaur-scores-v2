@@ -1,10 +1,21 @@
-import 'package:centaur_scores/src/model/participant_model.dart';
+import 'package:centaur_scores/src/model/api_error.dart';
+import 'package:centaur_scores/src/model/scorekeeper_match.dart';
+import 'package:centaur_scores/src/model/scorekeeper_participant_options.dart';
+import 'package:centaur_scores/src/model/scorekeeper_participant_update.dart';
+import 'package:centaur_scores/src/model/scorekeeper_score_conflict.dart';
+import 'package:centaur_scores/src/model/scorekeeper_score_update.dart';
 import 'package:centaur_scores/src/repository/modelstore.dart';
 import 'package:http/http.dart' as http;
+import 'package:http/io_client.dart';
 import 'dart:convert';
-import '../model/match_model.dart';
 import 'dart:developer';
+import 'dart:io';
 
+/// Client for the new public scorekeeper API
+/// (`/scorekeeper/{tenantId}/{matchId}/{deviceId}/...`, see
+/// PUBLIC-API-DESIGN.md). The base URL (up to and including the device ID)
+/// is whatever was scanned/entered during pairing, re-read from
+/// [ModelStore] on every call so a re-pair takes effect immediately.
 class CentaurScoresAPI {
   static final CentaurScoresAPI _instance = CentaurScoresAPI._internal();
 
@@ -20,131 +31,117 @@ class CentaurScoresAPI {
 
   final ModelStore _store = ModelStore();
 
-  Future<bool> pushParticipants(
-      int matchId, List<ParticipantModel> participants) async {
-    String baseUrl = await _store.getServerURL();
-    var deviceID = await _store.getDeviceID();
-    var client = http.Client();
-    var uri = Uri.parse('$baseUrl/match/$matchId/participants/$deviceID');
-    Map<String, String> headers = <String, String>{};
-    headers['Content-Type'] = 'application/json';
-    var response =
-        await client.put(uri, headers: headers, body: jsonEncode(participants));
-    if (response.statusCode == 200) {
-      return true;
-    } else {
-      throw 'Request to $baseUrl/match/$matchId/participants/$deviceID failed with status ${response.statusCode}';
-    }
+  Future<ScorekeeperMatch> getMatchInfo() async {
+    final json = await _request('GET', '');
+    return ScorekeeperMatch.fromJson(json as Map<String, dynamic>);
   }
 
-  Future<MatchModel> httpGetActiveMatchModel() async {
-    String baseUrl = await _store.getServerURL();
-    var client = http.Client();
-    var uri = Uri.parse('$baseUrl/match/active');
-    var response = await client.get(uri);
-    if (response.statusCode == 200) {
-      Map<String, dynamic> result =
-          jsonDecode(const Utf8Decoder().convert(response.bodyBytes))
-              as Map<String, dynamic>;
-      result['isDirty'] = jsonDecode("false");
-      result['participants'] = jsonDecode("[]");
-      return MatchModel.fromJson(result);
-    } else {
-      throw 'Request to $baseUrl/match/active failed with status ${response.statusCode}';
-    }
+  Future<void> putParticipants(List<ScorekeeperParticipantUpdate> participants) async {
+    await _request('PUT', '/participants',
+        body: participants.map((p) => p.toJson()).toList());
   }
 
-  Future<List<ParticipantModel>> httpGetParticipantsForMatch(
-      int matchId) async {
-    String baseUrl = await _store.getServerURL();
-    var deviceID = await _store.getDeviceID();
-    var client = http.Client();
-    var uri = Uri.parse('$baseUrl/match/$matchId/participants/$deviceID');
-    var response = await client.get(uri);
-    if (response.statusCode == 200) {
-      List result = jsonDecode(const Utf8Decoder().convert(response.bodyBytes));
-      var resultList = result.map((item) {
-        if (item['name'] == null) {
-          item['name'] = '';
-        }
-        return ParticipantModel.fromJson(item);
-      }).toList();
-      resultList.sort((a, b) => a.lijn.compareTo(b.lijn));
-      for (int i = 0; i < resultList.length; i++) {
-        resultList[i].id = i + 1;
+  Future<void> putScores(List<ParticipantScoreUpdates> updates) async {
+    await _request('PUT', '/scores',
+        body: updates.map((u) => u.toJson()).toList());
+  }
+
+  Future<ScorekeeperParticipantOptions> getParticipantOptions() async {
+    final json = await _request('GET', '/participant-options');
+    return ScorekeeperParticipantOptions.fromJson(json as Map<String, dynamic>);
+  }
+
+  Future<DateTime> getTime() async {
+    final json = await _request('GET', '/time') as Map<String, dynamic>;
+    return DateTime.parse(json['time'] as String);
+  }
+
+  // --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- ---
+
+  Future<dynamic> _request(String method, String pathSuffix, {dynamic body}) async {
+    final baseUrl = await _store.getApiBaseUrl();
+    if (baseUrl == null) {
+      throw NetworkException('No API base URL configured - device is not paired yet.');
+    }
+    final uri = Uri.parse('$baseUrl$pathSuffix');
+    final headers = <String, String>{'accept': 'application/json'};
+    if (body != null) headers['content-type'] = 'application/json';
+
+    http.Response response;
+    // Certificate verification is disabled: many target devices (min SDK 23)
+    // ship with outdated CA trust stores that can't validate current Let's
+    // Encrypt chains, and pinning a specific root would force a redeploy
+    // whenever the server's issuing CA changes.
+    final rawClient = HttpClient()
+      ..badCertificateCallback = (cert, host, port) => true;
+    final client = IOClient(rawClient);
+    try {
+      switch (method) {
+        case 'GET':
+          response = await client.get(uri, headers: headers);
+          break;
+        case 'PUT':
+          response = await client.put(uri,
+              headers: headers, body: body != null ? jsonEncode(body) : null);
+          break;
+        default:
+          throw ArgumentError('Unsupported method $method');
       }
-      return resultList;
-    } else {
-      throw 'Request to $baseUrl/match/active failed with status ${response.statusCode}';
+    } catch (error) {
+      throw NetworkException('Request to $uri failed: $error');
+    } finally {
+      client.close();
     }
+
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      final bodyText = const Utf8Decoder().convert(response.bodyBytes);
+      if (bodyText.isEmpty) return null;
+      return jsonDecode(bodyText);
+    }
+
+    throw _parseErrorResponse(response);
   }
 
-  Future<List<ParticipantModel>> httpGetAllParticipantsForMatch(
-      int matchId) async {
-    String baseUrl = await _store.getServerURL();
-    var client = http.Client();
-    var uri = Uri.parse('$baseUrl/match/$matchId/participants');
-    var response = await client.get(uri);
-    if (response.statusCode == 200) {
-      List result = jsonDecode(const Utf8Decoder().convert(response.bodyBytes));
-      var resultList = result.map((item) {
-        if (item['name'] == null) {
-          item['name'] = '';
-        }
-        return ParticipantModel.fromJson(item);
-      }).toList();
-      resultList.sort((a, b) => '${a.deviceID}${a.lijn}${a.name}'
-          .compareTo('${b.deviceID}${b.lijn}${b.name}'));
-      return resultList;
-    } else {
-      throw 'Request to $uri failed with status ${response.statusCode}';
+  ApiException _parseErrorResponse(http.Response response) {
+    final bodyText = const Utf8Decoder().convert(response.bodyBytes);
+    if (bodyText.isEmpty) {
+      return ApiException(response.statusCode, null, 'HTTP ${response.statusCode}');
     }
-  }
 
-  Future<bool> moveParticipantToThisDevice(
-      int matchId, ParticipantModel participant, String lijn) async {
-    String baseUrl = await _store.getServerURL();
-    var deviceID = await _store.getDeviceID();
-    var client = http.Client();
-    var uri = Uri.parse(
-        '$baseUrl/match/$matchId/participants/${participant.id}/transfer/$deviceID/$lijn');
-    Map<String, String> headers = <String, String>{};
-    headers['Content-Type'] = 'application/json';
-    var response = await client.post(uri, headers: headers);
-    if (response.statusCode == 200) {
-      return true;
-    } else {
-      throw 'Request to $uri failed with status ${response.statusCode}';
+    dynamic decoded;
+    try {
+      decoded = jsonDecode(bodyText);
+    } catch (_) {
+      return ApiException(response.statusCode, null, bodyText);
     }
-  }
 
-  Future<bool> doesDeviceNeedSync() async {
-    String baseUrl = await _store.getServerURL();
-    var client = http.Client();
-    var deviceID = await _store.getDeviceID();
-    var uri = Uri.parse('$baseUrl/devices/$deviceID/sync');
-    Map<String, String> headers = <String, String>{};
-    headers['Content-Type'] = 'application/json';
-    var response = await client.get(uri, headers: headers);
-    if (response.statusCode == 200) {
-      return const Utf8Decoder().convert(response.bodyBytes) == "true";
-    } else {
-      throw 'Request to $uri failed with status ${response.statusCode}';
+    if (decoded is! Map<String, dynamic>) {
+      return ApiException(response.statusCode, null, bodyText);
     }
-  }
 
-  Future<bool> clearDeviceNeedSync() async {
-    String baseUrl = await _store.getServerURL();
-    var client = http.Client();
-    var deviceID = await _store.getDeviceID();
-    var uri = Uri.parse('$baseUrl/devices/$deviceID/sync');
-    Map<String, String> headers = <String, String>{};
-    headers['Content-Type'] = 'application/json';
-    var response = await client.delete(uri, headers: headers);
-    if (response.statusCode == 200) {
-      return true;
+    // Two known shapes: a bare {code, message} (most errors), or a nested
+    // {error: {code, message}, conflicts: [...]} (PUT /scores 409). Parse
+    // both tolerantly.
+    String? code;
+    String message = bodyText;
+    List<ScoreConflictEntry>? conflicts;
+
+    final errorField = decoded['error'];
+    if (errorField is Map<String, dynamic>) {
+      code = errorField['code'] as String?;
+      message = (errorField['message'] as String?) ?? message;
     } else {
-      throw 'Request to $uri failed with status ${response.statusCode}';
+      code = decoded['code'] as String?;
+      message = (decoded['message'] as String?) ?? message;
     }
+
+    final conflictsField = decoded['conflicts'];
+    if (conflictsField is List) {
+      conflicts = conflictsField
+          .map((e) => ScoreConflictEntry.fromJson(e as Map<String, dynamic>))
+          .toList();
+    }
+
+    return ApiException(response.statusCode, code, message, conflicts: conflicts);
   }
 }

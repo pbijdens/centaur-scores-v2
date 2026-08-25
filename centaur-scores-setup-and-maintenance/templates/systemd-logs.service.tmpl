@@ -1,0 +1,7 @@
+[Unit]
+Description=CentaurScores log rotation and total log-folder budget enforcement
+
+[Service]
+Type=oneshot
+ExecStart=/usr/sbin/logrotate --state ${CENTAUR_BASE_DIR}/state/logrotate.status /etc/logrotate.d/centaur-scores-api /etc/logrotate.d/centaur-scores-nginx
+ExecStart=/usr/local/bin/centaur-scores-log-prune.sh

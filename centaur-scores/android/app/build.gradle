@@ -24,7 +24,7 @@ if (flutterVersionName == null) {
 
 android {
     namespace "com.example.centaur_scores"
-    compileSdk flutter.compileSdkVersion
+    compileSdk 36
     ndkVersion "27.0.12077973"// flutter.ndkVersion
 // https://stackoverflow.com/questions/79102777/how-to-resolve-source-value-8-is-obsolete-warning-in-android-studio
 // TODO
@@ -46,7 +46,7 @@ android {
         applicationId "com.example.centaur_scores"
         // You can update the following values to match your application needs.
         // For more information, see: https://docs.flutter.dev/deployment/android#reviewing-the-gradle-build-configuration.
-        minSdkVersion flutter.minSdkVersion
+        minSdkVersion 23
         targetSdkVersion flutter.targetSdkVersion
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName

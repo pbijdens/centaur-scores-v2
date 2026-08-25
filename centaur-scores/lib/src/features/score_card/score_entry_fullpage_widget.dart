@@ -1,5 +1,4 @@
 import 'package:centaur_scores/src/features/score_card/score_column_keyboard.dart';
-import 'package:centaur_scores/src/features/score_entry/score_entry_single_end_viewmodel.dart';
 import 'package:centaur_scores/src/repository/repository.dart';
 import 'package:centaur_scores/src/mvvm/events/loading_event.dart';
 import 'package:centaur_scores/src/mvvm/observer.dart';
@@ -12,8 +11,8 @@ import 'package:centaur_scores/src/style/loading_screen.dart';
 import 'package:centaur_scores/src/style/style_helper.dart';
 import 'package:flutter/material.dart';
 
-import '../../model/match_model.dart';
-import '../../model/participant_model.dart';
+import '../../model/scorekeeper_match.dart';
+import '../../model/scorekeeper_match_participant.dart';
 
 class ScoreEntryFullPageWidget extends StatefulWidget {
   const ScoreEntryFullPageWidget({super.key});
@@ -49,38 +48,24 @@ class ScoreEntryFullPageWidgetState extends State<ScoreEntryFullPageWidget>
         _isLoading = event.isLoading;
       });
     } else if (event is ScoresViewmodelLoadedEvent) {
-      debugPrint("ScoresViewmodelLoadedEvent - loaded scores viewmodel");
-      setState(() {
-        model = event.model;
-        participants = event.model.participants;
-      });
+      setState(() {});
     } else if (event is ScoresViewmodelUpdatedEvent) {
-      debugPrint("ScoresViewmodelUpdatedEvent - scores viewmodel was updated");
       setState(() {});
     } else if (event is ArrowStateChangedEvent) {
-      debugPrint(
-          "ArrowStateChangedEvent - arrow state changed for a single arrow");
       setState(() {});
     } else if (event is KeyboardShownEvent) {
-      debugPrint("KeyboardShownEvent - showing keyboard");
-      //setState(() {});
       WidgetsBinding.instance.addPostFrameCallback((_) {
         final context = _keyboardScrollKey.currentContext;
         if (context != null) {
-          debugPrint("KeyboardShownEvent - scrolling keyboard into view");
           Scrollable.ensureVisible(context,
               duration: const Duration(milliseconds: 500),
               curve: Curves.easeInOut);
         }
       });
     } else if (event is ActiveArrowChangedEvent) {
-      debugPrint("ActiveArrowChangedEvent - active arrow changed");
-      //setState(() {});
       WidgetsBinding.instance.addPostFrameCallback((_) {
         final context = _scrollKey.currentContext;
         if (context != null) {
-          debugPrint(
-              "ActiveArrowChangedEvent - scrolling arrow selection into view");
           Scrollable.ensureVisible(context,
               duration: const Duration(milliseconds: 500),
               curve: Curves.easeInOut);
@@ -90,17 +75,21 @@ class ScoreEntryFullPageWidgetState extends State<ScoreEntryFullPageWidget>
   }
 
   bool _isLoading = false;
-  List<ParticipantModel> participants = [];
-  MatchModel model = MatchModel();
   final GlobalKey _scrollKey = GlobalKey();
   final GlobalKey _keyboardScrollKey = GlobalKey();
 
+  // Read live off MatchRepository on every build - the background sync
+  // engine replaces the whole ScorekeeperMatch object on every poll, so
+  // caching a snapshot (as the old MatchModel-based version did) would go
+  // stale after the first 60s poll.
+  ScorekeeperMatch? get model => MatchRepository().currentMatchOrNull;
+  List<ScorekeeperMatchParticipant> get participants => model?.participants ?? [];
+
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
+    if (_isLoading || model == null) {
       return const LoadingScreen();
     }
-    // Build a Form widget using the _formKey created above.
     return Form(
         key: _formKey,
         child: SingleChildScrollView(
@@ -123,69 +112,76 @@ class ScoreEntryFullPageWidgetState extends State<ScoreEntryFullPageWidget>
   }
 
   List<Widget> singeParticipantScoreForms() {
+    final currentModel = model!;
     return participants
-        .where((element) => element.name?.isNotEmpty ?? false)
         .map((participant) => Column(children: [
               Expanded(
                   flex: 10,
                   child: SingeParticipantScoreForm(
                       scrollKey: _scrollKey,
                       viewModel: _viewModel,
-                      model: model,
+                      model: currentModel,
                       participant: participant,
                       onSelect: (BuildContext currentContext, int endNo,
                           int? arrowNo) {
-                        int activeKeyboard = participants
-                            .indexWhere((e) => e.id == participant.id);
+                        int activeKeyboard = participants.indexWhere(
+                            (e) => e.matchParticipantId == participant.matchParticipantId);
                         _viewModel.activateKeyboard(
-                            model,
+                            currentModel,
                             activeKeyboard >= 0 ? activeKeyboard : null,
                             endNo,
                             arrowNo);
                       },
-                      index: participants
-                          .indexWhere((e) => e.id == participant.id))),
-              keyboard(context, model, participant,
-                  participants.indexWhere((e) => e.id == participant.id))
+                      index: participants.indexWhere(
+                          (e) => e.matchParticipantId == participant.matchParticipantId))),
+              keyboard(
+                  context,
+                  currentModel,
+                  participant,
+                  participants.indexWhere(
+                      (e) => e.matchParticipantId == participant.matchParticipantId))
             ]))
         .toList();
   }
 
   List<Widget> singeParticipantNames() {
+    final currentModel = model!;
     return participants
-        .where((element) => element.name?.isNotEmpty ?? false)
         .map((participant) => SingleParticipantHeaderLineOne(
-            model: model,
+            model: currentModel,
             participant: participant,
-            index: participants.indexWhere((e) => e.id == participant.id)))
+            index: participants.indexWhere(
+                (e) => e.matchParticipantId == participant.matchParticipantId)))
         .toList();
   }
 
   List<Widget> singeParticipantDisciplines() {
+    final currentModel = model!;
     return participants
-        .where((element) => element.name?.isNotEmpty ?? false)
         .map((participant) => SingleParticipantHeaderLineTwo(
-            model: model,
+            model: currentModel,
             participant: participant,
-            index: participants.indexWhere((e) => e.id == participant.id)))
+            index: participants.indexWhere(
+                (e) => e.matchParticipantId == participant.matchParticipantId)))
         .toList();
   }
 
   List<Widget> singeParticipantSummaries() {
+    final currentModel = model!;
     return participants
-        .where((element) => element.name?.isNotEmpty ?? false)
         .map((participant) => Column(children: [
               SingeParticipantFooter(
-                  model: model,
+                  model: currentModel,
                   participant: participant,
                   viewmodel: _viewModel,
-                  index: participants.indexWhere((e) => e.id == participant.id))
+                  index: participants.indexWhere(
+                      (e) => e.matchParticipantId == participant.matchParticipantId))
             ]))
         .toList();
   }
 
-  Widget keyboard(BuildContext context, MatchModel model,
-      ParticipantModel participantModel, int participantIndex) {
+  Widget keyboard(BuildContext context, ScorekeeperMatch model,
+      ScorekeeperMatchParticipant participantModel, int participantIndex) {
     if (participantIndex == _viewModel.activeKeyboard) {
       return IntrinsicHeight(
           key: _keyboardScrollKey,

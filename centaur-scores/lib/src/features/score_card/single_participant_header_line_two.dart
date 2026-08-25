@@ -1,14 +1,13 @@
-import 'package:centaur_scores/src/features/participants/participants_view.dart';
+import 'package:centaur_scores/src/repository/app_navigator.dart';
 import 'package:centaur_scores/src/style/style_helper.dart';
 import 'package:flutter/material.dart';
 
-import '../../model/group_info.dart';
-import '../../model/match_model.dart';
-import '../../model/participant_model.dart';
+import '../../model/scorekeeper_match.dart';
+import '../../model/scorekeeper_match_participant.dart';
 
 class SingleParticipantHeaderLineTwo extends StatelessWidget {
-  final MatchModel model;
-  final ParticipantModel participant;
+  final ScorekeeperMatch model;
+  final ScorekeeperMatchParticipant participant;
   final int index;
 
   const SingleParticipantHeaderLineTwo(
@@ -19,28 +18,13 @@ class SingleParticipantHeaderLineTwo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    var group = model.groups
-            .where((element) => element.code == participant.group)
-            .firstOrNull ??
-        GroupInfo.create(0, "Onbekend", "");
-    var subgroup = model.subgroups
-            .where((element) => element.code == participant.subgroup)
-            .firstOrNull ??
-        GroupInfo.create(0, "Onbekend", "");
-
-    // Build a Form widget using the _formKey created above.
     return InkWell(
       onTap: () {
-        Navigator.pushReplacement(
-            context,
-            MaterialPageRoute<void>(
-              builder: (BuildContext context) => const ParticipantsView(),
-            ));
+        AppNavigator().navigate(const HomeScreen(), resetStack: true);
       },
       child: SizedBox(
           width: StyleHelper.scoreCardColumnWidth(context, model),
-          height: StyleHelper.scLine2Height,
-          //height: 80,
+          height: StyleHelper.scLine2Height(context),
           child: Container(
               alignment: Alignment.topLeft,
               color: StyleHelper.colorForColumnFooter(index),
@@ -49,43 +33,36 @@ class SingleParticipantHeaderLineTwo extends StatelessWidget {
                   child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(
-                            child: RichText(
-                                text: TextSpan(
-                          text: '',
-                          style: StyleHelper.scoreFormHeaderLineTwoTextStyle(
-                              context),
-                          children: <TextSpan>[
-                            TextSpan(
-                                text: 'Lijn: ',
-                                style: StyleHelper
-                                    .scoreFormHeaderLineTwoBoldTextStyle(
-                                        context)),
-                            TextSpan(text: participant.lijn),
-                          ],
-                        ))),
-                        RichText(
-                          text: TextSpan(
+                        if (participant.federationNumber?.isNotEmpty ?? false)
+                          RichText(
+                              text: TextSpan(
                             text: '',
-                            style: StyleHelper.scoreFormHeaderLineTwoTextStyle(
-                                context),
+                            style:
+                                StyleHelper.scoreFormHeaderLineTwoTextStyle(
+                                    context),
                             children: <TextSpan>[
                               TextSpan(
-                                  text: ' Klasse: ',
+                                  text: 'Nr: ',
                                   style: StyleHelper
                                       .scoreFormHeaderLineTwoBoldTextStyle(
                                           context)),
-                              TextSpan(text: restrictLength(group.label, 12)),
-                              TextSpan(
-                                  text: ' / ',
-                                  style: StyleHelper
-                                      .scoreFormHeaderLineTwoBoldTextStyle(
-                                          context)),
-                              TextSpan(
-                                  text: restrictLength(subgroup.label, 12)),
+                              TextSpan(text: participant.federationNumber),
                             ],
-                          ),
-                        )
+                          )),
+                        Expanded(
+                            child: Align(
+                                alignment: Alignment.centerRight,
+                                child: RichText(
+                                  textAlign: TextAlign.right,
+                                  text: TextSpan(
+                                    text:
+                                        restrictLength(participant.info, 26) ??
+                                            '',
+                                    style: StyleHelper
+                                        .scoreFormHeaderLineTwoTextStyle(
+                                            context),
+                                  ),
+                                ))),
                       ])))),
     );
   }

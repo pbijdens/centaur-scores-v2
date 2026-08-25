@@ -2,21 +2,21 @@ import 'package:centaur_scores/src/features/score_card/scores_viewmodel.dart';
 import 'package:centaur_scores/src/style/style_helper.dart';
 import 'package:flutter/material.dart';
 
-import '../../model/match_model.dart';
-import '../../model/participant_model.dart';
-import '../../model/score_button_definition.dart';
+import '../../model/scorekeeper_key.dart';
+import '../../model/scorekeeper_match.dart';
+import '../../model/scorekeeper_match_participant.dart';
+import '../../scoring/scoring.dart' as scoring;
 
 class ScoreColumnKeyboard extends StatelessWidget {
   final ScoresViewmodel _viewModel;
-  final MatchModel _model;
-  final ParticipantModel _participant;
+  final ScorekeeperMatch _model;
+  final ScorekeeperMatchParticipant _participant;
 
   const ScoreColumnKeyboard(this._viewModel, this._model, this._participant,
       {super.key});
 
   @override
   Widget build(BuildContext context) {
-    //MediaQueryData q = MediaQuery.of(context);
     return Container(
         decoration: BoxDecoration(
             border: Border.all(width: 2.0, color: Colors.transparent),
@@ -33,39 +33,33 @@ class ScoreColumnKeyboard extends StatelessWidget {
     List<Widget> result = [];
     List<Widget> currentRow = [];
 
-    List<ScoreButtonDefinition> keys = [];
+    // The keys available for this participant, from the match's keyboard
+    // definition, plus a permanent "delete" key (there's no equivalent
+    // dedicated key in the new API's keyboard list, unlike the old
+    // scoreValues map which typically included a "DEL" entry).
+    List<ScorekeeperKey> keys = scoring.availableKeys(_model, _participant);
 
-    String? mostRelevantKeyboard = _model.scoreValues.keys
-        .where((element) => element
-            .split(',')
-            .map((e) => e.trim())
-            .contains(_participant.target))
-        .lastOrNull;
-    if (mostRelevantKeyboard == null) {
-      keys = _model.scoreValues.entries.firstOrNull?.value ?? [];
-    } else {
-      keys = _model.scoreValues[mostRelevantKeyboard] ?? [];
-    }
-
-    int buttonsPerRow = keys.length > 7 ? 4 : 3;
+    int buttonsPerRow = (keys.length + 1) > 7 ? 4 : 3;
 
     var rowHeight = StyleHelper.keyboardButtonRowHeight(
         context, _model, buttonsPerRow, keys);
 
-    for (int i = 0; i < keys.length; i++) {
+    void addButton({
+      required String label,
+      required int? colorValue,
+      required VoidCallback onPressed,
+    }) {
       currentRow.add(Expanded(
           child: Padding(
               padding: const EdgeInsets.all(1.0),
               child: ElevatedButton(
-                onPressed: () {
-                  _viewModel.setScore(keys[i].value, _model, _participant);
-                },
+                onPressed: onPressed,
                 style: ElevatedButton.styleFrom(
                   padding: EdgeInsets.zero, // remove default padding
                   backgroundColor:
-                      StyleHelper.colorForButton(context, keys[i].value),
+                      StyleHelper.colorForButton(context, colorValue),
                   foregroundColor:
-                      StyleHelper.colorForButtonLabel(context, keys[i].value),
+                      StyleHelper.colorForButtonLabel(context, colorValue),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(5.0),
                   ),
@@ -79,13 +73,11 @@ class ScoreColumnKeyboard extends StatelessWidget {
                   ),
                   child: Center(
                     child: Text(
-                      keys[i].label,
-                      style: StyleHelper.keypadTextStyleSmall(
-                        context,
-                        keys[i].label,
-                      )?.apply(
+                      label,
+                      style: StyleHelper.keypadTextStyleSmall(context, label)
+                          ?.apply(
                         color: StyleHelper.colorForButtonLabel(
-                            context, keys[i].value),
+                            context, colorValue),
                       ),
                     ),
                   ),
@@ -99,6 +91,18 @@ class ScoreColumnKeyboard extends StatelessWidget {
         currentRow = [];
       }
     }
+
+    for (int i = 0; i < keys.length; i++) {
+      addButton(
+          label: keys[i].label,
+          colorValue: keys[i].value,
+          onPressed: () => _viewModel.setScore(keys[i].id, _model, _participant));
+    }
+    addButton(
+        label: 'DEL',
+        colorValue: null,
+        onPressed: () => _viewModel.setScore(null, _model, _participant));
+
     if (currentRow.isNotEmpty) {
       result.add(Container(
           color: Colors.transparent, child: Row(children: currentRow)));
