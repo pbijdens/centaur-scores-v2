@@ -83,7 +83,8 @@ if [[ -f "${site_conf}" ]]; then
     log "${site_conf} already exists - leaving it untouched (it may already carry certbot's TLS edits)."
 else
     render_template "${CS_TEMPLATES_DIR}/nginx-site.conf.tmpl" "${site_conf}" \
-        PUBLIC_HOSTNAME PUBLIC_API_VDIR PUBLIC_APP_VDIR CENTAUR_LOG_DIR
+        PUBLIC_HOSTNAME PUBLIC_API_VDIR PUBLIC_APP_VDIR \
+        PUBLIC_API_VDIR_NOSLASH PUBLIC_APP_VDIR_NOSLASH CENTAUR_LOG_DIR
 fi
 ln -sf "${site_conf}" /etc/nginx/sites-enabled/centaur-scores.conf
 

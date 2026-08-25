@@ -24,6 +24,18 @@ server {
     root $centaur_scores_webroot;
     index index.html;
 
+    # A bare vdir with no trailing slash (e.g. a QR code linking to
+    # "${PUBLIC_APP_VDIR_NOSLASH}?api=...") is one character short of the
+    # "^~ ${PUBLIC_APP_VDIR}" prefix below and would otherwise fall through
+    # to "location /" and serve the wrong app. Redirect it to the
+    # trailing-slash form first, preserving the query string.
+    location = ${PUBLIC_API_VDIR_NOSLASH} {
+        return 301 ${PUBLIC_API_VDIR}$is_args$args;
+    }
+    location = ${PUBLIC_APP_VDIR_NOSLASH} {
+        return 301 ${PUBLIC_APP_VDIR}$is_args$args;
+    }
+
     location ^~ ${PUBLIC_API_VDIR} {
         # proxy_pass's target is a variable (it picks blue vs. green), and
         # nginx does NOT do its usual "strip the matched location prefix"

@@ -59,6 +59,16 @@ load_config() {
     PUBLIC_API_URL="https://${PUBLIC_HOSTNAME}${PUBLIC_API_VDIR%/}"
     export PUBLIC_API_URL
 
+    # nginx's "location ^~ /api/" only matches paths that literally start
+    # with the trailing slash - a bare "/api" (no trailing slash, e.g. from
+    # a hand-built URL or a QR code pointing at "/scores") falls through to
+    # "location /" instead. These no-slash forms feed an explicit redirect
+    # location in the nginx site config that sends the browser to the
+    # trailing-slash form, preserving any query string.
+    PUBLIC_API_VDIR_NOSLASH="${PUBLIC_API_VDIR%/}"
+    PUBLIC_APP_VDIR_NOSLASH="${PUBLIC_APP_VDIR%/}"
+    export PUBLIC_API_VDIR_NOSLASH PUBLIC_APP_VDIR_NOSLASH
+
     STATE_DIR="${CENTAUR_BASE_DIR}/state"
     RELEASES_DIR="${CENTAUR_BASE_DIR}/releases"
     BUILD_DIR="${CENTAUR_BASE_DIR}/build"
