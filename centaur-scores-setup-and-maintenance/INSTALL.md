@@ -103,7 +103,11 @@ means for how you ship schema changes.
 ```
 
 Everything runs as a dedicated, unprivileged system user (`centaur-scores`
-by default, no login shell).
+by default, no login shell). Its directories are `0750` (owner + group only,
+nothing for "other"), and `setup/06-install-nginx-and-certbot.sh` adds
+`www-data` (nginx's worker user on Debian) to that group so nginx can read
+the deployed release directories without the tree being world-readable -
+`state/`, `build/` and `logs/` stay private to the `centaur-scores` user.
 
 ## 3. Get the scripts onto the server
 
