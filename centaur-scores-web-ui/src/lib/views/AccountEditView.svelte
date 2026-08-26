@@ -1,6 +1,6 @@
 <script lang="ts">
-  import type { ApiClient } from './api'
-  import type { Account } from './types'
+  import type { ApiClient } from '../api'
+  import type { Account } from '../types'
 
   export let api: ApiClient
   export let accountId: string

@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { formatLocalDate } from './date'
-  import type { Competition, Language, Match } from './types'
+  import { formatLocalDate } from '../date'
+  import type { Competition, Language, Match } from '../types'
 
   export let matches: Match[]
   export let competitions: Competition[]

@@ -1,8 +1,8 @@
 <script lang="ts">
-  import type { ApiClient } from './api'
-  import { labelForError } from './errors'
-  import { parseMatchKeyboardConfig } from './matchConfig'
-  import type { ArrowScore, Category, KeyboardKey, Match, MatchParticipant, ParticipantList, ParticipantListMember } from './types'
+  import type { ApiClient } from '../api'
+  import { labelForError } from '../errors'
+  import { parseMatchKeyboardConfig } from '../matchConfig'
+  import type { ArrowScore, Category, KeyboardKey, Match, MatchParticipant, ParticipantList, ParticipantListMember } from '../types'
 
   export let api: ApiClient
   export let match: Match

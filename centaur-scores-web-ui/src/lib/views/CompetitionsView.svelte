@@ -1,8 +1,8 @@
 <script lang="ts">
-  import type { ApiClient } from './api'
-  import { formatLocalDate } from './date'
-  import { labelForError } from './errors'
-  import type { Competition, Language } from './types'
+  import type { ApiClient } from '../api'
+  import { formatLocalDate } from '../date'
+  import { labelForError } from '../errors'
+  import type { Competition, Language } from '../types'
 
   export let api: ApiClient
   export let competitions: Competition[]

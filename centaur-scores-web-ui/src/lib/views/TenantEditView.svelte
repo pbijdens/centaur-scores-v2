@@ -1,7 +1,7 @@
 <script lang="ts">
-  import type { ApiClient } from './api'
-  import { readLogoFile, validateLogoFile } from './tenantLogo'
-  import type { Tenant } from './types'
+  import type { ApiClient } from '../api'
+  import { readLogoFile, validateLogoFile } from '../tenantLogo'
+  import type { Tenant } from '../types'
 
   export let api: ApiClient
   export let tenantId: string

@@ -1,6 +1,6 @@
 <script lang="ts">
-  import type { Tenant } from './types'
-  import type { Language } from './types'
+  import type { Tenant } from '../types'
+  import type { Language } from '../types'
 
   export let tenant: string
   export let tenants: Tenant[]

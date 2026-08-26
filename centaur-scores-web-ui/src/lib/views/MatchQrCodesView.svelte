@@ -1,7 +1,7 @@
 <script lang="ts">
   import QRCode from 'qrcode'
-  import { scorekeeperUrl } from './api'
-  import type { Language, Match } from './types'
+  import { scorekeeperUrl } from '../api'
+  import type { Language, Match } from '../types'
 
   export let match: Match
   export let tenantId: string

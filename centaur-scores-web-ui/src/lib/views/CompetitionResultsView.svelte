@@ -1,8 +1,8 @@
 <script lang="ts">
   import { onMount } from 'svelte'
-  import type { ApiClient } from './api'
-  import { formatLocalDate } from './date'
-  import type { CompetitionResultsDocument, Language } from './types'
+  import type { ApiClient } from '../api'
+  import { formatLocalDate } from '../date'
+  import type { CompetitionResultsDocument, Language } from '../types'
 
   export let api: ApiClient
   export let competitionId: string

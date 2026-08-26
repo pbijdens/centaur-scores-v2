@@ -1,8 +1,8 @@
 <script lang="ts">
-  import type { ApiClient } from './api'
-  import { labelForError } from './errors'
-  import { keyboardColors, deviceSelectionModes, parseTemplateConfiguration } from './templateConfig'
-  import type { Category, MatchTemplate, ParticipantList } from './types'
+  import type { ApiClient } from '../api'
+  import { labelForError } from '../errors'
+  import { keyboardColors, deviceSelectionModes, parseTemplateConfiguration } from '../templateConfig'
+  import type { Category, MatchTemplate, ParticipantList } from '../types'
 
   export let api: ApiClient
   export let template: MatchTemplate

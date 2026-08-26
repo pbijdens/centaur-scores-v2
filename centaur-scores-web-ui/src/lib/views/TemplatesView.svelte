@@ -1,8 +1,8 @@
 <script lang="ts">
-  import type { ApiClient } from './api'
-  import { labelForError } from './errors'
-  import { defaultTemplateConfigurationJson } from './templateConfig'
-  import type { MatchTemplate, ParticipantList } from './types'
+  import type { ApiClient } from '../api'
+  import { labelForError } from '../errors'
+  import { defaultTemplateConfigurationJson } from '../templateConfig'
+  import type { MatchTemplate, ParticipantList } from '../types'
 
   export let api: ApiClient
   export let templates: MatchTemplate[]

@@ -1,9 +1,9 @@
 <script lang="ts">
-  import type { ApiClient } from './api'
-  import { labelForError } from './errors'
-  import { parseMatchKeyboardConfig, parseMatchScoringRules } from './matchConfig'
-  import { deviceSelectionModes, keyboardColors } from './templateConfig'
-  import type { Category, LiveScopeConfig, Match, ParticipantList } from './types'
+  import type { ApiClient } from '../api'
+  import { labelForError } from '../errors'
+  import { parseMatchKeyboardConfig, parseMatchScoringRules } from '../matchConfig'
+  import { deviceSelectionModes, keyboardColors } from '../templateConfig'
+  import type { Category, LiveScopeConfig, Match, ParticipantList } from '../types'
 
   export let api: ApiClient
   export let match: Match

@@ -1,9 +1,9 @@
 <script lang="ts">
-  import type { ApiClient } from './api'
-  import { labelForError } from './errors'
-  import { defaultMatchKeyboardJson, defaultMatchScoringRulesJson } from './matchConfig'
-  import { parseTemplateConfiguration } from './templateConfig'
-  import type { Language, Match, MatchTemplate } from './types'
+  import type { ApiClient } from '../api'
+  import { labelForError } from '../errors'
+  import { defaultMatchKeyboardJson, defaultMatchScoringRulesJson } from '../matchConfig'
+  import { parseTemplateConfiguration } from '../templateConfig'
+  import type { Language, Match, MatchTemplate } from '../types'
 
   export let api: ApiClient
   export let matches: Match[]

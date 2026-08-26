@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { Tenant } from './types'
+  import type { Tenant } from '../types'
 
   export let tenants: Tenant[]
   export let labels: Record<string, string>

@@ -1,8 +1,8 @@
 <script lang="ts">
   import { onMount } from 'svelte'
-  import { fetchLiveScoringMatches, fetchLiveScoringPage } from './api'
-  import { formatLocalDate } from './date'
-  import type { Language, LiveScoringMatch, LiveScoringPage } from './types'
+  import { fetchLiveScoringMatches, fetchLiveScoringPage } from '../api'
+  import { formatLocalDate } from '../date'
+  import type { Language, LiveScoringMatch, LiveScoringPage } from '../types'
 
   export let tenantId: string
   export let scope: string

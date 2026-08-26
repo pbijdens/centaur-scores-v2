@@ -1,7 +1,7 @@
 <script lang="ts">
-  import type { ApiClient } from './api'
-  import { labelForError } from './errors'
-  import type { Category, ParticipantList, ParticipantListMember } from './types'
+  import type { ApiClient } from '../api'
+  import { labelForError } from '../errors'
+  import type { Category, ParticipantList, ParticipantListMember } from '../types'
 
   export let api: ApiClient
   export let list: ParticipantList

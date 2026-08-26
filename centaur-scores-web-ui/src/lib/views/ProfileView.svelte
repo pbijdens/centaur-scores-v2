@@ -1,7 +1,7 @@
 <script lang="ts">
-  import type { ApiClient } from './api'
-  import { labelForError } from './errors'
-  import type { Profile } from './types'
+  import type { ApiClient } from '../api'
+  import { labelForError } from '../errors'
+  import type { Profile } from '../types'
 
   export let api: ApiClient
   export let labels: Record<string, string>
