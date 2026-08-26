@@ -1,10 +1,32 @@
 <script lang="ts">
   import { onMount } from 'svelte'
-  import { ApiClient, fetchTenants, login } from './lib/api'
+  import { ApiClient, login } from './lib/api'
+  import {
+    accounts,
+    categories,
+    childTenants,
+    competitions,
+    currentTenant,
+    matches,
+    participantLists,
+    profile,
+    templates,
+    tenants,
+    loadData as loadAllData,
+    loadTenants as fetchTenantsList,
+    loadMatchesList as fetchMatchesList,
+    loadCompetitionsList as fetchCompetitionsList,
+    loadAccounts as fetchAccountsList,
+    loadChildTenants as fetchChildTenantsList,
+    refreshCategories as fetchCategoriesList,
+    refreshParticipantLists as fetchParticipantListsList,
+    refreshTemplates as fetchTemplatesList,
+    resetMatchesAndCompetitions
+  } from './lib/data'
   import { labelForError } from './lib/errors'
   import { translationsFor } from './lib/i18n'
   import { navigateTo, resolveRoute } from './lib/router'
-  import type { Account, Category, Competition, Language, Match, MatchTemplate, ParticipantList, Profile, Tenant, View } from './lib/types'
+  import type { Account, Category, Competition, Language, Match, MatchTemplate, ParticipantList, Tenant, View } from './lib/types'
   import AccountEditView from './lib/views/AccountEditView.svelte'
   import AccountsView from './lib/views/AccountsView.svelte'
   import AppHeader from './lib/AppHeader.svelte'
@@ -36,30 +58,20 @@
   let loggedIn = localStorage.getItem('centaur-token') !== null
   let token = localStorage.getItem('centaur-token') ?? ''
   let tenant = localStorage.getItem('centaur-tenant') ?? rootTenant
-  let tenants: Tenant[] = []
   let tenantsLoading = false
   let tenantsError = ''
   let username = ''
   let password = ''
   let language = (localStorage.getItem('centaur-language') ?? 'en') as Language
   let view: View = 'home'
-  let matches: Match[] = []
-  let competitions: Competition[] = []
   let selectedMatch: Match | null = null
   let loginError = ''
   let loading = false
-  let profile: Profile | null = null
-  let currentTenant: Tenant | null = null
-  let childTenants: Tenant[] = []
   let selectedTenantId: string | null = null
-  let accounts: Account[] = []
   let selectedAccountId: string | null = null
-  let categories: Category[] = []
   let selectedCategoryId: string | null = null
-  let participantLists: ParticipantList[] = []
   let selectedListId: string | null = null
   let selectedMemberId: string | null = null
-  let templates: MatchTemplate[] = []
   let selectedTemplateId: string | null = null
   let selectedMatchId: string | null = null
   let selectedParticipantId: string | null = null
@@ -70,14 +82,14 @@
   let selectedResultsScope: string | null = null
 
   $: t = translationsFor(language)
-  $: isAdmin = profile?.authorization === 'Administrator'
+  $: isAdmin = $profile?.authorization === 'Administrator'
   $: homeQuickLinks = (
     [['participants', t.participants], ['categories', t.categories], ['templates', t.templates]] as [string, string][]
   ).concat(isAdmin ? [['accounts', t.accounts], ['tenants', t.tenants]] : [])
-  $: selectedCategory = categories.find((category) => category.id === selectedCategoryId) ?? null
-  $: selectedList = participantLists.find((list) => list.id === selectedListId) ?? null
+  $: selectedCategory = $categories.find((category) => category.id === selectedCategoryId) ?? null
+  $: selectedList = $participantLists.find((list) => list.id === selectedListId) ?? null
   $: selectedMember = selectedMemberId && selectedMemberId !== 'new' ? selectedList?.members.find((member) => member.id === selectedMemberId) ?? null : null
-  $: selectedTemplate = templates.find((template) => template.id === selectedTemplateId) ?? null
+  $: selectedTemplate = $templates.find((template) => template.id === selectedTemplateId) ?? null
   $: selectedParticipant = selectedMatch?.participants?.find((participant) => participant.id === selectedParticipantId) ?? null
 
   const api = new ApiClient(() => token, signOut)
@@ -86,10 +98,10 @@
     tenantsLoading = true
     tenantsError = ''
     try {
-      tenants = await fetchTenants()
-      if (tenants.length > 0 && !tenants.some((item) => item.id === tenant)) tenant = tenants[0].id
+      const result = await fetchTenantsList()
+      if (result.length > 0 && !result.some((item) => item.id === tenant)) tenant = result[0].id
     } catch {
-      tenants = []
+      tenants.set([])
       tenantsError = t.tenantsLoadError
     } finally { tenantsLoading = false }
   }
@@ -98,15 +110,9 @@
     if (!token) return
     loading = true
     try {
-      matches = await api.fetchMatches()
-      competitions = await api.fetchCompetitions()
-      profile = await api.fetchProfile()
-      currentTenant = await api.fetchCurrentTenant()
-      categories = await api.fetchCategories()
-      participantLists = await api.fetchParticipantLists()
-      templates = await api.fetchTemplates()
+      await loadAllData(api)
       applyRoute()
-    } catch { matches = []; competitions = [] } finally { loading = false }
+    } catch { resetMatchesAndCompetitions() } finally { loading = false }
   }
 
   async function signIn() {
@@ -149,7 +155,7 @@
   function openCompetition(competition: Competition) { navigate(`/competitions/${competition.id}`) }
 
   async function loadCompetitionsList() {
-    competitions = await api.fetchCompetitions()
+    await fetchCompetitionsList(api)
   }
 
   function onCompetitionDeleted() {
@@ -163,7 +169,7 @@
   }
 
   async function loadMatchesList() {
-    matches = await api.fetchMatches()
+    await fetchMatchesList(api)
   }
 
   function deactivateAllMatches() {
@@ -188,7 +194,7 @@
   function openTenant(childTenant: Tenant) { navigate(`/tenants/${childTenant.id}`) }
 
   async function loadChildTenants() {
-    childTenants = await api.fetchChildTenants()
+    await fetchChildTenantsList(api)
   }
 
   async function createChildTenant(name: string) {
@@ -204,13 +210,13 @@
   function openAccount(account: Account) { navigate(`/accounts/${account.id}`) }
 
   async function loadAccounts() {
-    accounts = await api.fetchAccounts()
+    await fetchAccountsList(api)
   }
 
   function openCategory(category: Category) { navigate(`/categories/${category.id}`) }
 
   async function refreshCategories() {
-    categories = await api.fetchCategories()
+    await fetchCategoriesList(api)
   }
 
   function onCategoryDeleted() {
@@ -221,7 +227,7 @@
   function openList(list: ParticipantList) { navigate(`/participants/${list.id}`) }
 
   async function refreshParticipantLists() {
-    participantLists = await api.fetchParticipantLists()
+    await fetchParticipantListsList(api)
   }
 
   function openMember(memberId: string) {
@@ -240,7 +246,7 @@
   function openTemplate(template: MatchTemplate) { navigate(`/templates/${template.id}`) }
 
   async function refreshTemplates() {
-    templates = await api.fetchTemplates()
+    await fetchTemplatesList(api)
   }
 
   function onTemplateDeleted() {
@@ -301,58 +307,58 @@
 {:else if view === 'match-results-scope' && selectedMatchId && selectedResultsScope}
   <MatchResultsScopeView {api} matchId={selectedMatchId} scope={selectedResultsScope} {language} labels={t} />
 {:else if view === 'competition-results' && selectedCompetitionId}
-  <CompetitionResultsView {api} competitionId={selectedCompetitionId} tenantLogoUrl={currentTenant?.logoUrl} {language} labels={t} />
+  <CompetitionResultsView {api} competitionId={selectedCompetitionId} tenantLogoUrl={$currentTenant?.logoUrl} {language} labels={t} />
 {:else if !loggedIn}
-  <LoginView bind:tenant {tenants} {tenantsLoading} {tenantsError} bind:username bind:password {loginError} {language} labels={t} onSubmit={signIn} onLanguageChange={setLanguage} />
+  <LoginView bind:tenant tenants={$tenants} {tenantsLoading} {tenantsError} bind:username bind:password {loginError} {language} labels={t} onSubmit={signIn} onLanguageChange={setLanguage} />
 {:else}
   <div class="app-shell">
-    <AppHeader {username} {language} {view} labels={t} tenantName={currentTenant?.name} tenantLogoUrl={currentTenant?.logoUrl} onNavigate={navigate} onLanguageChange={setLanguage} onLogout={signOut} />
+    <AppHeader {username} {language} {view} labels={t} tenantName={$currentTenant?.name} tenantLogoUrl={$currentTenant?.logoUrl} onNavigate={navigate} onLanguageChange={setLanguage} onLogout={signOut} />
     <main class="content">
       {#if view === 'home'}
-        <HomeView {matches} {competitions} tenantId={tenant} {language} labels={t} quickLinks={homeQuickLinks} onOpenMatch={openMatch} onNavigate={navigate} onDeactivateAll={deactivateAllMatches} />
+        <HomeView matches={$matches} competitions={$competitions} tenantId={tenant} {language} labels={t} quickLinks={homeQuickLinks} onOpenMatch={openMatch} onNavigate={navigate} onDeactivateAll={deactivateAllMatches} />
       {:else if view === 'matches'}
-        <MatchesView {api} {matches} {templates} {language} labels={t} onOpenMatch={openMatch} onChanged={loadMatchesList} />
+        <MatchesView {api} matches={$matches} templates={$templates} {language} labels={t} onOpenMatch={openMatch} onChanged={loadMatchesList} />
       {:else if view === 'match' && selectedMatch}
         {@const currentMatch = selectedMatch}
-        <MatchDetailView {api} match={currentMatch} {categories} {participantLists} {language} labels={t} onBack={() => navigate('/matches')} onToggleOpen={toggleSelectedMatch} onChanged={refreshSelectedMatch} onDeleted={onMatchDeleted} onEditMetadata={() => navigate(`/matches/${currentMatch.id}/edit`)} onManageDevices={() => navigate(`/matches/${currentMatch.id}/devices`)} onOpenParticipant={openParticipant} />
+        <MatchDetailView {api} match={currentMatch} categories={$categories} participantLists={$participantLists} {language} labels={t} onBack={() => navigate('/matches')} onToggleOpen={toggleSelectedMatch} onChanged={refreshSelectedMatch} onDeleted={onMatchDeleted} onEditMetadata={() => navigate(`/matches/${currentMatch.id}/edit`)} onManageDevices={() => navigate(`/matches/${currentMatch.id}/devices`)} onOpenParticipant={openParticipant} />
       {:else if view === 'match-metadata' && selectedMatch}
         {@const currentMatch = selectedMatch}
-        <MatchMetadataEditView {api} match={currentMatch} {categories} {participantLists} labels={t} onBack={() => navigate(`/matches/${currentMatch.id}`)} onSaved={() => navigate(`/matches/${currentMatch.id}`)} onDeleted={onMatchDeleted} />
+        <MatchMetadataEditView {api} match={currentMatch} categories={$categories} participantLists={$participantLists} labels={t} onBack={() => navigate(`/matches/${currentMatch.id}`)} onSaved={() => navigate(`/matches/${currentMatch.id}`)} onDeleted={onMatchDeleted} />
       {:else if view === 'match-devices' && selectedMatch}
         {@const currentMatch = selectedMatch}
-        <MatchDevicesView {api} match={currentMatch} {categories} labels={t} onBack={() => navigate(`/matches/${currentMatch.id}`)} onChanged={refreshSelectedMatch} />
+        <MatchDevicesView {api} match={currentMatch} categories={$categories} labels={t} onBack={() => navigate(`/matches/${currentMatch.id}`)} onChanged={refreshSelectedMatch} />
       {:else if view === 'match-participant' && selectedMatch && selectedParticipant}
         {@const currentMatch = selectedMatch}
-        <MatchParticipantView {api} match={currentMatch} participant={selectedParticipant} {categories} {participantLists} labels={t} onBack={returnToSelectedMatch} onChanged={refreshSelectedMatch} onRemoved={() => navigate(`/matches/${currentMatch.id}`)} />
+        <MatchParticipantView {api} match={currentMatch} participant={selectedParticipant} categories={$categories} participantLists={$participantLists} labels={t} onBack={returnToSelectedMatch} onChanged={refreshSelectedMatch} onRemoved={() => navigate(`/matches/${currentMatch.id}`)} />
       {:else if view === 'competitions'}
-        <CompetitionsView {api} {competitions} {language} labels={t} onOpenCompetition={openCompetition} onChanged={loadCompetitionsList} />
+        <CompetitionsView {api} competitions={$competitions} {language} labels={t} onOpenCompetition={openCompetition} onChanged={loadCompetitionsList} />
       {:else if view === 'competition' && selectedCompetition}
         {@const currentCompetition = selectedCompetition}
-        <CompetitionDetailView {api} competition={currentCompetition} {categories} {matches} {language} labels={t} onBack={() => navigate('/competitions')} onChanged={refreshSelectedCompetition} onDeleted={onCompetitionDeleted} onViewResults={() => window.open(`/competitions/${currentCompetition.id}/results`, '_blank')} onCopied={(copy) => { loadCompetitionsList(); openCompetition(copy) }} />
+        <CompetitionDetailView {api} competition={currentCompetition} categories={$categories} matches={$matches} {language} labels={t} onBack={() => navigate('/competitions')} onChanged={refreshSelectedCompetition} onDeleted={onCompetitionDeleted} onViewResults={() => window.open(`/competitions/${currentCompetition.id}/results`, '_blank')} onCopied={(copy) => { loadCompetitionsList(); openCompetition(copy) }} />
       {:else if view === 'profile'}
         <ProfileView {api} labels={t} onBack={() => navigate('/')} />
       {:else if view === 'tenants' && isAdmin}
-        <TenantsView tenants={childTenants} labels={t} onOpenTenant={openTenant} onCreateTenant={createChildTenant} onBack={() => navigate('/')} />
+        <TenantsView tenants={$childTenants} labels={t} onOpenTenant={openTenant} onCreateTenant={createChildTenant} onBack={() => navigate('/')} />
       {:else if view === 'tenant' && selectedTenantId && isAdmin}
         <TenantEditView {api} tenantId={selectedTenantId} labels={t} onBack={() => navigate('/tenants')} onDeleted={onTenantDeleted} />
       {:else if view === 'accounts' && isAdmin}
-        <AccountsView {api} {accounts} labels={t} onOpenAccount={openAccount} onBack={() => navigate('/')} />
+        <AccountsView {api} accounts={$accounts} labels={t} onOpenAccount={openAccount} onBack={() => navigate('/')} />
       {:else if view === 'account' && selectedAccountId && isAdmin}
-        <AccountEditView {api} accountId={selectedAccountId} currentAccountId={profile?.id ?? null} labels={t} onBack={() => navigate('/accounts')} />
+        <AccountEditView {api} accountId={selectedAccountId} currentAccountId={$profile?.id ?? null} labels={t} onBack={() => navigate('/accounts')} />
       {:else if view === 'categories'}
-        <CategoriesView {api} {categories} labels={t} onOpenCategory={openCategory} onChanged={refreshCategories} onBack={() => navigate('/')} />
+        <CategoriesView {api} categories={$categories} labels={t} onOpenCategory={openCategory} onChanged={refreshCategories} onBack={() => navigate('/')} />
       {:else if view === 'category' && selectedCategory}
         <CategoryDetailView {api} category={selectedCategory} labels={t} onChanged={refreshCategories} onDeleted={onCategoryDeleted} onBack={() => navigate('/categories')} />
       {:else if view === 'participants'}
-        <ParticipantListsView {api} lists={participantLists} labels={t} onOpenList={openList} onChanged={refreshParticipantLists} onBack={() => navigate('/')} />
+        <ParticipantListsView {api} lists={$participantLists} labels={t} onOpenList={openList} onChanged={refreshParticipantLists} onBack={() => navigate('/')} />
       {:else if view === 'participant-list' && selectedList}
-        <ParticipantListDetailView {api} list={selectedList} {categories} labels={t} onOpenMember={openMember} onAddMember={addMember} onChanged={refreshParticipantLists} onBack={() => navigate('/participants')} />
+        <ParticipantListDetailView {api} list={selectedList} categories={$categories} labels={t} onOpenMember={openMember} onAddMember={addMember} onChanged={refreshParticipantLists} onBack={() => navigate('/participants')} />
       {:else if view === 'participant' && selectedListId}
-        <ParticipantMemberView {api} listId={selectedListId} member={selectedMember} {categories} labels={t} onBack={() => navigate(`/participants/${selectedListId}`)} onSaved={onMemberSaved} onDeleted={onMemberSaved} />
+        <ParticipantMemberView {api} listId={selectedListId} member={selectedMember} categories={$categories} labels={t} onBack={() => navigate(`/participants/${selectedListId}`)} onSaved={onMemberSaved} onDeleted={onMemberSaved} />
       {:else if view === 'templates'}
-        <TemplatesView {api} {templates} {participantLists} labels={t} onOpenTemplate={openTemplate} onChanged={refreshTemplates} onBack={() => navigate('/')} />
+        <TemplatesView {api} templates={$templates} participantLists={$participantLists} labels={t} onOpenTemplate={openTemplate} onChanged={refreshTemplates} onBack={() => navigate('/')} />
       {:else if view === 'template' && selectedTemplate}
-        <TemplateEditView {api} template={selectedTemplate} {categories} {participantLists} labels={t} onBack={() => navigate('/templates')} onSaved={refreshTemplates} onDeleted={onTemplateDeleted} />
+        <TemplateEditView {api} template={selectedTemplate} categories={$categories} participantLists={$participantLists} labels={t} onBack={() => navigate('/templates')} onSaved={refreshTemplates} onDeleted={onTemplateDeleted} />
       {/if}
       {#if loading}<p class="loading">{t.loadingTenantData}</p>{/if}
     </main>
