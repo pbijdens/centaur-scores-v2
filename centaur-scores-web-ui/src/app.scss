@@ -37,6 +37,7 @@ $color-danger-tint-hover: #fadcd3;
 body {
   margin: 0;
   min-width: 320px;
+  overflow-wrap: break-word;
 }
 
 button,
@@ -149,6 +150,7 @@ select {
   color: var(--ink);
   padding: 11px 12px;
   min-height: 43px;
+  min-width: 0;
   outline: none;
 }
 
@@ -206,13 +208,18 @@ select:focus {
 }
 
 header {
+  position: sticky;
+  top: 0;
+  z-index: 40;
   height: 76px;
+  flex: 0 0 auto;
   border-bottom: 1px solid var(--line);
   background: $color-paper;
   display: flex;
   align-items: center;
-  padding: 0 clamp(18px, 5vw, 72px);
-  gap: 44px;
+  padding: 0 clamp(14px, 5vw, 72px);
+  gap: 18px;
+  max-width: 100vw;
 }
 
 .brand {
@@ -223,11 +230,16 @@ header {
   background: transparent;
   padding: 0;
   text-align: left;
+  flex: 0 1 auto;
+  min-width: 0;
 }
 
 .brand strong,
 .brand small {
   display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .brand strong {
@@ -244,6 +256,17 @@ nav {
   display: flex;
   gap: 20px;
   height: 100%;
+  flex: 1 1 auto;
+  min-width: 24px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  mask-image: linear-gradient(to right, black calc(100% - 20px), transparent);
+  -webkit-mask-image: linear-gradient(to right, black calc(100% - 20px), transparent);
+}
+
+nav::-webkit-scrollbar {
+  display: none;
 }
 
 nav button,
@@ -257,6 +280,8 @@ nav button,
 
 nav button {
   position: relative;
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 
 nav button.active {
@@ -275,17 +300,16 @@ nav button.active:after {
 }
 
 .user-menu {
-  margin-left: auto;
   display: flex;
   align-items: center;
-  gap: 14px;
   font-size: 13px;
+  flex: 0 0 auto;
 }
 
-.user-menu select {
-  min-height: 31px;
-  padding: 4px 7px;
-  width: 54px;
+.menu-trigger {
+  border: 0;
+  background: transparent;
+  padding: 0;
 }
 
 .profile-button {
@@ -312,6 +336,105 @@ nav button.active:after {
   color: $color-paper;
   font: 700 12px 'Space Grotesk';
   flex: 0 0 auto;
+}
+
+.menu-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 11px 12px;
+}
+
+.menu-item:hover,
+.menu-item:focus-visible {
+  background: var(--neutral);
+}
+
+.menu-item.active {
+  font-weight: 700;
+}
+
+.menu-item-danger {
+  color: $color-danger-text;
+}
+
+.menu-item-danger:hover,
+.menu-item-danger:focus-visible {
+  background: #{$color-danger-tint};
+}
+
+.menu-separator {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 6px 4px;
+}
+
+.menu-section {
+  display: flex;
+  gap: 8px;
+  padding: 6px 12px 10px;
+}
+
+.lang-flag-button {
+  border: 1px solid var(--line);
+  background: var(--paper);
+  padding: 6px 10px;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.lang-flag-button.active {
+  border-color: var(--green);
+  background: #{$tint-accent-soft};
+}
+
+.highlight-button {
+  border: 0;
+  background: var(--green);
+  color: white;
+  font-weight: 700;
+  padding: 12px 20px;
+}
+
+.highlight-button.is-live {
+  background: var(--accent);
+  color: var(--ink);
+}
+
+.match-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 0 0 auto;
+}
+
+.actions-trigger {
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 20px;
+  line-height: 1;
+  padding: 12px 18px;
+  height: 100%;
+}
+
+.actions-trigger:hover,
+.actions-trigger[aria-expanded="true"] {
+  border-color: var(--green);
+  color: var(--green);
+}
+
+.results-trigger {
+  font-size: 14px;
+  font-weight: 700;
+  padding: 12px 20px;
 }
 
 .content {
@@ -562,16 +685,40 @@ nav button.active:after {
 .inline-form {
   display: flex;
   align-items: end;
+  flex-wrap: wrap;
   gap: 12px;
   background: var(--paper);
   border: 1px solid var(--line);
   padding: 20px;
   margin-bottom: 16px;
+  max-width: 100%;
 }
 
 .inline-form label {
-  flex: 1;
+  flex: 1 1 160px;
+  min-width: 0;
   margin: 0;
+}
+
+.inline-form input,
+.inline-form select {
+  max-width: 100%;
+}
+
+.entry-card {
+  max-width: 480px;
+}
+
+.entry-card form {
+  margin-top: 0;
+}
+
+.large-submit {
+  width: 100%;
+  margin-top: 6px;
+  padding: 14px 20px;
+  font-size: 15px;
+  box-shadow: 0 8px 20px rgba($color-primary, .22);
 }
 
 .tenant-logo-thumb {
@@ -619,27 +766,56 @@ nav button.active:after {
 }
 
 @media (max-width: 720px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+
   header {
     height: auto;
-    min-height: 70px;
     flex-wrap: wrap;
-    padding: 15px 18px;
-    gap: 14px 24px;
+    align-items: center;
+    padding: 12px 14px;
+    row-gap: 10px;
+  }
+
+  .brand {
+    order: 1;
+  }
+
+  .brand small {
+    display: none;
+  }
+
+  .user-menu {
+    order: 2;
+    margin-left: auto;
   }
 
   nav {
     order: 3;
+    flex-basis: 100%;
     width: 100%;
-    height: 32px;
     gap: 18px;
-  }
-
-  .user-menu {
-    margin-left: auto;
+    padding-right: 16px;
   }
 
   .profile-button .name {
     display: none;
+  }
+
+  .inline-form {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .inline-form .primary {
+    width: 100%;
+  }
+
+  .inline-form button:not(.primary) {
+    align-self: flex-start;
   }
 
   .content {
@@ -650,6 +826,10 @@ nav button.active:after {
     align-items: start;
     flex-direction: column;
     margin-bottom: 25px;
+  }
+
+  .page-intro .match-header-actions {
+    align-self: flex-end;
   }
 
   .dashboard-grid,

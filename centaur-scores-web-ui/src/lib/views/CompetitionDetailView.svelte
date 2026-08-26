@@ -1,7 +1,9 @@
 <script lang="ts">
   import type { ApiClient } from '../api'
   import { formatLocalDate } from '../date'
+  import DropdownMenu from '../DropdownMenu.svelte'
   import { labelForError } from '../errors'
+  import RowActions from '../RowActions.svelte'
   import type { Category, Competition, CompetitionRound, CompetitionScoreRule, Language, Match } from '../types'
 
   export let api: ApiClient
@@ -290,8 +292,18 @@
 <button class="back-link" on:click={onBack}>← {labels.competitions}</button>
 <div class="page-intro">
   <div><p class="eyebrow">{labels.eyebrowCompetitionDetail}</p><h1>{competition.name}</h1></div>
-  <button class="primary" on:click={onViewResults}>{labels.viewResults}</button>
+  <div class="match-header-actions">
+    <button class="primary" on:click={onViewResults}>{labels.viewResults}</button>
+    <DropdownMenu ariaLabel={labels.matchActions} buttonClass="actions-trigger" align="right">
+      <svelte:fragment slot="trigger">⋯</svelte:fragment>
+      <button class="menu-item" on:click={copyCompetition}>{labels.saveCopy}</button>
+      <hr class="menu-separator" />
+      <button class="menu-item menu-item-danger" on:click={deleteCompetition}>{labels.deleteCompetition}</button>
+    </DropdownMenu>
+  </div>
 </div>
+{#if copyError}<p class="error">{copyError}</p>{/if}
+{#if deleteError}<p class="error">{deleteError}</p>{/if}
 
 <section class="panel section-gap">
   <label>{labels.competitionNameLabel}<input bind:value={name} /></label>
@@ -308,10 +320,13 @@
           {category.name}
         </label>
         {#if groupByCategoryIds.includes(category.id)}
-          <div class="device-actions">
-            <button class="icon-button" aria-label={labels.moveUp} disabled={index === 0} on:click={() => moveGroupCategory(index, -1)}>↑</button>
-            <button class="icon-button" aria-label={labels.moveDown} disabled={index === groupByCategoryIds.length - 1} on:click={() => moveGroupCategory(index, 1)}>↓</button>
-          </div>
+          <RowActions
+            {labels}
+            canMoveUp={index > 0}
+            canMoveDown={index < groupByCategoryIds.length - 1}
+            onMoveUp={() => moveGroupCategory(index, -1)}
+            onMoveDown={() => moveGroupCategory(index, 1)}
+          />
         {/if}
       </div>
     {/each}
@@ -340,11 +355,17 @@
           <span class="management-icon">◇</span>
           <span><strong>{round.longName}</strong><small>{round.shortName} · {round.matches?.length ?? 0} matches</small></span>
           <div class="device-actions">
-            <button class="icon-button" aria-label={labels.moveUp} disabled={roundIndex === 0} on:click={() => moveRound(round.id, -1)}>↑</button>
-            <button class="icon-button" aria-label={labels.moveDown} disabled={roundIndex === rounds.length - 1} on:click={() => moveRound(round.id, 1)}>↓</button>
             <button class="icon-button" aria-label={labels.addMatchToRound} on:click={() => (openMatchEditorRoundId = openMatchEditorRoundId === round.id ? null : round.id)}>+</button>
             <button class="icon-button" aria-label={labels.edit} aria-expanded={editingRoundId === round.id} on:click={() => startEditRound(round)}>✎</button>
-            <button class="icon-button danger-icon-button" aria-label={labels.removeValue} on:click={() => removeRound(round)}>🗑</button>
+            <RowActions
+              {labels}
+              pushRight={false}
+              canMoveUp={roundIndex > 0}
+              canMoveDown={roundIndex < rounds.length - 1}
+              onMoveUp={() => moveRound(round.id, -1)}
+              onMoveDown={() => moveRound(round.id, 1)}
+              onDelete={() => removeRound(round)}
+            />
           </div>
         </div>
         {#if editingRoundId === round.id}
@@ -419,10 +440,16 @@
         <div class="list-row">
           <span><strong>{rule.name}</strong><small>{ruleRoundNames(rule)} · {rule.aggregation === 'f1' ? labels.aggregationF1 : labels.aggregationTotal} · {rule.highestScores}/{rule.minimumScores}</small></span>
           <div class="device-actions">
-            <button class="icon-button" aria-label={labels.moveUp} disabled={ruleIndex === 0} on:click={() => moveRule(rule.id, -1)}>↑</button>
-            <button class="icon-button" aria-label={labels.moveDown} disabled={ruleIndex === rules.length - 1} on:click={() => moveRule(rule.id, 1)}>↓</button>
             <button class="icon-button" aria-label={labels.edit} aria-expanded={editingRuleId === rule.id} on:click={() => startEditRule(rule)}>✎</button>
-            <button class="icon-button danger-icon-button" aria-label={labels.removeValue} on:click={() => removeRule(rule)}>🗑</button>
+            <RowActions
+              {labels}
+              pushRight={false}
+              canMoveUp={ruleIndex > 0}
+              canMoveDown={ruleIndex < rules.length - 1}
+              onMoveUp={() => moveRule(rule.id, -1)}
+              onMoveDown={() => moveRule(rule.id, 1)}
+              onDelete={() => removeRule(rule)}
+            />
           </div>
         </div>
         {#if editingRuleId === rule.id}
@@ -454,16 +481,6 @@
   {#if ruleError}<p class="error">{ruleError}</p>{/if}
 </section>
 
-<section class="section-gap">
-  <button class="text-button" on:click={copyCompetition}>{labels.saveCopy}</button>
-  {#if copyError}<p class="error">{copyError}</p>{/if}
-</section>
-
-<section class="section-gap">
-  <button class="text-button danger-icon-button" on:click={deleteCompetition}>{labels.deleteCompetition}</button>
-  {#if deleteError}<p class="error">{deleteError}</p>{/if}
-</section>
-
 <style>
   .section-gap {
     margin-top: 20px;
@@ -484,8 +501,10 @@
 
   .device-actions {
     display: flex;
+    flex-wrap: wrap;
     gap: 10px;
     align-items: center;
+    justify-content: flex-end;
     margin-left: auto;
   }
 
@@ -533,6 +552,7 @@
   .editor-row {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
     gap: 10px;
     padding: 6px 0;
   }
@@ -549,5 +569,26 @@
     display: flex;
     align-items: center;
     gap: 8px;
+  }
+
+  @media (max-width: 720px) {
+    .device-block {
+      padding: 14px;
+    }
+
+    .device-block .list-row {
+      flex-wrap: wrap;
+      align-items: flex-start;
+    }
+
+    .device-actions {
+      width: 100%;
+      justify-content: flex-end;
+      margin-left: 0;
+    }
+
+    .editor-row {
+      align-items: flex-start;
+    }
   }
 </style>

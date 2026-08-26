@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { ApiClient } from '../api'
+  import DropdownMenu from '../DropdownMenu.svelte'
   import { readLogoFile, validateLogoFile } from '../tenantLogo'
   import type { Tenant } from '../types'
 
@@ -15,6 +16,7 @@
   let saveMessage = ''
   let saveError = ''
   let logoWarning = ''
+  let deleteError = ''
 
   async function loadTenant() {
     tenant = await api.fetchChildTenant(tenantId)
@@ -48,16 +50,30 @@
 
   async function remove() {
     if (!tenant) return
+    deleteError = ''
     const message = labels.deleteTenantConfirm.replace('{name}', tenant.name)
     if (!confirm(message)) return
-    await api.deleteChildTenant(tenantId)
-    onDeleted()
+    try {
+      await api.deleteChildTenant(tenantId)
+      onDeleted()
+    } catch {
+      deleteError = labels.tenantSaveError
+    }
   }
 </script>
 
 <button class="back-link" on:click={onBack}>← {labels.tenants}</button>
 {#if tenant}
-  <div class="page-intro"><div><p class="eyebrow">{labels.eyebrowSubTenant}</p><h1>{tenant.name}</h1></div></div>
+  <div class="page-intro">
+    <div><p class="eyebrow">{labels.eyebrowSubTenant}</p><h1>{tenant.name}</h1></div>
+    <div class="match-header-actions">
+      <DropdownMenu ariaLabel={labels.matchActions} buttonClass="actions-trigger" align="right">
+        <svelte:fragment slot="trigger">⋯</svelte:fragment>
+        <button class="menu-item menu-item-danger" on:click={remove}>{labels.deleteTenant}</button>
+      </DropdownMenu>
+    </div>
+  </div>
+  {#if deleteError}<p class="error">{deleteError}</p>{/if}
   <section class="panel">
     <form on:submit|preventDefault={save}>
       <label>{labels.tenantName}<input bind:value={name} /></label>
@@ -72,5 +88,4 @@
       <button class="primary" type="submit">{labels.save}</button>
     </form>
   </section>
-  <button class="danger-button" on:click={remove}>{labels.deleteTenant}</button>
 {/if}

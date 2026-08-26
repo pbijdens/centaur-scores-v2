@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { ApiClient } from '../api'
   import { labelForError } from '../errors'
+  import RowActions from '../RowActions.svelte'
   import type { Category, Match, MatchParticipant, ScoreDevice } from '../types'
 
   export let api: ApiClient
@@ -163,8 +164,6 @@
         <span class="management-icon">◇</span>
         <span><strong>{device.name}</strong><small>{assignedCount(device.id)} {labels.membersLabel.toLowerCase()}</small></span>
         <div class="device-actions">
-          <button class="icon-button" aria-label={labels.moveUp} disabled={deviceIndex === 0} on:click={() => moveDevice(device.id, -1)}>↑</button>
-          <button class="icon-button" aria-label={labels.moveDown} disabled={deviceIndex === devices.length - 1} on:click={() => moveDevice(device.id, 1)}>↓</button>
           <button
             class="icon-button participant-add-button"
             aria-label={labels.addParticipant}
@@ -172,7 +171,15 @@
             title={labels.addParticipant}
             on:click={() => (openParticipantEditorDeviceId = openParticipantEditorDeviceId === device.id ? null : device.id)}
           >+</button>
-          <button class="icon-button danger-icon-button" aria-label={labels.removeValue} on:click={() => removeDevice(device.id, device.name)}>🗑</button>
+          <RowActions
+            {labels}
+            pushRight={false}
+            canMoveUp={deviceIndex > 0}
+            canMoveDown={deviceIndex < devices.length - 1}
+            onMoveUp={() => moveDevice(device.id, -1)}
+            onMoveDown={() => moveDevice(device.id, 1)}
+            onDelete={() => removeDevice(device.id, device.name)}
+          />
         </div>
       </div>
 
@@ -198,11 +205,14 @@
                 <strong>{participantName(participant)}</strong>
                 {#if participantCategoryLabel(participant)}<small>{participantCategoryLabel(participant)}</small>{/if}
               </span>
-              <div class="device-actions">
-                <button class="icon-button" aria-label={labels.moveUp} disabled={participantIndex === 0} on:click={() => moveParticipant(device.id, participant.id, -1)}>↑</button>
-                <button class="icon-button" aria-label={labels.moveDown} disabled={participantIndex === assignedParticipants(device.id).length - 1} on:click={() => moveParticipant(device.id, participant.id, 1)}>↓</button>
-                <button class="icon-button danger-icon-button" aria-label={labels.removeValue} on:click={() => removeParticipantFromDevice(participant.id)}>✕</button>
-              </div>
+              <RowActions
+                {labels}
+                canMoveUp={participantIndex > 0}
+                canMoveDown={participantIndex < assignedParticipants(device.id).length - 1}
+                onMoveUp={() => moveParticipant(device.id, participant.id, -1)}
+                onMoveDown={() => moveParticipant(device.id, participant.id, 1)}
+                onDelete={() => removeParticipantFromDevice(participant.id)}
+              />
             </div>
           {/each}
         {/if}
@@ -236,8 +246,10 @@
 
   .device-actions {
     display: flex;
+    flex-wrap: wrap;
     gap: 10px;
     align-items: center;
+    justify-content: flex-end;
     margin-left: auto;
   }
 
@@ -261,13 +273,6 @@
     background: var(--neutral);
   }
 
-  .device-actions .danger-icon-button:hover,
-  .device-actions .danger-icon-button:focus-visible {
-    color: #b84232;
-    border-color: #e8755b;
-    background: #fdeeea;
-  }
-
   .participant-add-row {
     align-items: end;
     margin-top: 12px;
@@ -283,7 +288,7 @@
     padding-top: 8px;
   }
 
-  @media (max-width: 560px) {
+  @media (max-width: 720px) {
     .device-block {
       padding: 14px;
     }

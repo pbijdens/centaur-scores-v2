@@ -1,8 +1,10 @@
 <script lang="ts">
   import type { ApiClient } from '../api'
   import { formatLocalDate } from '../date'
+  import DropdownMenu from '../DropdownMenu.svelte'
   import { labelForError } from '../errors'
   import { parseMatchKeyboardConfig } from '../matchConfig'
+  import { deriveLastName } from '../participantName'
   import type { Category, Language, Match, ParticipantList } from '../types'
 
   export let api: ApiClient
@@ -31,9 +33,8 @@
   let deleteError = ''
   let exportError = ''
   let showAddForm = false
-  let addMode: 'list' | 'manual' = 'list'
+  let showManualCard = false
   let sourceMemberId = ''
-  let manualLastName = ''
   let manualFullName = ''
   let manualFederationNumber = ''
   let manualCategoryValues: Record<string, string> = {}
@@ -42,6 +43,11 @@
   $: participants = match.participants ?? []
   $: devices = match.devices ?? []
   $: liveScopes = match.liveScopes ?? []
+  $: sortedLiveScopes = [...liveScopes].sort((a, b) => a.scope.localeCompare(b.scope))
+
+  function openResults(scope: string) {
+    window.open(`/matches/${match.id}/results/${encodeURIComponent(scope)}`, '_blank')
+  }
   $: keyboardConfig = parseMatchKeyboardConfig(match.keyboardJson)
   $: matchCategories = keyboardConfig.categoryOrder.map((id) => categories.find((category) => category.id === id)).filter((category): category is Category => !!category)
   $: assignedMemberIds = new Set(participants.map((participant) => participant.participantListMemberId).filter((id): id is string => !!id))
@@ -51,7 +57,8 @@
         .filter((member) => member.isActive && !assignedMemberIds.has(member.id))
         .sort((a, b) => (a.fullName || a.lastName).localeCompare(b.fullName || b.lastName))
     : []
-  $: if (!sourceList) addMode = 'manual'
+  $: manualAllCategoriesFilled = matchCategories.every((category) => manualCategoryValues[category.id])
+  $: canAddManually = manualFullName.trim() !== '' && manualAllCategoriesFilled
 
   function categoryLabel(participantCategories: Record<string, number>): string {
     return matchCategories
@@ -144,10 +151,10 @@
 
   function resetAddForm() {
     sourceMemberId = ''
-    manualLastName = ''
     manualFullName = ''
     manualFederationNumber = ''
     manualCategoryValues = {}
+    showManualCard = false
   }
 
   async function submitAddFromList() {
@@ -165,7 +172,7 @@
   }
 
   async function submitAddManually() {
-    if (!manualLastName.trim() || !manualFullName.trim()) return
+    if (!canAddManually) return
     addError = ''
     const categoryValues: Record<string, number> = {}
     for (const category of matchCategories) {
@@ -173,7 +180,7 @@
       if (value) categoryValues[category.id] = Number(value)
     }
     try {
-      await api.addMatchParticipant(match.id, { participantListMemberId: null, lastName: manualLastName.trim(), fullName: manualFullName.trim(), federationNumber: manualFederationNumber || null, categories: categoryValues })
+      await api.addMatchParticipant(match.id, { participantListMemberId: null, lastName: deriveLastName(manualFullName.trim()), fullName: manualFullName.trim(), federationNumber: manualFederationNumber || null, categories: categoryValues })
       resetAddForm()
       showAddForm = false
       onChanged()
@@ -186,22 +193,36 @@
 <button class="back-link" on:click={onBack}>← {labels.matches}</button>
 <div class="page-intro">
   <div><p class="eyebrow">{labels.eyebrowMatch}</p><h1>{match.name}</h1><p class="muted">{formatLocalDate(match.date, language)}</p></div>
-  <button class="primary" on:click={onToggleOpen}>{match.isOpen ? labels.deactivate : labels.activate}</button>
-</div>
-
-<div class="editor-actions">
-  <button class="primary" on:click={onEditMetadata}>{labels.editMetadata}</button>
-  <button class="primary" on:click={onManageDevices}>{labels.manageDevices}</button>
-  <button class="primary" on:click={() => window.open(`/matches/${match.id}/qr`, '_blank')}>{labels.viewQrCodes}</button>
-  <button class="primary" on:click={exportCsv}>{labels.exportCsv}</button>
-  {#if liveScopes.length > 0}
-    <select on:change={(event) => { if (event.currentTarget.value) { window.open(`/matches/${match.id}/results/${encodeURIComponent(event.currentTarget.value)}`, '_blank'); event.currentTarget.value = '' } }}>
-      <option value="">{labels.resultsLabel}</option>
-      {#each liveScopes as scope}<option value={scope.scope}>{scope.scope}</option>{/each}
-    </select>
-  {/if}
+  <div class="match-header-actions">
+    <button class="highlight-button" class:is-live={match.isOpen} on:click={onToggleOpen}>{match.isOpen ? labels.deactivate : labels.activate}</button>
+    <button class="qr-button" aria-label={labels.viewQrCodes} title={labels.viewQrCodes} on:click={() => window.open(`/matches/${match.id}/qr`, '_blank')}>▦</button>
+    <DropdownMenu ariaLabel={labels.matchActions} buttonClass="actions-trigger" align="right">
+      <svelte:fragment slot="trigger">⋯</svelte:fragment>
+      <button class="menu-item" on:click={onEditMetadata}>{labels.editMetadata}</button>
+      <button class="menu-item" on:click={onManageDevices}>{labels.manageDevices}</button>
+      <button class="menu-item" on:click={() => window.open(`/matches/${match.id}/qr`, '_blank')}>{labels.viewQrCodes}</button>
+      <button class="menu-item" on:click={exportCsv}>{labels.exportCsv}</button>
+      <hr class="menu-separator" />
+      <button class="menu-item menu-item-danger" on:click={remove}>{labels.deleteMatch}</button>
+    </DropdownMenu>
+  </div>
 </div>
 {#if exportError}<p class="error">{exportError}</p>{/if}
+{#if deleteError}<p class="error">{deleteError}</p>{/if}
+{#if sortedLiveScopes.length === 1}
+  <div class="results-row">
+    <button class="actions-trigger results-trigger" on:click={() => openResults(sortedLiveScopes[0].scope)}>{labels.resultsLabel}</button>
+  </div>
+{:else if sortedLiveScopes.length > 1}
+  <div class="results-row">
+    <DropdownMenu ariaLabel={labels.resultsLabel} buttonClass="actions-trigger results-trigger" align="right">
+      <svelte:fragment slot="trigger">{labels.resultsLabel}</svelte:fragment>
+      {#each sortedLiveScopes as scope}
+        <button class="menu-item" on:click={() => openResults(scope.scope)}>{scope.scope}</button>
+      {/each}
+    </DropdownMenu>
+  </div>
+{/if}
 
 <section class="panel section-gap">
   <div class="editor-row">
@@ -222,41 +243,42 @@
   </div>
 
   {#if showAddForm}
-    <form class="inline-form" on:submit|preventDefault={addMode === 'list' ? submitAddFromList : submitAddManually}>
-      {#if sourceList && match.allowFreeParticipants}
-        <label>{labels.addModeLabel}
-          <select bind:value={addMode}>
-            <option value="list">{labels.selectFromList}</option>
-            <option value="manual">{labels.addManually}</option>
-          </select>
-        </label>
-      {/if}
-      {#if addMode === 'list' && sourceList}
-        <label>{labels.selectParticipantLabel}
-          <select bind:value={sourceMemberId}>
-            <option value="">{labels.selectValue}</option>
-            {#each availableMembers as member}<option value={member.id}>{memberDisplayLabel(member)}</option>{/each}
-          </select>
-        </label>
-        <button class="primary" type="submit" disabled={!sourceMemberId}>{labels.save}</button>
-      {:else if match.allowFreeParticipants}
-        <label>{labels.lastNameLabel}<input bind:value={manualLastName} /></label>
-        <label>{labels.fullNameLabel}<input bind:value={manualFullName} /></label>
-        <label>{labels.federationNumberLabel}<input bind:value={manualFederationNumber} /></label>
-        {#each matchCategories as category}
-          <label>{category.name}
-            <select bind:value={manualCategoryValues[category.id]}>
+    <div class="entry-card">
+      {#if sourceList}
+        <form on:submit|preventDefault={submitAddFromList}>
+          <label>{labels.selectParticipantLabel}
+            <select bind:value={sourceMemberId}>
               <option value="">{labels.selectValue}</option>
-              {#each [...category.values].sort((a, b) => a.valueId - b.valueId) as value}<option value={String(value.valueId)}>{value.name}</option>{/each}
+              {#each availableMembers as member}<option value={member.id}>{memberDisplayLabel(member)}</option>{/each}
             </select>
           </label>
-        {/each}
-        <button class="primary" type="submit" disabled={!manualLastName.trim() || !manualFullName.trim()}>{labels.save}</button>
-      {:else}
-        <p class="muted">{labels.participantListLockedHint}</p>
+          <button class="primary" type="submit" disabled={!sourceMemberId}>{labels.save}</button>
+        </form>
+        {#if match.allowFreeParticipants}
+          <button type="button" class="text-button add-unlisted-button" on:click={() => (showManualCard = !showManualCard)}>+ {labels.addUnlistedParticipant}</button>
+        {/if}
       {/if}
-    </form>
-    {#if addError}<p class="error">{addError}</p>{/if}
+      {#if !sourceList || showManualCard}
+        {#if match.allowFreeParticipants}
+          <form class="manual-card" on:submit|preventDefault={submitAddManually}>
+            <label>{labels.fullNameLabel}<input bind:value={manualFullName} autocomplete="off" /></label>
+            <label>{labels.federationNumberLabel}<input bind:value={manualFederationNumber} /></label>
+            {#each matchCategories as category}
+              <label>{category.name}
+                <select bind:value={manualCategoryValues[category.id]}>
+                  <option value="">{labels.selectValue}</option>
+                  {#each [...category.values].sort((a, b) => a.valueId - b.valueId) as value}<option value={String(value.valueId)}>{value.name}</option>{/each}
+                </select>
+              </label>
+            {/each}
+            <button class="primary large-submit" type="submit" disabled={!canAddManually}>+ {labels.addThisParticipant}</button>
+          </form>
+        {:else}
+          <p class="muted">{labels.participantListLockedHint}</p>
+        {/if}
+      {/if}
+      {#if addError}<p class="error">{addError}</p>{/if}
+    </div>
   {/if}
 
   {#if participants.length === 0}<p class="empty-state">{labels.emptyState}</p>{/if}
@@ -275,24 +297,11 @@
   {/each}
 </section>
 
-<button class="danger-button" on:click={remove}>{labels.deleteMatch}</button>
-{#if deleteError}<p class="error">{deleteError}</p>{/if}
-
 <style>
   .section-gap {
     margin-top: 32px;
   }
 
-  .editor-actions {
-    display: flex;
-    justify-content: flex-end;
-    flex-wrap: wrap;
-    gap: 12px;
-    margin-top: 24px;
-  }
-
-  .editor-actions button,
-  .editor-actions select,
   .editor-row button,
   .editor-row select {
     min-height: 44px;
@@ -303,6 +312,49 @@
     align-items: end;
     gap: 16px;
     flex-wrap: wrap;
+  }
+
+  .qr-button {
+    display: grid;
+    place-items: center;
+    flex: 0 0 auto;
+    width: 44px;
+    height: 44px;
+    border: 1px solid var(--line);
+    background: var(--paper);
+    color: var(--ink);
+    font-size: 20px;
+    line-height: 1;
+    padding: 0;
+  }
+
+  .qr-button:hover,
+  .qr-button:focus-visible {
+    border-color: var(--green);
+    color: var(--green);
+  }
+
+  .results-row {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 16px;
+  }
+
+  .add-unlisted-button {
+    margin-top: 12px;
+  }
+
+  .manual-card {
+    margin-top: 16px;
+  }
+
+  .entry-card form {
+    margin-top: 0;
+  }
+
+  .manual-card:not(:first-child) {
+    border-top: 1px solid var(--line);
+    padding-top: 16px;
   }
 
   .group-heading {
@@ -342,26 +394,13 @@
   }
 
   @media (max-width: 720px) {
-    .editor-actions {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-
-    .editor-actions button,
-    .editor-actions select {
-      width: 100%;
-    }
-
     .editor-row {
+      flex-direction: column;
       align-items: stretch;
     }
 
-    .editor-row label {
-      flex: 1 1 130px;
-    }
-
-    .editor-row > button {
-      flex: 1 1 100%;
+    .match-header-actions {
+      flex: 0 0 auto;
     }
 
     .match-participant-row {

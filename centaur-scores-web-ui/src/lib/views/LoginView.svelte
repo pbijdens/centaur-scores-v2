@@ -28,8 +28,8 @@
         </select>
       </label>
       {#if tenantsError}<p class="error">{tenantsError}</p>{/if}
-      <label>{labels.usernameLabel}<input bind:value={username} autocomplete="off" /></label>
-      <label>{labels.passwordLabel}<input type="password" bind:value={password} autocomplete="new-password" /></label>
+      <label>{labels.usernameLabel}<input type="text" bind:value={username} autocomplete="username" autocapitalize="off" autocorrect="off" spellcheck="false" /></label>
+      <label>{labels.passwordLabel}<input type="password" bind:value={password} autocomplete="current-password" autocapitalize="off" autocorrect="off" spellcheck="false" /></label>
       {#if loginError}<p class="error">{loginError}</p>{/if}
       <button class="primary" disabled={!username || !password || tenants.length === 0}>{labels.signIn}<span>→</span></button>
     </form>

@@ -69,12 +69,18 @@
     padding: 16px;
   }
 
+  .qr-toolbar .primary {
+    width: 100%;
+    padding: 16px;
+    font-size: 16px;
+  }
+
   .qr-page {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 256px;
-    padding: 24px;
-    max-width: 900px;
+    display: flex;
+    flex-direction: column;
+    gap: clamp(80px, 25vw, 120px);
+    padding: 16px;
+    max-width: 480px;
     margin: 0 auto;
   }
 
@@ -130,7 +136,11 @@
     }
 
     .qr-page {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
       gap: 56px;
+      padding: 24px;
+      max-width: 900px;
     }
   }
 </style>

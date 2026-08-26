@@ -1,6 +1,8 @@
 <script lang="ts">
   import type { ApiClient } from '../api'
+  import DropdownMenu from '../DropdownMenu.svelte'
   import { labelForError } from '../errors'
+  import RowActions from '../RowActions.svelte'
   import { keyboardColors, deviceSelectionModes, parseTemplateConfiguration } from '../templateConfig'
   import type { Category, MatchTemplate, ParticipantList } from '../types'
 
@@ -170,7 +172,14 @@
 <button class="back-link" on:click={onBack}>← {labels.templates}</button>
 <div class="page-intro">
   <div><p class="eyebrow">{labels.eyebrowTemplateDetail}</p><h1>{template.name}</h1></div>
+  <div class="match-header-actions">
+    <DropdownMenu ariaLabel={labels.matchActions} buttonClass="actions-trigger" align="right">
+      <svelte:fragment slot="trigger">⋯</svelte:fragment>
+      <button class="menu-item menu-item-danger" on:click={remove}>{labels.deleteTemplate}</button>
+    </DropdownMenu>
+  </div>
 </div>
+{#if deleteError}<p class="error">{deleteError}</p>{/if}
 
 <section class="panel">
   <label>{labels.templateNameLabel}<input bind:value={name} /></label>
@@ -204,8 +213,13 @@
           {category.name}
         </label>
         {#if config.categoryOrder.includes(category.id)}
-          <button class="icon-button move-button" aria-label={labels.moveUp} disabled={index === 0} on:click={() => moveCategory(index, -1)}>▲</button>
-          <button class="icon-button move-button" aria-label={labels.moveDown} disabled={index === config.categoryOrder.length - 1} on:click={() => moveCategory(index, 1)}>▼</button>
+          <RowActions
+            {labels}
+            canMoveUp={index > 0}
+            canMoveDown={index < config.categoryOrder.length - 1}
+            onMoveUp={() => moveCategory(index, -1)}
+            onMoveDown={() => moveCategory(index, 1)}
+          />
         {/if}
       </div>
     {/each}
@@ -219,11 +233,14 @@
     <div class="editor-row device-row">
       <span class="muted device-position">{index + 1}.</span>
       <label>{labels.deviceNameLabel}<input value={deviceName} on:input={(event) => renameDevice(index, event.currentTarget.value)} /></label>
-      <div class="row-actions">
-        <button class="icon-button move-button" aria-label={labels.moveUp} disabled={index === 0} on:click={() => moveDevice(index, -1)}>▲</button>
-        <button class="icon-button move-button" aria-label={labels.moveDown} disabled={index === config.deviceNames.length - 1} on:click={() => moveDevice(index, 1)}>▼</button>
-        <button class="icon-button danger-icon-button" aria-label={labels.removeValue} on:click={() => removeDevice(index)}>🗑</button>
-      </div>
+      <RowActions
+        {labels}
+        canMoveUp={index > 0}
+        canMoveDown={index < config.deviceNames.length - 1}
+        onMoveUp={() => moveDevice(index, -1)}
+        onMoveDown={() => moveDevice(index, 1)}
+        onDelete={() => removeDevice(index)}
+      />
     </div>
   {/each}
   <button class="primary" on:click={addDevice}>+ {labels.addTemplateDevice}</button>
@@ -233,7 +250,7 @@
   <h2>{labels.keyboardLabel}</h2>
   <p class="muted">{labels.keyboardHint}</p>
   {#each config.keyboard as key, index}
-    <div class="editor-row">
+    <div class="editor-row keyboard-row">
       <label>{labels.keyLabelLabel}<input bind:value={key.label} /></label>
       <label>{labels.keyIdLabel}<input bind:value={key.keyId} /></label>
       <label>{labels.keyColorLabel}
@@ -242,9 +259,14 @@
         </select>
       </label>
       <label>{labels.keyValueLabel}<input type="number" bind:value={key.value} /></label>
-      <button class="icon-button move-button" aria-label={labels.moveUp} disabled={index === 0} on:click={() => moveKey(index, -1)}>▲</button>
-      <button class="icon-button move-button" aria-label={labels.moveDown} disabled={index === config.keyboard.length - 1} on:click={() => moveKey(index, 1)}>▼</button>
-      <button class="icon-button" aria-label={labels.removeValue} on:click={() => removeKey(index)}>🗑</button>
+      <RowActions
+        {labels}
+        canMoveUp={index > 0}
+        canMoveDown={index < config.keyboard.length - 1}
+        onMoveUp={() => moveKey(index, -1)}
+        onMoveDown={() => moveKey(index, 1)}
+        onDelete={() => removeKey(index)}
+      />
     </div>
   {/each}
   <div class="editor-actions">
@@ -256,7 +278,7 @@
   <h2>{labels.disabledKeysLabel}</h2>
   <p class="muted">{labels.disabledKeysHint}</p>
   {#each config.disabledKeyRules as rule, index}
-    <div class="editor-row wrap">
+    <div class="editor-row">
       <label>{labels.ruleCategoryLabel}
         <select bind:value={rule.categoryId}>
           {#each categories as category}<option value={category.id}>{category.name}</option>{/each}
@@ -278,7 +300,7 @@
           </label>
         {/each}
       </div>
-      <button class="icon-button" aria-label={labels.removeValue} on:click={() => removeDisabledKeyRule(index)}>🗑</button>
+      <button class="icon-button danger-icon-button row-delete-only" aria-label={labels.removeValue} on:click={() => removeDisabledKeyRule(index)}>🗑</button>
     </div>
   {/each}
   <button class="primary" on:click={addDisabledKeyRule} disabled={categories.length === 0}>+ {labels.addDisabledKeyRule}</button>
@@ -288,24 +310,33 @@
   <h2>{labels.scoringRulesLabel}</h2>
   <p class="muted">{labels.scoringRulesHint}</p>
   {#each config.scoringRules as rule, index}
-    <div class="editor-row">
-      <span class="muted">{index + 1}.</span>
-      <label>{labels.ruleTypeLabel}
-        <select bind:value={rule.type}>
-          <option value="total">{labels.ruleTypeTotal}</option>
-          <option value="countKey">{labels.ruleTypeCountKey}</option>
-        </select>
-      </label>
-      {#if rule.type === 'countKey'}
-        <label>{labels.ruleCountKeyLabel}
-          <select bind:value={rule.keyId}>
-            {#each config.keyboard as key}<option value={key.keyId}>{key.label}</option>{/each}
+    <div class="rule-block">
+      <div class="rule-row">
+        <span class="muted">{index + 1}.</span>
+        <label>{labels.ruleTypeLabel}
+          <select bind:value={rule.type}>
+            <option value="total">{labels.ruleTypeTotal}</option>
+            <option value="countKey">{labels.ruleTypeCountKey}</option>
           </select>
         </label>
+        <RowActions
+          {labels}
+          canMoveUp={index > 0}
+          canMoveDown={index < config.scoringRules.length - 1}
+          onMoveUp={() => moveScoringRule(index, -1)}
+          onMoveDown={() => moveScoringRule(index, 1)}
+          onDelete={config.scoringRules.length > 1 ? () => removeScoringRule(index) : null}
+        />
+      </div>
+      {#if rule.type === 'countKey'}
+        <div class="rule-params-row">
+          <label>{labels.ruleCountKeyLabel}
+            <select bind:value={rule.keyId}>
+              {#each config.keyboard as key}<option value={key.keyId}>{key.label}</option>{/each}
+            </select>
+          </label>
+        </div>
       {/if}
-      <button class="icon-button move-button" aria-label={labels.moveUp} disabled={index === 0} on:click={() => moveScoringRule(index, -1)}>▲</button>
-      <button class="icon-button move-button" aria-label={labels.moveDown} disabled={index === config.scoringRules.length - 1} on:click={() => moveScoringRule(index, 1)}>▼</button>
-      <button class="icon-button" aria-label={labels.removeValue} disabled={config.scoringRules.length <= 1} on:click={() => removeScoringRule(index)}>🗑</button>
     </div>
   {/each}
   <button class="primary" on:click={addScoringRule}>+ {labels.addScoringRule}</button>
@@ -315,7 +346,7 @@
   <h2>{labels.liveScopesLabel}</h2>
   <p class="muted">{labels.liveScopesHint}</p>
   {#each config.liveScopes as scope, index}
-    <div class="editor-row wrap">
+    <div class="editor-row">
       <label>{labels.scopeNameLabel}<input bind:value={scope.scope} /></label>
       <div class="checkbox-grid">
         <span class="muted">{labels.scopeGroupByLabel}:</span>
@@ -332,7 +363,7 @@
         <label class="checkbox-label"><input type="checkbox" bind:checked={scope.includeEqualizers} /> {labels.scopeIncludeEqualizers}</label>
         <label class="checkbox-label"><input type="checkbox" bind:checked={scope.includePersonalBest} /> {labels.scopeIncludePersonalBest}</label>
       </div>
-      <button class="icon-button" aria-label={labels.removeValue} on:click={() => removeLiveScope(index)}>🗑</button>
+      <button class="icon-button danger-icon-button row-delete-only" aria-label={labels.removeValue} on:click={() => removeLiveScope(index)}>🗑</button>
     </div>
   {/each}
   <button class="primary" on:click={addLiveScope}>+ {labels.addLiveScope}</button>
@@ -343,9 +374,6 @@
   {#if saveMessage}<p class="success">{saveMessage}</p>{/if}
   <button class="primary" on:click={save}>{labels.save}</button>
 </section>
-
-<button class="danger-button" on:click={remove}>{labels.deleteTemplate}</button>
-{#if deleteError}<p class="error">{deleteError}</p>{/if}
 
 <style>
   .section-gap {
@@ -365,13 +393,10 @@
   .editor-row {
     display: flex;
     align-items: end;
+    flex-wrap: wrap;
     gap: 16px;
     padding: 14px 0;
     border-top: 1px solid var(--line);
-  }
-
-  .editor-row.wrap {
-    flex-wrap: wrap;
   }
 
   .editor-actions {
@@ -387,10 +412,6 @@
     gap: 6px 16px;
   }
 
-  .move-button:hover {
-    color: var(--green);
-  }
-
   .device-row label {
     flex: 1;
   }
@@ -400,42 +421,81 @@
     min-width: 2ch;
   }
 
-  .row-actions {
-    display: flex;
-    gap: 10px;
+  .keyboard-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1.1fr) minmax(0, 0.8fr) auto;
   }
 
-  .row-actions .icon-button {
+  .keyboard-row input,
+  .keyboard-row select {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .rule-block {
+    padding: 14px 0;
+    border-top: 1px solid var(--line);
+  }
+
+  .rule-row {
+    display: flex;
+    align-items: end;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+
+  .rule-params-row {
+    display: flex;
+    margin-top: 12px;
+  }
+
+  .rule-row label,
+  .rule-params-row label {
+    flex: 1 1 220px;
+    min-width: 0;
+  }
+
+  .rule-row select,
+  .rule-params-row select {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .row-delete-only {
     display: grid;
     place-items: center;
     flex: 0 0 44px;
     width: 44px;
     height: 44px;
-    margin-left: 0;
+    margin-left: auto;
     padding: 0;
     border: 1px solid var(--line);
     background: var(--paper);
   }
 
-  .row-actions .danger-icon-button:hover {
+  .row-delete-only:hover,
+  .row-delete-only:focus-visible {
     color: #b84232;
     border-color: #e8755b;
     background: #fdeeea;
   }
 
   @media (max-width: 720px) {
-    .device-row {
+    .editor-row {
+      flex-direction: column;
       align-items: stretch;
-      flex-wrap: wrap;
     }
 
     .device-row label {
-      flex-basis: calc(100% - 4ch);
+      flex-basis: auto;
     }
 
-    .row-actions {
-      width: 100%;
-      justify-content: flex-end;
+    .keyboard-row {
+      grid-template-columns: 1fr;
+    }
+
+    .row-delete-only {
+      align-self: flex-end;
     }
   }
 </style>

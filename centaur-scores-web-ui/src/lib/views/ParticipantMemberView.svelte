@@ -1,6 +1,8 @@
 <script lang="ts">
   import type { ApiClient } from '../api'
+  import DropdownMenu from '../DropdownMenu.svelte'
   import { labelForError } from '../errors'
+  import { deriveLastName } from '../participantName'
   import type { Category, ParticipantListMember } from '../types'
 
   export let api: ApiClient
@@ -12,7 +14,6 @@
   export let onSaved: () => void
   export let onDeleted: () => void
 
-  let lastName = member?.lastName ?? ''
   let fullName = member?.fullName ?? ''
   let federationNumber = member?.federationNumber ?? ''
   let isActive = member?.isActive ?? true
@@ -22,6 +23,7 @@
     categoryValues[category.id] = existing !== undefined ? String(existing) : ''
   }
   let saveError = ''
+  let deleteError = ''
 
   $: allCategoriesFilled = categories.every((category) => categoryValues[category.id])
 
@@ -36,7 +38,7 @@
       const value = categoryValues[category.id]
       if (value) categoriesPayload[category.id] = Number(value)
     }
-    const body = { lastName, fullName, federationNumber: federationNumber || null, categories: categoriesPayload, isActive }
+    const body = { lastName: deriveLastName(fullName.trim()), fullName, federationNumber: federationNumber || null, categories: categoriesPayload, isActive }
     try {
       if (member) await api.updateParticipantMember(listId, member.id, body)
       else await api.addParticipantMember(listId, body)
@@ -48,21 +50,34 @@
 
   async function remove() {
     if (!member) return
+    deleteError = ''
     const message = labels.deleteMemberConfirm.replace('{name}', member.fullName || member.lastName)
     if (!confirm(message)) return
-    await api.deleteParticipantMember(listId, member.id)
-    onDeleted()
+    try {
+      await api.deleteParticipantMember(listId, member.id)
+      onDeleted()
+    } catch (error) {
+      deleteError = labelForError(error, labels, 'memberSaveError')
+    }
   }
 </script>
 
 <button class="back-link" on:click={onBack}>← {labels.membersLabel}</button>
 <div class="page-intro">
   <div><p class="eyebrow">{labels.eyebrowParticipant}</p><h1>{member ? (member.fullName || member.lastName) : labels.newMember}</h1></div>
+  {#if member}
+    <div class="match-header-actions">
+      <DropdownMenu ariaLabel={labels.matchActions} buttonClass="actions-trigger" align="right">
+        <svelte:fragment slot="trigger">⋯</svelte:fragment>
+        <button class="menu-item menu-item-danger" on:click={remove}>{labels.deleteMember}</button>
+      </DropdownMenu>
+    </div>
+  {/if}
 </div>
+{#if deleteError}<p class="error">{deleteError}</p>{/if}
 <section class="panel">
   <form on:submit|preventDefault={save}>
-    <label>{labels.lastNameLabel}<input bind:value={lastName} /></label>
-    <label>{labels.fullNameLabel}<input bind:value={fullName} /></label>
+    <label>{labels.fullNameLabel}<input bind:value={fullName} autocomplete="off" /></label>
     <label>{labels.federationNumberLabel}<input bind:value={federationNumber} /></label>
     {#each categories as category}
       <label>{category.name}
@@ -76,9 +91,6 @@
     {/each}
     <label class="checkbox-label"><input type="checkbox" bind:checked={isActive} /> {labels.memberActiveLabel}</label>
     {#if saveError}<p class="error">{saveError}</p>{/if}
-    <button class="primary" type="submit" disabled={!lastName.trim() || !fullName.trim() || !allCategoriesFilled}>{labels.save}</button>
+    <button class="primary" type="submit" disabled={!fullName.trim() || !allCategoriesFilled}>{labels.save}</button>
   </form>
 </section>
-{#if member}
-  <button class="danger-button" on:click={remove}>{labels.deleteMember}</button>
-{/if}

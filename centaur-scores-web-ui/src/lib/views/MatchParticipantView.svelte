@@ -1,7 +1,9 @@
 <script lang="ts">
   import type { ApiClient } from '../api'
+  import DropdownMenu from '../DropdownMenu.svelte'
   import { labelForError } from '../errors'
   import { parseMatchKeyboardConfig } from '../matchConfig'
+  import { deriveLastName } from '../participantName'
   import type { ArrowScore, Category, KeyboardKey, Match, MatchParticipant, ParticipantList, ParticipantListMember } from '../types'
 
   export let api: ApiClient
@@ -21,7 +23,6 @@
 
   let showMetadataEditor = false
   let editMode: 'manual' | 'list' = 'manual'
-  let editLastName = ''
   let editFullName = ''
   let editFederationNumber = ''
   let editCategoryValues: Record<string, string> = {}
@@ -37,7 +38,7 @@
       .flatMap((rule) => rule.disabledKeyIds)
   )
   $: availableKeys = keyboardConfig.keyboard.filter((key) => !disabledKeyIds.has(key.keyId))
-  $: devices = match.devices ?? []
+  $: devices = [...(match.devices ?? [])].sort((a, b) => (a.sortOrder ?? Number.MAX_SAFE_INTEGER) - (b.sortOrder ?? Number.MAX_SAFE_INTEGER) || a.name.localeCompare(b.name))
   $: totalScore = (participant.scores ?? []).reduce((sum, score) => sum + score.value, 0)
   $: sourceList = participantLists.find((list) => list.id === match.participantListId) ?? null
   $: assignedMemberIds = new Set(
@@ -67,7 +68,6 @@
   }
 
   function openMetadataEditor() {
-    editLastName = participant.lastName
     editFullName = participant.fullName
     editFederationNumber = participant.federationNumber ?? ''
     editCategoryValues = {}
@@ -88,7 +88,7 @@
   }
 
   async function submitManualEdit() {
-    if (!editLastName.trim() || !editFullName.trim()) return
+    if (!editFullName.trim()) return
     metadataError = ''
     const categoryValues: Record<string, number> = {}
     for (const category of matchCategories) {
@@ -96,7 +96,7 @@
       if (value) categoryValues[category.id] = Number(value)
     }
     try {
-      const updated = await api.updateMatchParticipant(match.id, participant.id, { participantListMemberId: null, lastName: editLastName.trim(), fullName: editFullName.trim(), federationNumber: editFederationNumber || null, categories: categoryValues })
+      const updated = await api.updateMatchParticipant(match.id, participant.id, { participantListMemberId: null, lastName: deriveLastName(editFullName.trim()), fullName: editFullName.trim(), federationNumber: editFederationNumber || null, categories: categoryValues })
       applyUpdatedMetadata(updated)
       showMetadataEditor = false
       metadataMessage = labels.participantSaved
@@ -251,7 +251,14 @@
 <button class="back-link" on:click={onBack}>← {labels.matches}</button>
 <div class="page-intro">
   <div><p class="eyebrow">{labels.eyebrowParticipantDetail}</p><h1>{participant.fullName || participant.lastName}</h1>{#if categoryLabel()}<p class="muted">{categoryLabel()}</p>{/if}</div>
+  <div class="match-header-actions">
+    <DropdownMenu ariaLabel={labels.matchActions} buttonClass="actions-trigger" align="right">
+      <svelte:fragment slot="trigger">⋯</svelte:fragment>
+      <button class="menu-item menu-item-danger" on:click={remove}>{labels.removeParticipant}</button>
+    </DropdownMenu>
+  </div>
 </div>
+{#if removeError}<p class="error">{removeError}</p>{/if}
 
 <section class="panel">
   <div>
@@ -283,8 +290,7 @@
       </form>
     {:else}
       <form class="inline-form" on:submit|preventDefault={submitManualEdit}>
-        <label>{labels.lastNameLabel}<input bind:value={editLastName} /></label>
-        <label>{labels.fullNameLabel}<input bind:value={editFullName} /></label>
+        <label>{labels.fullNameLabel}<input bind:value={editFullName} autocomplete="off" /></label>
         <label>{labels.federationNumberLabel}<input bind:value={editFederationNumber} /></label>
         {#each matchCategories as category}
           <label>{category.name}
@@ -294,7 +300,7 @@
             </select>
           </label>
         {/each}
-        <button class="primary" type="submit" disabled={!editLastName.trim() || !editFullName.trim()}>{labels.save}</button>
+        <button class="primary" type="submit" disabled={!editFullName.trim()}>{labels.save}</button>
         <button class="secondary" type="button" on:click={() => (showMetadataEditor = false)}>{labels.cancel}</button>
       </form>
     {/if}
@@ -316,15 +322,15 @@
   <h2>{labels.scoresLabel}</h2>
   <p class="muted">{labels.totalScoreLabel}: {totalScore}</p>
   {#each Array(match.ends) as _, endIndex}
-    <div class="editor-row wrap">
+    <div class="editor-row">
       <div class="score-summary">
         <span><span class="muted">{labels.endLabel}</span><strong>{endIndex + 1}</strong></span>
         <span><span class="muted">{labels.endScoreLabel}</span><strong>{totalForEnd(endIndex + 1)}</strong></span>
         <span><span class="muted">{labels.runningTotalLabel}</span><strong>{runningTotal(endIndex + 1)}{#if showGroupRunningTotal}<span>&nbsp;({groupRunningTotal(endIndex + 1)})</span>{/if}</strong></span>
       </div>
       {#each Array(match.arrowsPerEnd) as _, arrowIndex}
-        <label>{labels.arrowLabel} {arrowIndex + 1}
-          <select value={scoreFor(endIndex + 1, arrowIndex + 1)?.keyId ?? ''} on:change={(event) => setScore(endIndex + 1, arrowIndex + 1, event.currentTarget.value)}>
+        <label class="arrow-score-label">{labels.arrowLabel} {arrowIndex + 1}
+          <select class="arrow-score-select" value={scoreFor(endIndex + 1, arrowIndex + 1)?.keyId ?? ''} on:change={(event) => setScore(endIndex + 1, arrowIndex + 1, event.currentTarget.value)}>
             <option value="">{labels.selectValue}</option>
             {#each availableKeys as key}<option value={key.keyId}>{key.label}</option>{/each}
           </select>
@@ -344,9 +350,6 @@
   {#if quickSetMessage}<p class="success">{quickSetMessage}</p>{/if}
 </section>
 
-<button class="danger-button" on:click={remove}>{labels.removeParticipant}</button>
-{#if removeError}<p class="error">{removeError}</p>{/if}
-
 <style>
   .section-gap {
     margin-top: 32px;
@@ -355,13 +358,10 @@
   .editor-row {
     display: flex;
     align-items: end;
+    flex-wrap: wrap;
     gap: 16px;
     padding: 14px 0;
     border-top: 1px solid var(--line);
-  }
-
-  .editor-row.wrap {
-    flex-wrap: wrap;
   }
 
   .score-summary {
@@ -374,5 +374,24 @@
     display: grid;
     gap: 4px;
     min-width: 96px;
+  }
+
+  .arrow-score-label {
+    width: 90px;
+  }
+
+  .arrow-score-select {
+    width: 100%;
+  }
+
+  @media (max-width: 720px) {
+    .editor-row {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .arrow-score-label {
+      width: 100%;
+    }
   }
 </style>

@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { ApiClient } from '../api'
+  import DropdownMenu from '../DropdownMenu.svelte'
   import { labelForError } from '../errors'
   import type { Category } from '../types'
 
@@ -90,7 +91,17 @@
 <button class="back-link" on:click={onBack}>← {labels.categories}</button>
 <div class="page-intro">
   <div><p class="eyebrow">{labels.eyebrowCategoryDetail}</p><h1>{category.name}</h1></div>
+  {#if !category.isUsed}
+    <div class="match-header-actions">
+      <DropdownMenu ariaLabel={labels.matchActions} buttonClass="actions-trigger" align="right">
+        <svelte:fragment slot="trigger">⋯</svelte:fragment>
+        <button class="menu-item menu-item-danger" on:click={remove}>{labels.deleteCategory}</button>
+      </DropdownMenu>
+    </div>
+  {/if}
 </div>
+{#if category.isUsed}<p class="muted">{labels.categoryUsedHint}</p>{/if}
+{#if deleteError}<p class="error">{deleteError}</p>{/if}
 <section class="panel">
   <form class="inline-form" on:submit|preventDefault={submitEditCategory}>
     <label>{labels.categoryNameLabel}<input bind:value={categoryName} /></label>
@@ -130,9 +141,3 @@
     <button class="primary" on:click={() => (showAddValueForm = true)}>+ {labels.addValue}</button>
   {/if}
 </section>
-{#if category.isUsed}
-  <p class="muted">{labels.categoryUsedHint}</p>
-{:else}
-  <button class="danger-button" on:click={remove}>{labels.deleteCategory}</button>
-{/if}
-{#if deleteError}<p class="error">{deleteError}</p>{/if}

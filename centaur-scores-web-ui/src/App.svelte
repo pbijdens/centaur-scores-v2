@@ -83,6 +83,7 @@
 
   $: t = translationsFor(language)
   $: isAdmin = $profile?.authorization === 'Administrator'
+  $: headerUsername = $profile?.displayName || $profile?.username || username
   $: homeQuickLinks = (
     [['participants', t.participants], ['categories', t.categories], ['templates', t.templates]] as [string, string][]
   ).concat(isAdmin ? [['accounts', t.accounts], ['tenants', t.tenants]] : [])
@@ -312,7 +313,7 @@
   <LoginView bind:tenant tenants={$tenants} {tenantsLoading} {tenantsError} bind:username bind:password {loginError} {language} labels={t} onSubmit={signIn} onLanguageChange={setLanguage} />
 {:else}
   <div class="app-shell">
-    <AppHeader {username} {language} {view} labels={t} tenantName={$currentTenant?.name} tenantLogoUrl={$currentTenant?.logoUrl} onNavigate={navigate} onLanguageChange={setLanguage} onLogout={signOut} />
+    <AppHeader username={headerUsername} {language} {view} labels={t} tenantName={$currentTenant?.name} tenantLogoUrl={$currentTenant?.logoUrl} onNavigate={navigate} onLanguageChange={setLanguage} onLogout={signOut} />
     <main class="content">
       {#if view === 'home'}
         <HomeView matches={$matches} competitions={$competitions} tenantId={tenant} {language} labels={t} quickLinks={homeQuickLinks} onOpenMatch={openMatch} onNavigate={navigate} onDeactivateAll={deactivateAllMatches} />

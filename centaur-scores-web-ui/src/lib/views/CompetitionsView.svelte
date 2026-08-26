@@ -63,11 +63,11 @@
   {#if createError}<p class="error">{createError}</p>{/if}
 {/if}
 <div class="toolbar">
-  <input placeholder={labels.filterMatchesPlaceholder} bind:value={filter} />
+  <input placeholder={labels.filterCompetitionsPlaceholder} bind:value={filter} />
   <select bind:value={filterMode}>
-    <option value="all">{labels.allMatches}</option>
-    <option value="future">{labels.futureMatches}</option>
-    <option value="past">{labels.pastMatches}</option>
+    <option value="all">{labels.allCompetitions}</option>
+    <option value="future">{labels.futureCompetitions}</option>
+    <option value="past">{labels.pastCompetitions}</option>
   </select>
 </div>
 <section class="list-panel">

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import DropdownMenu from './DropdownMenu.svelte'
   import type { Language, View } from './types'
 
   export let username: string
@@ -27,14 +28,30 @@
     <button class:active={view === 'competitions'} on:click={() => onNavigate('/competitions')}>{labels.competitions}</button>
   </nav>
   <div class="user-menu">
-    <select value={language} on:change={(event) => onLanguageChange(event.currentTarget.value)} aria-label="Language">
-      <option value="en">{labels.languageEnShort}</option>
-      <option value="nl">{labels.languageNlShort}</option>
-    </select>
-    <button class="profile-button" class:active={view === 'profile'} on:click={() => onNavigate('/profile')} aria-label={labels.profile}>
-      <span class="avatar">{username.slice(0, 1).toUpperCase()}</span>
-      <span class="name">{username}</span>
-    </button>
-    <button class="text-button" on:click={onLogout}>{labels.logout}</button>
+    <DropdownMenu ariaLabel={labels.profile} buttonClass="menu-trigger profile-button" align="right">
+      <svelte:fragment slot="trigger">
+        <span class="avatar">{username.slice(0, 1).toUpperCase()}</span>
+        <span class="name">{username}</span>
+      </svelte:fragment>
+      <div class="menu-section">
+        <button
+          type="button"
+          class="lang-flag-button"
+          class:active={language === 'en'}
+          aria-label={labels.languageEnglish}
+          on:click={() => onLanguageChange('en')}
+        >🇬🇧</button>
+        <button
+          type="button"
+          class="lang-flag-button"
+          class:active={language === 'nl'}
+          aria-label={labels.languageDutch}
+          on:click={() => onLanguageChange('nl')}
+        >🇳🇱</button>
+      </div>
+      <hr class="menu-separator" />
+      <button class="menu-item" class:active={view === 'profile'} on:click={() => onNavigate('/profile')}>{labels.editMyProfile}</button>
+      <button class="menu-item" on:click={onLogout}>{labels.logout}</button>
+    </DropdownMenu>
   </div>
 </header>
