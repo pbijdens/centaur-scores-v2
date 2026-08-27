@@ -17,6 +17,8 @@
   export let onDeleted: () => void
   export let onBack: () => void
 
+  type GroupBy = 'none' | 'category'
+
   let name = list.name
   let isActive = list.isActive
   let showSettings = false
@@ -31,6 +33,14 @@
   let importing = false
   let fileInput: HTMLInputElement
 
+  const storedGroupBy = localStorage.getItem('centaur-participant-list-group-by')
+  let groupBy: GroupBy = storedGroupBy === 'category' ? 'category' : 'none'
+
+  function setGroupBy(value: string) {
+    groupBy = value === 'category' ? 'category' : 'none'
+    localStorage.setItem('centaur-participant-list-group-by', groupBy)
+  }
+
   function displayLabel(member: ParticipantListMember): string {
     return memberDisplayLabel(categories, member)
   }
@@ -41,6 +51,19 @@
       const nameCompare = (a.fullName || a.lastName).localeCompare(b.fullName || b.lastName)
       return nameCompare !== 0 ? nameCompare : memberCategoryLabel(categories, a).localeCompare(memberCategoryLabel(categories, b))
     })
+
+  $: groupedMembers = (() => {
+    if (groupBy === 'none') return [{ key: '', items: sortedMembers }]
+    const groups = new Map<string, typeof sortedMembers>()
+    for (const member of sortedMembers) {
+      const key = memberCategoryLabel(categories, member) || labels.unassignedGroup
+      groups.set(key, [...(groups.get(key) ?? []), member])
+    }
+    const unassignedKey = labels.unassignedGroup
+    return [...groups.entries()]
+      .sort((a, b) => (a[0] === unassignedKey ? 1 : b[0] === unassignedKey ? -1 : a[0].localeCompare(b[0])))
+      .map(([key, items]) => ({ key, items }))
+  })()
 
   async function save() {
     saveMessage = ''
@@ -147,22 +170,35 @@
 {/if}
 <div class="toolbar">
   <input placeholder={labels.filterParticipantsPlaceholder} bind:value={filter} />
+  <label>{labels.groupByLabel}
+    <select value={groupBy} on:change={(event) => setGroupBy(event.currentTarget.value)}>
+      <option value="none">{labels.groupByNone}</option>
+      <option value="category">{labels.groupByCategory}</option>
+    </select>
+  </label>
 </div>
-<section class="list-panel">
-  {#if sortedMembers.length === 0}<p class="empty-state">{labels.emptyState}</p>{/if}
-  {#each sortedMembers as member}
-    <button class="list-row" on:click={() => onOpenMember(member.id)}>
-      <span class="management-icon">◇</span>
-      <span><strong>{member.fullName || member.lastName}</strong>{#if memberDetailLabel(categories, member)}<span class="member-categories"> ({memberDetailLabel(categories, member)})</span>{/if}</span>
-      {#if !member.isActive}<span class="tag">{labels.statusInactive}</span>{/if}
-      <span class="arrow">→</span>
-    </button>
-  {/each}
-</section>
+{#if sortedMembers.length === 0}<p class="empty-state">{labels.emptyState}</p>{/if}
+{#each groupedMembers as group}
+  {#if group.key}<h2 class="group-heading">{group.key}</h2>{/if}
+  <section class="list-panel">
+    {#each group.items as member}
+      <button class="list-row" on:click={() => onOpenMember(member.id)}>
+        <span class="management-icon">◇</span>
+        <span><strong>{member.fullName || member.lastName}</strong>{#if memberDetailLabel(categories, member)}<span class="member-categories"> ({memberDetailLabel(categories, member)})</span>{/if}</span>
+        {#if !member.isActive}<span class="tag">{labels.statusInactive}</span>{/if}
+        <span class="arrow">→</span>
+      </button>
+    {/each}
+  </section>
+{/each}
 
 <style>
   .members-intro {
     margin-top: 32px;
+  }
+
+  .group-heading {
+    margin: 24px 0 4px;
   }
 
   .member-categories {
