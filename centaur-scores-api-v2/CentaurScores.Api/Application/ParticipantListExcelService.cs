@@ -104,14 +104,20 @@ public sealed class ParticipantListExcelService : IParticipantListExcelService
             var metadataRange = metadataSheet.Range(1, column2, values.Count + 1, column2);
             metadataRange.CreateTable(tableName);
 
-            // Structured table references work across sheets even though a plain range reference would not,
-            // which is how the Data sheet's dropdowns stay linked to this Metadata table.
+            // Data validation can't take a structured table reference directly - Excel/LibreOffice both
+            // reject "Table[Column]" as a list source and corrupt the file. A workbook-scoped named range
+            // that refers to the same structured reference is the accepted workaround, and it also lets the
+            // dropdown follow the table across sheets the way a plain range reference could not.
+            var rangeName = SanitizeTableName($"{category.Name}_List", usedTableNames);
+            usedTableNames.Add(rangeName);
+            workbook.DefinedNames.Add(rangeName, $"{tableName}[{category.Name}]");
+
             var dataColumn = 5 + categoryIndex;
             var validationRange = dataSheet.Range(2, dataColumn, 1000, dataColumn);
             var validation = validationRange.CreateDataValidation();
             validation.IgnoreBlanks = true;
             validation.InCellDropdown = true;
-            validation.List($"{tableName}[{category.Name}]");
+            validation.List(rangeName);
 
             column2 += 2;
         }
