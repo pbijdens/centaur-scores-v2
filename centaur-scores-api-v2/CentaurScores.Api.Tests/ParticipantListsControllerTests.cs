@@ -174,6 +174,84 @@ public sealed class ParticipantListsControllerTests
     }
 
     [Fact]
+    public async Task List_returns_member_counts_without_the_members_themselves()
+    {
+        await using var connection = new SqliteConnection("Filename=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>().UseSqlite(connection).Options;
+        await using var db = new ApplicationDbContext(options);
+        await db.Database.EnsureCreatedAsync();
+
+        var tenantId = Guid.NewGuid();
+        var list = new ParticipantList
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            Name = "Club members",
+            Members =
+            [
+                new ParticipantListMember { Id = Guid.NewGuid(), TenantId = tenantId, LastName = "Archer", FullName = "Amy Archer", IsActive = true },
+                new ParticipantListMember { Id = Guid.NewGuid(), TenantId = tenantId, LastName = "Bowman", FullName = "Bob Bowman", IsActive = false }
+            ]
+        };
+        db.AddRange(new Tenant { Id = tenantId, Name = "Tenant" }, list);
+        await db.SaveChangesAsync();
+
+        var controller = new ParticipantListsController(db, new TestTenantContext(tenantId), new ParticipantListExcelService());
+        var result = Assert.IsType<OkObjectResult>(await controller.List(true, CancellationToken.None));
+        var items = Assert.IsAssignableFrom<IReadOnlyList<ParticipantListSummary>>(result.Value);
+        var summary = Assert.Single(items);
+
+        Assert.Equal(2, summary.MemberCount);
+        Assert.Equal(1, summary.ActiveMemberCount);
+    }
+
+    [Fact]
+    public async Task Get_returns_the_list_with_its_members()
+    {
+        await using var connection = new SqliteConnection("Filename=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>().UseSqlite(connection).Options;
+        await using var db = new ApplicationDbContext(options);
+        await db.Database.EnsureCreatedAsync();
+
+        var tenantId = Guid.NewGuid();
+        var list = new ParticipantList
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            Name = "Club members",
+            Members = [new ParticipantListMember { Id = Guid.NewGuid(), TenantId = tenantId, LastName = "Archer", FullName = "Amy Archer" }]
+        };
+        db.AddRange(new Tenant { Id = tenantId, Name = "Tenant" }, list);
+        await db.SaveChangesAsync();
+
+        var controller = new ParticipantListsController(db, new TestTenantContext(tenantId), new ParticipantListExcelService());
+        var result = Assert.IsType<OkObjectResult>(await controller.Get(list.Id, CancellationToken.None));
+        var returned = Assert.IsType<ParticipantList>(result.Value);
+
+        Assert.Single(returned.Members);
+    }
+
+    [Fact]
+    public async Task Get_returns_not_found_for_a_list_in_another_tenant()
+    {
+        await using var connection = new SqliteConnection("Filename=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>().UseSqlite(connection).Options;
+        await using var db = new ApplicationDbContext(options);
+        await db.Database.EnsureCreatedAsync();
+
+        var otherTenantId = Guid.NewGuid();
+        var list = new ParticipantList { Id = Guid.NewGuid(), TenantId = otherTenantId, Name = "Club members" };
+        db.AddRange(new Tenant { Id = otherTenantId, Name = "Tenant" }, list);
+        await db.SaveChangesAsync();
+
+        var controller = new ParticipantListsController(db, new TestTenantContext(Guid.NewGuid()), new ParticipantListExcelService());
+        Assert.IsType<NotFoundResult>(await controller.Get(list.Id, CancellationToken.None));
+    }
+
+    [Fact]
     public async Task Delete_removes_the_list_and_its_members()
     {
         await using var connection = new SqliteConnection("Filename=:memory:");

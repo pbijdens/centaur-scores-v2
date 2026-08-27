@@ -10,8 +10,20 @@ namespace CentaurScores.Api.Controllers;
 [Route("api/matches")]
 public sealed class MatchesController(ApplicationDbContext db, ITenantContext tenantContext, IScoringService scoring, ILiveScoringService liveScoringService) : ApiControllerBase(tenantContext)
 {
+    // Lists never send the (potentially huge) Participants collection - callers get aggregate counts here and
+    // fetch the full roster per-match via Get/Participants when they actually need it.
     [HttpGet]
-    public async Task<IActionResult> List(CancellationToken cancellationToken) => Ok(await db.Matches.AsNoTracking().Include(item => item.Participants).Include(item => item.LiveScopes).Where(item => item.TenantId == TenantId).OrderByDescending(item => item.IsOpen).ThenBy(item => item.Date).ToListAsync(cancellationToken));
+    public async Task<IActionResult> List(CancellationToken cancellationToken) => Ok(await db.Matches.AsNoTracking()
+        .Where(item => item.TenantId == TenantId)
+        .OrderByDescending(item => item.IsOpen).ThenBy(item => item.Date)
+        .Select(item => new MatchListItem(
+            item.Id, item.TenantId, item.Name, item.Date, item.ShortCode, item.IsOpen, item.ParticipantListId,
+            item.DeviceSelectionMode, item.Ends, item.ArrowsPerEnd, item.GroupEnds, item.AllowFreeParticipants,
+            item.KeyboardJson, item.ScoringRulesJson,
+            item.Participants.Count,
+            item.Participants.Count(participant => participant.ParticipantListMemberId == null),
+            item.LiveScopes))
+        .ToListAsync(cancellationToken));
 
     [HttpPost]
     public async Task<IActionResult> Create(CreateMatchRequest request, CancellationToken cancellationToken)

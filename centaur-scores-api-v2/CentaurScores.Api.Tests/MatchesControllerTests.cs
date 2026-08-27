@@ -1,4 +1,5 @@
 using CentaurScores.Api.Application;
+using CentaurScores.Api.Contracts;
 using CentaurScores.Api.Controllers;
 using CentaurScores.Api.Domain;
 using CentaurScores.Api.Infrastructure;
@@ -71,6 +72,43 @@ public sealed class MatchesControllerTests
             "federation_number,full_name,total,\"Miss\",\"X\",Null,Split1,Split2,\"Class\",\"Discipline\",lastname\n" +
             "\"123\",\"Robin Archer\",20,1,2,5,10,10,\"Senior\",\"Recurve\",\"Archer\"",
             Encoding.UTF8.GetString(result.FileContents));
+    }
+
+    [Fact]
+    public async Task List_returns_participant_counts_without_the_participants_themselves()
+    {
+        await using var connection = new SqliteConnection("Filename=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>().UseSqlite(connection).Options;
+        await using var db = new ApplicationDbContext(options);
+        await db.Database.EnsureCreatedAsync();
+
+        var tenantId = Guid.NewGuid();
+        var matchId = Guid.NewGuid();
+        var listedParticipantId = Guid.NewGuid();
+        var listMemberId = Guid.NewGuid();
+        var match = new Match
+        {
+            Id = matchId,
+            TenantId = tenantId,
+            Name = "Open",
+            Participants =
+            [
+                new MatchParticipant { Id = listedParticipantId, TenantId = tenantId, MatchId = matchId, ParticipantListMemberId = listMemberId, LastName = "Listed", FullName = "Listed Archer" },
+                new MatchParticipant { Id = Guid.NewGuid(), TenantId = tenantId, MatchId = matchId, ParticipantListMemberId = null, LastName = "Walkin", FullName = "Walk In" }
+            ]
+        };
+        db.AddRange(new Tenant { Id = tenantId, Name = "Tenant" }, match);
+        await db.SaveChangesAsync();
+        var scoring = new ScoringService();
+        var controller = new MatchesController(db, new TestTenantContext(tenantId), scoring, new LiveScoringService(scoring));
+
+        var result = Assert.IsType<OkObjectResult>(await controller.List(CancellationToken.None));
+        var items = Assert.IsAssignableFrom<IReadOnlyList<MatchListItem>>(result.Value);
+        var item = Assert.Single(items);
+
+        Assert.Equal(2, item.ParticipantCount);
+        Assert.Equal(1, item.UnlistedParticipantCount);
     }
 
     private static ArrowScore Score(Guid tenantId, Guid participantId, int end, int arrow, string keyId, int value) => new()

@@ -65,7 +65,8 @@ JWTs are returned by `POST /api/auth/login` and contain the account and active t
 | `PUT` | `/api/categories/{categoryId}/values/{valueId}` | manager | Rename a category value with `{ name }`. |
 | `DELETE` | `/api/categories/{categoryId}/values/{valueId}` | manager | Remove a category value. |
 | `DELETE` | `/api/categories/{categoryId}` | admin | Delete an unused category; used categories return `409`. |
-| `GET` | `/api/participant-lists?includeInactive=true` | user | List participant lists, including members. |
+| `GET` | `/api/participant-lists?includeInactive=true` | user | List participant lists as lightweight summaries (`{ id, tenantId, name, isActive, memberCount, activeMemberCount }`) - no member rows, so this stays cheap regardless of list size. |
+| `GET` | `/api/participant-lists/{listId}` | user | Get one participant list including its full `members` array. |
 | `POST` | `/api/participant-lists` | manager | Create a participant list. |
 | `PUT` | `/api/participant-lists/{listId}` | manager | Update list name and active state. |
 | `POST` | `/api/participant-lists/{listId}/members` | manager | Add a participant with `{ lastName, fullName, federationNumber?, categories, isActive? }` (`isActive` defaults to `true`). |
@@ -87,7 +88,7 @@ JWTs are returned by `POST /api/auth/login` and contain the account and active t
 
 | Method | Path | Auth | Description |
 |---|---|---|---|
-| `GET` | `/api/matches` | user | List matches, open matches first and then by date. |
+| `GET` | `/api/matches` | user | List matches, open matches first and then by date, as lightweight items (match fields plus `participantCount`/`unlistedParticipantCount` aggregates and `liveScopes` - no `participants`/`devices`, so this stays cheap regardless of roster size). |
 | `POST` | `/api/matches` | manager | Create match metadata, end configuration, an optional `participantListId` (the match's single source list), `deviceSelectionMode` (`restricted`, `list`, or `list-and-free`), keyboard, and scoring rules. |
 | `GET` | `/api/matches/{id}` | user | Get match metadata, participants, devices, and live scopes. |
 | `PUT` | `/api/matches/{id}` | manager | Update match configuration or open state. `409` with a coded error body (`PARTICIPANT_LIST_LOCKED`) if `participantListId` changes after the match already has participants. |

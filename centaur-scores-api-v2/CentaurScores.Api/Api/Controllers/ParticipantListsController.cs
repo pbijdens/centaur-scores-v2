@@ -10,13 +10,22 @@ namespace CentaurScores.Api.Controllers;
 [Route("api/participant-lists")]
 public sealed class ParticipantListsController(ApplicationDbContext db, ITenantContext tenantContext, IParticipantListExcelService excelService) : ApiControllerBase(tenantContext)
 {
+    // Lists never send the (potentially huge) Members collection - callers get member counts here and fetch
+    // the full roster for one list via Get(listId) when they actually need to show/edit its members.
     [HttpGet]
     public async Task<IActionResult> List([FromQuery] bool includeInactive = true, CancellationToken cancellationToken = default)
     {
-        var query = db.ParticipantLists.AsNoTracking().Include(item => item.Members).Where(item => item.TenantId == TenantId);
+        var query = db.ParticipantLists.AsNoTracking().Where(item => item.TenantId == TenantId);
         if (!includeInactive) query = query.Where(item => item.IsActive);
-        return Ok(await query.OrderByDescending(item => item.IsActive).ThenBy(item => item.Name).ToListAsync(cancellationToken));
+        return Ok(await query
+            .OrderByDescending(item => item.IsActive).ThenBy(item => item.Name)
+            .Select(item => new ParticipantListSummary(item.Id, item.TenantId, item.Name, item.IsActive, item.Members.Count, item.Members.Count(member => member.IsActive)))
+            .ToListAsync(cancellationToken));
     }
+
+    [HttpGet("{listId:guid}")]
+    public async Task<IActionResult> Get(Guid listId, CancellationToken cancellationToken) =>
+        await db.ParticipantLists.AsNoTracking().Include(item => item.Members).SingleOrDefaultAsync(item => item.Id == listId && item.TenantId == TenantId, cancellationToken) is { } list ? Ok(list) : NotFound();
 
     [HttpPost]
     public async Task<IActionResult> Create(CreateParticipantListRequest request, CancellationToken cancellationToken)
