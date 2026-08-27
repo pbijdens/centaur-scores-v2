@@ -51,6 +51,17 @@ public sealed class ParticipantListsController(ApplicationDbContext db, ITenantC
         return Ok(list);
     }
 
+    [HttpDelete("{listId:guid}")]
+    public async Task<IActionResult> Delete(Guid listId, CancellationToken cancellationToken)
+    {
+        if (!CanManage) return Forbid();
+        var list = await db.ParticipantLists.SingleOrDefaultAsync(item => item.Id == listId && item.TenantId == TenantId, cancellationToken);
+        if (list is null) return NotFound();
+        db.ParticipantLists.Remove(list);
+        await db.SaveChangesAsync(cancellationToken);
+        return NoContent();
+    }
+
     [HttpPut("{listId:guid}/members/{memberId:guid}")]
     public async Task<IActionResult> UpdateMember(Guid listId, Guid memberId, CreateParticipantRequest request, CancellationToken cancellationToken)
     {

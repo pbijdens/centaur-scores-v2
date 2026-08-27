@@ -173,6 +173,51 @@ public sealed class ParticipantListsControllerTests
         Assert.Equal("IMPORT_UNRECOGNIZED_HEADERS", error.Code);
     }
 
+    [Fact]
+    public async Task Delete_removes_the_list_and_its_members()
+    {
+        await using var connection = new SqliteConnection("Filename=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>().UseSqlite(connection).Options;
+        await using var db = new ApplicationDbContext(options);
+        await db.Database.EnsureCreatedAsync();
+
+        var tenantId = Guid.NewGuid();
+        var list = new ParticipantList
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            Name = "Club members",
+            Members = [new ParticipantListMember { Id = Guid.NewGuid(), TenantId = tenantId, LastName = "Archer", FullName = "Amy Archer" }]
+        };
+        db.AddRange(new Tenant { Id = tenantId, Name = "Tenant" }, list);
+        await db.SaveChangesAsync();
+
+        var controller = new ParticipantListsController(db, new TestTenantContext(tenantId), new ParticipantListExcelService());
+        Assert.IsType<NoContentResult>(await controller.Delete(list.Id, CancellationToken.None));
+
+        Assert.False(await db.ParticipantLists.AnyAsync(item => item.Id == list.Id));
+        Assert.False(await db.ParticipantListMembers.AnyAsync(item => item.ParticipantListId == list.Id));
+    }
+
+    [Fact]
+    public async Task Delete_is_forbidden_for_non_managers()
+    {
+        await using var connection = new SqliteConnection("Filename=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>().UseSqlite(connection).Options;
+        await using var db = new ApplicationDbContext(options);
+        await db.Database.EnsureCreatedAsync();
+
+        var tenantId = Guid.NewGuid();
+        var list = new ParticipantList { Id = Guid.NewGuid(), TenantId = tenantId, Name = "Club members" };
+        db.AddRange(new Tenant { Id = tenantId, Name = "Tenant" }, list);
+        await db.SaveChangesAsync();
+
+        var controller = new ParticipantListsController(db, new TestTenantContext(tenantId, canManage: false), new ParticipantListExcelService());
+        Assert.IsType<ForbidResult>(await controller.Delete(list.Id, CancellationToken.None));
+    }
+
     private sealed class TestTenantContext(Guid tenantId, bool canManage = true) : ITenantContext
     {
         public Guid TenantId { get; } = tenantId;

@@ -299,6 +299,10 @@ export class ApiClient {
     return this.request(`/api/participant-lists/${id}`, { method: 'PUT', body: JSON.stringify(body) })
   }
 
+  deleteParticipantList(id: string) {
+    return this.request(`/api/participant-lists/${id}`, { method: 'DELETE' })
+  }
+
   addParticipantMember(listId: string, body: { lastName: string; fullName: string; federationNumber?: string | null; categories: Record<string, number>; isActive: boolean }) {
     return this.request(`/api/participant-lists/${listId}/members`, { method: 'POST', body: JSON.stringify(body) })
   }

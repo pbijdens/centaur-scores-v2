@@ -14,6 +14,7 @@
   export let onOpenMember: (memberId: string) => void
   export let onAddMember: () => void
   export let onChanged: () => void
+  export let onDeleted: () => void
   export let onBack: () => void
 
   let name = list.name
@@ -21,6 +22,7 @@
   let showSettings = false
   let saveMessage = ''
   let saveError = ''
+  let deleteError = ''
   let filter = ''
   let exportError = ''
   let importError = ''
@@ -87,6 +89,17 @@
       importing = false
     }
   }
+
+  async function remove() {
+    deleteError = ''
+    if (!confirm(labels.deleteParticipantListConfirm.replace('{name}', list.name))) return
+    try {
+      await api.deleteParticipantList(list.id)
+      onDeleted()
+    } catch (error) {
+      deleteError = labelForError(error, labels, 'listDeleteError')
+    }
+  }
 </script>
 
 <button class="back-link" on:click={onBack}>← {labels.participants}</button>
@@ -100,11 +113,14 @@
       {#if canManage}
         <button class="menu-item" on:click={exportList}>{labels.exportParticipantList}</button>
         <button class="menu-item" disabled={importing} on:click={() => fileInput.click()}>{labels.importParticipantList}</button>
+        <hr class="menu-separator" />
+        <button class="menu-item menu-item-danger" on:click={remove}>{labels.deleteParticipantList}</button>
       {/if}
     </DropdownMenu>
   </div>
 </div>
 <input type="file" accept=".xlsx" bind:this={fileInput} on:change={importFile} hidden />
+{#if deleteError}<p class="error">{deleteError}</p>{/if}
 {#if showSettings}
   <section class="panel">
     <form on:submit|preventDefault={save}>
