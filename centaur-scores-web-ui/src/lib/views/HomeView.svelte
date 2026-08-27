@@ -1,13 +1,13 @@
 <script lang="ts">
   import { formatLocalDate } from '../date'
-  import type { Competition, Language, Match } from '../types'
+  import type { Competition, Language, MatchListItem } from '../types'
 
-  export let matches: Match[]
+  export let matches: MatchListItem[]
   export let competitions: Competition[]
   export let language: Language
   export let labels: Record<string, string>
   export let quickLinks: [string, string][]
-  export let onOpenMatch: (match: Match) => void
+  export let onOpenMatch: (match: MatchListItem) => void
   export let onNavigate: (path: string) => void
   export let onDeactivateAll: () => void
 
@@ -37,7 +37,7 @@
     {#each matches.filter((match) => match.isOpen) as match}
       <button class="match-row" on:click={() => onOpenMatch(match)}>
         <span class="status-dot"></span>
-        <span><strong>{match.name}</strong><small>{formatLocalDate(match.date, language)} · {match.participantCount ?? 0} participants</small></span>
+        <span><strong>{match.name}</strong><small>{formatLocalDate(match.date, language)} · {match.participantCount} {labels.participantsCountLabel}</small></span>
         <span class="arrow">→</span>
       </button>
     {/each}

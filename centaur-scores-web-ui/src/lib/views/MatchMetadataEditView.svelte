@@ -5,12 +5,12 @@
   import { parseMatchKeyboardConfig, parseMatchScoringRules } from '../matchConfig'
   import RowActions from '../RowActions.svelte'
   import { deviceSelectionModes, keyboardColors } from '../templateConfig'
-  import type { Category, LiveScopeConfig, Match, ParticipantList } from '../types'
+  import type { Category, LiveScopeConfig, Match, ParticipantListSummary } from '../types'
 
   export let api: ApiClient
   export let match: Match
   export let categories: Category[]
-  export let participantLists: ParticipantList[]
+  export let participantLists: ParticipantListSummary[]
   export let labels: Record<string, string>
   export let onBack: () => void
   export let onSaved: () => void

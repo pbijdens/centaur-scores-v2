@@ -4,12 +4,12 @@
   import { labelForError } from '../errors'
   import RowActions from '../RowActions.svelte'
   import { keyboardColors, deviceSelectionModes, parseTemplateConfiguration } from '../templateConfig'
-  import type { Category, MatchTemplate, ParticipantList } from '../types'
+  import type { Category, MatchTemplate, ParticipantListSummary } from '../types'
 
   export let api: ApiClient
   export let template: MatchTemplate
   export let categories: Category[]
-  export let participantLists: ParticipantList[]
+  export let participantLists: ParticipantListSummary[]
   export let labels: Record<string, string>
   export let onBack: () => void
   export let onSaved: () => void

@@ -1,12 +1,12 @@
 <script lang="ts">
   import type { ApiClient } from '../api'
   import { labelForError } from '../errors'
-  import type { ParticipantList } from '../types'
+  import type { ParticipantListSummary } from '../types'
 
   export let api: ApiClient
-  export let lists: ParticipantList[]
+  export let lists: ParticipantListSummary[]
   export let labels: Record<string, string>
-  export let onOpenList: (list: ParticipantList) => void
+  export let onOpenList: (list: ParticipantListSummary) => void
   export let onChanged: () => void
   export let onBack: () => void
 
@@ -47,7 +47,7 @@
   {#each sortedLists as list}
     <button class="list-row" on:click={() => onOpenList(list)}>
       <span class:live={list.isActive} class="list-indicator"></span>
-      <span><strong>{list.name}</strong><small>{list.members.length} {labels.membersLabel.toLowerCase()}</small></span>
+      <span><strong>{list.name}</strong><small>{list.memberCount} {labels.membersLabel.toLowerCase()}</small></span>
       {#if !list.isActive}<span class="tag">{labels.statusInactive}</span>{/if}
       <span class="arrow">→</span>
     </button>

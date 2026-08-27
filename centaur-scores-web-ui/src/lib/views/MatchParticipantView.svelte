@@ -10,7 +10,7 @@
   export let match: Match
   export let participant: MatchParticipant
   export let categories: Category[]
-  export let participantLists: ParticipantList[]
+  export let sourceList: ParticipantList | null
   export let labels: Record<string, string>
   export let onBack: () => void
   export let onChanged: () => void | Promise<void>
@@ -40,7 +40,6 @@
   $: availableKeys = keyboardConfig.keyboard.filter((key) => !disabledKeyIds.has(key.keyId))
   $: devices = [...(match.devices ?? [])].sort((a, b) => (a.sortOrder ?? Number.MAX_SAFE_INTEGER) - (b.sortOrder ?? Number.MAX_SAFE_INTEGER) || a.name.localeCompare(b.name))
   $: totalScore = (participant.scores ?? []).reduce((sum, score) => sum + score.value, 0)
-  $: sourceList = participantLists.find((list) => list.id === match.participantListId) ?? null
   $: assignedMemberIds = new Set(
     (match.participants ?? [])
       .filter((item) => item.id !== participant.id)

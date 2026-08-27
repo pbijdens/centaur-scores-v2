@@ -2,11 +2,11 @@
   import type { ApiClient } from '../api'
   import { labelForError } from '../errors'
   import { defaultTemplateConfigurationJson } from '../templateConfig'
-  import type { MatchTemplate, ParticipantList } from '../types'
+  import type { MatchTemplate, ParticipantListSummary } from '../types'
 
   export let api: ApiClient
   export let templates: MatchTemplate[]
-  export let participantLists: ParticipantList[]
+  export let participantLists: ParticipantListSummary[]
   export let labels: Record<string, string>
   export let onOpenTemplate: (template: MatchTemplate) => void
   export let onChanged: () => void

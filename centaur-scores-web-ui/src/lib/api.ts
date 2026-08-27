@@ -1,4 +1,4 @@
-import type { Account, Category, Competition, CompetitionResultsDocument, CompetitionRound, CompetitionScoreRule, Language, LiveScoringMatch, LiveScoringPage, Match, MatchParticipant, MatchTemplate, ParticipantList, Profile, ScoreDevice, Tenant } from './types'
+import type { Account, Category, Competition, CompetitionResultsDocument, CompetitionRound, CompetitionScoreRule, Language, LiveScoringMatch, LiveScoringPage, Match, MatchListItem, MatchParticipant, MatchTemplate, ParticipantList, ParticipantListSummary, Profile, ScoreDevice, Tenant } from './types'
 
 export const apiBase = import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:5080'
 
@@ -55,7 +55,7 @@ export class ApiClient {
     return response.status === 204 ? null : response.json()
   }
 
-  fetchMatches(): Promise<Match[]> {
+  fetchMatches(): Promise<MatchListItem[]> {
     return this.request('/api/matches')
   }
 
@@ -287,8 +287,12 @@ export class ApiClient {
     return this.request(`/api/categories/${categoryId}`, { method: 'DELETE' })
   }
 
-  fetchParticipantLists(): Promise<ParticipantList[]> {
+  fetchParticipantLists(): Promise<ParticipantListSummary[]> {
     return this.request('/api/participant-lists?includeInactive=true')
+  }
+
+  fetchParticipantList(id: string): Promise<ParticipantList> {
+    return this.request(`/api/participant-lists/${id}`)
   }
 
   createParticipantList(body: { name: string; isActive: boolean }): Promise<ParticipantList> {

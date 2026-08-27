@@ -4,12 +4,12 @@
   import DropdownMenu from '../DropdownMenu.svelte'
   import { labelForError } from '../errors'
   import RowActions from '../RowActions.svelte'
-  import type { Category, Competition, CompetitionRound, CompetitionScoreRule, Language, Match } from '../types'
+  import type { Category, Competition, CompetitionRound, CompetitionScoreRule, Language, MatchListItem } from '../types'
 
   export let api: ApiClient
   export let competition: Competition
   export let categories: Category[]
-  export let matches: Match[]
+  export let matches: MatchListItem[]
   export let language: Language
   export let labels: Record<string, string>
   export let onBack: () => void

@@ -3,14 +3,14 @@
   import { labelForError } from '../errors'
   import { defaultMatchKeyboardJson, defaultMatchScoringRulesJson } from '../matchConfig'
   import { parseTemplateConfiguration } from '../templateConfig'
-  import type { Language, Match, MatchTemplate } from '../types'
+  import type { Language, MatchListItem, MatchTemplate } from '../types'
 
   export let api: ApiClient
-  export let matches: Match[]
+  export let matches: MatchListItem[]
   export let templates: MatchTemplate[]
   export let language: Language
   export let labels: Record<string, string>
-  export let onOpenMatch: (match: Match) => void
+  export let onOpenMatch: (match: { id: string }) => void
   export let onChanged: () => void
 
   let filter = ''
@@ -134,7 +134,7 @@
   {#each openMatches as match}
     <button class="list-row" on:click={() => onOpenMatch(match)}>
       <span class:live={match.isOpen} class="list-indicator"></span>
-      <span><strong>{match.name}</strong><small>{formatDate(match.date)} · {match.participantCount ?? 0} participants</small></span>
+      <span><strong>{match.name}</strong><small>{formatDate(match.date)} · {match.participantCount} {labels.participantsCountLabel}{#if match.unlistedParticipantCount > 0}{' · '}<span class="error unlisted-warning">{match.unlistedParticipantCount} {labels.unlistedParticipantsWarning}</span>{/if}</small></span>
       <span class="tag">{labels.statusOpen}</span>
       <span class="arrow">→</span>
     </button>
@@ -143,7 +143,7 @@
     {#each upcomingMatches as match}
       <button class="list-row" on:click={() => onOpenMatch(match)}>
         <span class="list-indicator"></span>
-        <span><strong>{match.name}</strong><small>{formatDate(match.date)} · {match.participantCount ?? 0} participants</small></span>
+        <span><strong>{match.name}</strong><small>{formatDate(match.date)} · {match.participantCount} {labels.participantsCountLabel}{#if match.unlistedParticipantCount > 0}{' · '}<span class="error unlisted-warning">{match.unlistedParticipantCount} {labels.unlistedParticipantsWarning}</span>{/if}</small></span>
         <span class="tag">{labels.statusPlanned}</span>
         <span class="arrow">→</span>
       </button>
@@ -153,7 +153,7 @@
     {#each pastMatches as match}
       <button class="list-row past" on:click={() => onOpenMatch(match)}>
         <span class="list-indicator"></span>
-        <span><strong>{match.name}</strong><small>{formatDate(match.date)} · {match.participantCount ?? 0} participants</small></span>
+        <span><strong>{match.name}</strong><small>{formatDate(match.date)} · {match.participantCount} {labels.participantsCountLabel}{#if match.unlistedParticipantCount > 0}{' · '}<span class="error unlisted-warning">{match.unlistedParticipantCount} {labels.unlistedParticipantsWarning}</span>{/if}</small></span>
         <span class="tag">{labels.statusPast}</span>
         <span class="arrow">→</span>
       </button>
@@ -173,6 +173,10 @@
 
   .list-row.past {
     opacity: .65;
+  }
+
+  .unlisted-warning {
+    font-weight: 600;
   }
 </style>
 

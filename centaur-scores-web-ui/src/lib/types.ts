@@ -15,10 +15,29 @@ export type Match = {
   allowFreeParticipants: boolean
   keyboardJson: string
   scoringRulesJson: string
-  participantCount?: number
   participants?: MatchParticipant[]
   devices?: ScoreDevice[]
   liveScopes?: LiveScoreScope[]
+}
+// Shape of GET /api/matches: unlike Match (a single match's full detail), this never carries the
+// (potentially huge) participants/devices collections - just aggregate counts for list rendering.
+export type MatchListItem = {
+  id: string
+  name: string
+  date: string
+  shortCode?: string | null
+  isOpen: boolean
+  participantListId?: string | null
+  deviceSelectionMode: string
+  ends: number
+  arrowsPerEnd: number
+  groupEnds?: number | null
+  allowFreeParticipants: boolean
+  keyboardJson: string
+  scoringRulesJson: string
+  participantCount: number
+  unlistedParticipantCount: number
+  liveScopes: LiveScoreScope[]
 }
 export type MatchParticipant = {
   id: string
@@ -54,6 +73,9 @@ export type CategoryValue = { categoryId: string; valueId: number; name: string 
 export type Category = { id: string; name: string; isUsed: boolean; values: CategoryValue[] }
 export type ParticipantListMember = { id: string; participantListId: string; lastName: string; fullName: string; federationNumber?: string | null; categories: Record<string, number>; isActive: boolean }
 export type ParticipantList = { id: string; name: string; isActive: boolean; members: ParticipantListMember[] }
+// Shape of GET /api/participant-lists: unlike ParticipantList (one list's full detail, with members),
+// this never carries the (potentially huge) members collection - just counts for list rendering.
+export type ParticipantListSummary = { id: string; name: string; isActive: boolean; memberCount: number; activeMemberCount: number }
 export type MatchTemplate = { id: string; name: string; participantListId?: string | null; allowFreeParticipants: boolean; deviceSelectionMode: string; configurationJson: string }
 
 export type KeyboardKeyColor = 'Yellow' | 'Red' | 'Blue' | 'Black' | 'White'

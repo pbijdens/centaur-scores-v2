@@ -78,6 +78,7 @@ export const labels = {
         statusPlanned: 'PLANNED',
         statusActive: 'ACTIVE',
         statusReady: 'READY',
+        unlistedParticipantsWarning: 'unlisted',
         deactivate: 'Deactivate',
         activate: 'Activate',
         deactivateAll: 'Deactivate all',
@@ -347,7 +348,10 @@ export const labels = {
         editMyProfile: 'Edit my profile',
         matchActions: 'Actions',
         addUnlistedParticipant: 'Add unlisted participant',
-        addThisParticipant: 'Add this participant'
+        addThisParticipant: 'Add this participant',
+        filterUnlistedLabel: 'Unlisted only',
+        noUnlistedParticipants: 'No unlisted participants.',
+        participantsCountLabel: 'participants'
     },
     nl: {
         home: 'Overzicht',
@@ -426,6 +430,7 @@ export const labels = {
         statusPlanned: 'GEPLAND',
         statusActive: 'ACTIEF',
         statusReady: 'GEREED',
+        unlistedParticipantsWarning: 'ongeregistreerd',
         deactivate: 'Deactiveren',
         activate: 'Activeren',
         deactivateAll: 'Alles deactiveren',
@@ -695,7 +700,10 @@ export const labels = {
         editMyProfile: 'Profiel bewerken',
         matchActions: 'Acties',
         addUnlistedParticipant: 'Ongeregistreerde deelnemer toevoegen',
-        addThisParticipant: 'Deze deelnemer toevoegen'
+        addThisParticipant: 'Deze deelnemer toevoegen',
+        filterUnlistedLabel: 'Alleen ongeregistreerd',
+        noUnlistedParticipants: 'Geen ongeregistreerde deelnemers.',
+        participantsCountLabel: 'deelnemers'
     }
 } satisfies Record<Language, Record<string, string>>
 

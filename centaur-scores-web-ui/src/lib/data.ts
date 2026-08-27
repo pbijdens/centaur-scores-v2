@@ -1,16 +1,16 @@
 import { writable } from 'svelte/store'
 import { fetchTenants, type ApiClient } from './api'
-import type { Account, Category, Competition, Match, MatchTemplate, ParticipantList, Profile, Tenant } from './types'
+import type { Account, Category, Competition, MatchListItem, MatchTemplate, ParticipantListSummary, Profile, Tenant } from './types'
 
 export const tenants = writable<Tenant[]>([])
-export const matches = writable<Match[]>([])
+export const matches = writable<MatchListItem[]>([])
 export const competitions = writable<Competition[]>([])
 export const profile = writable<Profile | null>(null)
 export const currentTenant = writable<Tenant | null>(null)
 export const childTenants = writable<Tenant[]>([])
 export const accounts = writable<Account[]>([])
 export const categories = writable<Category[]>([])
-export const participantLists = writable<ParticipantList[]>([])
+export const participantLists = writable<ParticipantListSummary[]>([])
 export const templates = writable<MatchTemplate[]>([])
 
 export async function loadTenants(): Promise<Tenant[]> {

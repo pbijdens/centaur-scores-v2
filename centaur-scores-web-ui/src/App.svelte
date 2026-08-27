@@ -26,7 +26,7 @@
   import { labelForError } from './lib/errors'
   import { translationsFor } from './lib/i18n'
   import { navigateTo, resolveRoute } from './lib/router'
-  import type { Account, Category, Competition, Language, Match, MatchTemplate, ParticipantList, Tenant, View } from './lib/types'
+  import type { Account, Category, Competition, Language, Match, MatchTemplate, ParticipantList, ParticipantListSummary, Tenant, View } from './lib/types'
   import AccountEditView from './lib/views/AccountEditView.svelte'
   import AccountsView from './lib/views/AccountsView.svelte'
   import AppHeader from './lib/AppHeader.svelte'
@@ -65,6 +65,8 @@
   let language = (localStorage.getItem('centaur-language') ?? 'en') as Language
   let view: View = 'home'
   let selectedMatch: Match | null = null
+  let matchSourceList: ParticipantList | null = null
+  let selectedList: ParticipantList | null = null
   let loginError = ''
   let loading = false
   let selectedTenantId: string | null = null
@@ -88,7 +90,6 @@
     [['participants', t.participants], ['categories', t.categories], ['templates', t.templates]] as [string, string][]
   ).concat(isAdmin ? [['accounts', t.accounts], ['tenants', t.tenants]] : [])
   $: selectedCategory = $categories.find((category) => category.id === selectedCategoryId) ?? null
-  $: selectedList = $participantLists.find((list) => list.id === selectedListId) ?? null
   $: selectedMember = selectedMemberId && selectedMemberId !== 'new' ? selectedList?.members.find((member) => member.id === selectedMemberId) ?? null : null
   $: selectedTemplate = $templates.find((template) => template.id === selectedTemplateId) ?? null
   $: selectedParticipant = selectedMatch?.participants?.find((participant) => participant.id === selectedParticipantId) ?? null
@@ -132,7 +133,7 @@
 
   function setLanguage(value: string) { language = value as Language; localStorage.setItem('centaur-language', value) }
 
-  function openMatch(match: Match) { navigate(`/matches/${match.id}`) }
+  function openMatch(match: { id: string }) { navigate(`/matches/${match.id}`) }
 
   async function loadSelectedMatch(id: string) {
     const [match, participants] = await Promise.all([
@@ -140,6 +141,7 @@
       api.fetchMatchParticipants(id)
     ])
     selectedMatch = { ...match, participants }
+    matchSourceList = match.participantListId ? await api.fetchParticipantList(match.participantListId) : null
   }
 
   async function refreshSelectedMatch() {
@@ -226,10 +228,24 @@
     refreshCategories()
   }
 
-  function openList(list: ParticipantList) { navigate(`/participants/${list.id}`) }
+  function openList(list: ParticipantListSummary) { navigate(`/participants/${list.id}`) }
+
+  async function loadSelectedList(id: string) {
+    selectedList = await api.fetchParticipantList(id)
+  }
+
+  async function refreshSelectedList() {
+    if (selectedListId) await loadSelectedList(selectedListId)
+  }
 
   async function refreshParticipantLists() {
     await fetchParticipantListsList(api)
+  }
+
+  // ParticipantListDetailView mutates settings/members of the currently open list, so refresh both
+  // the full detail (shown on screen) and the lightweight summary (name/counts shown elsewhere).
+  async function onParticipantListChanged() {
+    await Promise.all([refreshSelectedList(), refreshParticipantLists()])
   }
 
   function onParticipantListDeleted() {
@@ -278,7 +294,7 @@
     const matchScopedViews: View[] = ['match', 'match-metadata', 'match-devices', 'match-qr', 'match-results-scope', 'match-participant']
     selectedMatchId = matchScopedViews.includes(route.view) ? route.matchId ?? null : null
     if (selectedMatchId) loadSelectedMatch(selectedMatchId)
-    else selectedMatch = null
+    else { selectedMatch = null; matchSourceList = null }
     const competitionScopedViews: View[] = ['competition', 'competition-results']
     selectedCompetitionId = competitionScopedViews.includes(route.view) ? route.competitionId ?? null : null
     if (selectedCompetitionId) loadSelectedCompetition(selectedCompetitionId)
@@ -290,6 +306,8 @@
     if (route.view === 'accounts') loadAccounts()
     selectedCategoryId = route.view === 'category' ? route.categoryId ?? null : null
     selectedListId = route.view === 'participant-list' || route.view === 'participant' ? route.listId ?? null : null
+    if (selectedListId) loadSelectedList(selectedListId)
+    else selectedList = null
     selectedMemberId = route.view === 'participant' ? route.memberId ?? null : null
     selectedTemplateId = route.view === 'template' ? route.templateId ?? null : null
   }
@@ -327,7 +345,7 @@
         <MatchesView {api} matches={$matches} templates={$templates} {language} labels={t} onOpenMatch={openMatch} onChanged={loadMatchesList} />
       {:else if view === 'match' && selectedMatch}
         {@const currentMatch = selectedMatch}
-        <MatchDetailView {api} match={currentMatch} categories={$categories} participantLists={$participantLists} {language} labels={t} onBack={() => navigate('/matches')} onToggleOpen={toggleSelectedMatch} onChanged={refreshSelectedMatch} onDeleted={onMatchDeleted} onEditMetadata={() => navigate(`/matches/${currentMatch.id}/edit`)} onManageDevices={() => navigate(`/matches/${currentMatch.id}/devices`)} onOpenParticipant={openParticipant} />
+        <MatchDetailView {api} match={currentMatch} categories={$categories} sourceList={matchSourceList} {language} labels={t} onBack={() => navigate('/matches')} onToggleOpen={toggleSelectedMatch} onChanged={refreshSelectedMatch} onDeleted={onMatchDeleted} onEditMetadata={() => navigate(`/matches/${currentMatch.id}/edit`)} onManageDevices={() => navigate(`/matches/${currentMatch.id}/devices`)} onOpenParticipant={openParticipant} />
       {:else if view === 'match-metadata' && selectedMatch}
         {@const currentMatch = selectedMatch}
         <MatchMetadataEditView {api} match={currentMatch} categories={$categories} participantLists={$participantLists} labels={t} onBack={() => navigate(`/matches/${currentMatch.id}`)} onSaved={() => navigate(`/matches/${currentMatch.id}`)} onDeleted={onMatchDeleted} />
@@ -336,7 +354,7 @@
         <MatchDevicesView {api} match={currentMatch} categories={$categories} labels={t} onBack={() => navigate(`/matches/${currentMatch.id}`)} onChanged={refreshSelectedMatch} />
       {:else if view === 'match-participant' && selectedMatch && selectedParticipant}
         {@const currentMatch = selectedMatch}
-        <MatchParticipantView {api} match={currentMatch} participant={selectedParticipant} categories={$categories} participantLists={$participantLists} labels={t} onBack={returnToSelectedMatch} onChanged={refreshSelectedMatch} onRemoved={() => navigate(`/matches/${currentMatch.id}`)} />
+        <MatchParticipantView {api} match={currentMatch} participant={selectedParticipant} categories={$categories} sourceList={matchSourceList} labels={t} onBack={returnToSelectedMatch} onChanged={refreshSelectedMatch} onRemoved={() => navigate(`/matches/${currentMatch.id}`)} />
       {:else if view === 'competitions'}
         <CompetitionsView {api} competitions={$competitions} {language} labels={t} onOpenCompetition={openCompetition} onChanged={loadCompetitionsList} />
       {:else if view === 'competition' && selectedCompetition}
@@ -359,7 +377,7 @@
       {:else if view === 'participants'}
         <ParticipantListsView {api} lists={$participantLists} labels={t} onOpenList={openList} onChanged={refreshParticipantLists} onBack={() => navigate('/')} />
       {:else if view === 'participant-list' && selectedList}
-        <ParticipantListDetailView {api} list={selectedList} categories={$categories} {language} {canManage} labels={t} onOpenMember={openMember} onAddMember={addMember} onChanged={refreshParticipantLists} onDeleted={onParticipantListDeleted} onBack={() => navigate('/participants')} />
+        <ParticipantListDetailView {api} list={selectedList} categories={$categories} {language} {canManage} labels={t} onOpenMember={openMember} onAddMember={addMember} onChanged={onParticipantListChanged} onDeleted={onParticipantListDeleted} onBack={() => navigate('/participants')} />
       {:else if view === 'participant' && selectedListId}
         <ParticipantMemberView {api} listId={selectedListId} member={selectedMember} categories={$categories} labels={t} onBack={() => navigate(`/participants/${selectedListId}`)} onSaved={onMemberSaved} onDeleted={onMemberSaved} />
       {:else if view === 'templates'}

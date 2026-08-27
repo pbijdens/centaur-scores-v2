@@ -5,12 +5,12 @@
   import { labelForError } from '../errors'
   import { parseMatchKeyboardConfig } from '../matchConfig'
   import { deriveLastName, memberDisplayLabel } from '../participantName'
-  import type { Category, Language, Match, ParticipantList } from '../types'
+  import type { Category, Language, Match, MatchParticipant, ParticipantList } from '../types'
 
   export let api: ApiClient
   export let match: Match
   export let categories: Category[]
-  export let participantLists: ParticipantList[]
+  export let sourceList: ParticipantList | null
   export let language: Language
   export let labels: Record<string, string>
   export let onBack: () => void
@@ -29,6 +29,7 @@
   const storedGroupBy = localStorage.getItem('centaur-match-group-by')
   let sortBy: SortBy = storedSortBy === 'score' ? 'score' : 'name'
   let groupBy: GroupBy = storedGroupBy === 'category' || storedGroupBy === 'device' ? storedGroupBy : 'none'
+  let unlistedOnly = false
   let results: ResultRow[] = []
   let deleteError = ''
   let exportError = ''
@@ -51,7 +52,6 @@
   $: keyboardConfig = parseMatchKeyboardConfig(match.keyboardJson)
   $: matchCategories = keyboardConfig.categoryOrder.map((id) => categories.find((category) => category.id === id)).filter((category): category is Category => !!category)
   $: assignedMemberIds = new Set(participants.map((participant) => participant.participantListMemberId).filter((id): id is string => !!id))
-  $: sourceList = participantLists.find((list) => list.id === match.participantListId) ?? null
   $: availableMembers = sourceList
     ? sourceList.members
         .filter((member) => member.isActive && !assignedMemberIds.has(member.id))
@@ -65,6 +65,10 @@
       .map((category) => category.values.find((value) => value.valueId === participantCategories[category.id])?.name)
       .filter((value): value is string => !!value)
       .join(' / ')
+  }
+
+  function participantDetailLabel(participant: MatchParticipant): string {
+    return [participant.federationNumber, categoryLabel(participant.categories)].filter((part): part is string => !!part).join(' / ')
   }
 
   $: totalsByParticipantId = new Map(results.map((row) => [row.participantId, row.total]))
@@ -87,7 +91,10 @@
     localStorage.setItem('centaur-match-group-by', groupBy)
   }
 
-  $: sortedParticipants = [...participants].sort((a, b) => {
+  $: unlistedParticipantCount = participants.filter((participant) => !participant.participantListMemberId).length
+  $: visibleParticipants = unlistedOnly ? participants.filter((participant) => !participant.participantListMemberId) : participants
+
+  $: sortedParticipants = [...visibleParticipants].sort((a, b) => {
     if (sortBy === 'score') return participantTotal(b.id, totalsByParticipantId) - participantTotal(a.id, totalsByParticipantId)
     return (a.fullName || a.lastName).localeCompare(b.fullName || b.lastName)
   })
@@ -230,6 +237,12 @@
         <option value="device">{labels.groupByDevice}</option>
       </select>
     </label>
+    {#if unlistedParticipantCount > 0}
+      <label class="checkbox-label unlisted-filter">
+        <input type="checkbox" bind:checked={unlistedOnly} />
+        {labels.filterUnlistedLabel} ({unlistedParticipantCount})
+      </label>
+    {/if}
     <button class="primary" on:click={() => (showAddForm = !showAddForm)}>+ {labels.addParticipant}</button>
   </div>
 
@@ -272,14 +285,14 @@
     </div>
   {/if}
 
-  {#if participants.length === 0}<p class="empty-state">{labels.emptyState}</p>{/if}
+  {#if participants.length === 0}<p class="empty-state">{labels.emptyState}</p>{:else if sortedParticipants.length === 0}<p class="empty-state">{labels.noUnlistedParticipants}</p>{/if}
   {#each groupedParticipants as group}
     {#if group.key}<h2 class="group-heading">{group.key}</h2>{/if}
     <div class="list-panel">
       {#each group.items as participant}
-        <button class="list-row match-participant-row" on:click={() => onOpenParticipant(participant.id)}>
+        <button class="list-row match-participant-row" class:unlisted-row={!participant.participantListMemberId} on:click={() => onOpenParticipant(participant.id)}>
           <span class="management-icon">◇</span>
-          <span class="participant-name"><strong>{participant.fullName || participant.lastName}</strong>{#if categoryLabel(participant.categories)}<span class="member-categories"> ({categoryLabel(participant.categories)})</span>{/if}</span>
+          <span class="participant-name"><strong>{participant.fullName || participant.lastName}</strong>{#if !participant.participantListMemberId}<span class="unlisted-tag">{labels.unlistedParticipantsWarning}</span>{/if}{#if participantDetailLabel(participant)}<span class="member-categories"> ({participantDetailLabel(participant)})</span>{/if}</span>
           <strong class="participant-score">{participantTotal(participant.id, totalsByParticipantId)}</strong>
           <span class="arrow">→</span>
         </button>
@@ -357,10 +370,31 @@
     font-weight: 400;
   }
 
+  .unlisted-filter {
+    margin-bottom: 2px;
+  }
+
   .match-participant-row {
     display: grid;
     grid-template-columns: 24px minmax(0, 1fr) minmax(5ch, 76px) 44px;
     gap: 14px;
+  }
+
+  .match-participant-row.unlisted-row {
+    margin: 0 -12px;
+    padding-left: 12px;
+    padding-right: 12px;
+    background: #fdeeea;
+    border-color: #e8755b;
+  }
+
+  .unlisted-tag {
+    margin-left: 8px;
+    color: #b84232;
+    font: 700 10px 'Space Grotesk';
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    vertical-align: middle;
   }
 
   .participant-name {
