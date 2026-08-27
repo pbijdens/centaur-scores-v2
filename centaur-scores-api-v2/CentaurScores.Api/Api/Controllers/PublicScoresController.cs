@@ -13,11 +13,11 @@ public sealed class PublicScoresController(ApplicationDbContext db, ILiveScoring
 {
     private IScorekeeperService ScorekeeperService => scorekeeperService ?? new ScorekeeperService(db);
 
-    [HttpGet("live-scoring/match/{tenantId:guid}/{scope}")]
-    public async Task<ActionResult<IReadOnlyList<LiveScoringMatch>>> LiveScoringMatches(Guid tenantId, string scope, CancellationToken cancellationToken)
+    [HttpGet("live-scoring/match/{scope}")]
+    public async Task<ActionResult<IReadOnlyList<LiveScoringMatch>>> LiveScoringMatches(string scope, CancellationToken cancellationToken)
     {
         var matches = await db.Matches.AsNoTracking()
-            .Where(match => match.TenantId == tenantId && match.IsOpen && match.LiveScopes.Any(item => item.Scope == scope))
+            .Where(match => match.IsOpen && match.LiveScopes.Any(item => item.Scope == scope))
             .OrderBy(match => match.Date)
             .ThenBy(match => match.Name)
             .Select(match => new LiveScoringMatch(match.Id, match.Date, match.Name))
@@ -25,19 +25,19 @@ public sealed class PublicScoresController(ApplicationDbContext db, ILiveScoring
         return Ok(matches);
     }
 
-    [HttpGet("live-scoring/match/{tenantId:guid}/{scope}/{matchId:guid}")]
-    public async Task<ActionResult<LiveScoringPage>> LiveScoringPage(Guid tenantId, string scope, Guid matchId, CancellationToken cancellationToken)
+    [HttpGet("live-scoring/match/{scope}/{matchId:guid}")]
+    public async Task<ActionResult<LiveScoringPage>> LiveScoringPage(string scope, Guid matchId, CancellationToken cancellationToken)
     {
         var match = await db.Matches.AsNoTracking()
             .Include(item => item.Participants).ThenInclude(item => item.Scores)
             .Include(item => item.LiveScopes)
-            .SingleOrDefaultAsync(item => item.Id == matchId && item.TenantId == tenantId && item.IsOpen, cancellationToken);
+            .SingleOrDefaultAsync(item => item.Id == matchId && item.IsOpen, cancellationToken);
         var liveScope = match?.LiveScopes.SingleOrDefault(item => item.Scope == scope);
         if (match is null || liveScope is null) return NotFound();
 
-        var tenant = await db.Tenants.AsNoTracking().SingleOrDefaultAsync(item => item.Id == tenantId, cancellationToken);
+        var tenant = await db.Tenants.AsNoTracking().SingleOrDefaultAsync(item => item.Id == match.TenantId, cancellationToken);
         if (tenant is null) return NotFound();
-        var categories = await db.Categories.AsNoTracking().Include(item => item.Values).Where(item => item.TenantId == tenantId).ToListAsync(cancellationToken);
+        var categories = await db.Categories.AsNoTracking().Include(item => item.Values).Where(item => item.TenantId == match.TenantId).ToListAsync(cancellationToken);
         return Ok(new LiveScoringPage(15, tenant.LogoUrl, tenant.Name, match.Name, match.Date, liveScoringService.BuildBlocks(match, liveScope, categories)));
     }
 

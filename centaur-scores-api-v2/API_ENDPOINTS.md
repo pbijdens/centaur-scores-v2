@@ -129,8 +129,8 @@ These endpoints intentionally do not require a JWT. They are intended for displa
 
 | Method | Path | Auth | Description |
 |---|---|---|---|
-| `GET` | `/live-scoring/match/{tenantId}/{scope}` | none | List open matches configured for the tenant and live display scope. |
-| `GET` | `/live-scoring/match/{tenantId}/{scope}/{matchId}` | none | Return the configured grouped and ranked live-scoring page for one open match. |
+| `GET` | `/live-scoring/match/{scope}` | none | List open matches, across all tenants, configured for the given live display scope. |
+| `GET` | `/live-scoring/match/{scope}/{matchId}` | none | Return the configured grouped and ranked live-scoring page for one open match (any tenant). |
 | `GET` | `/scorekeeper/{tenantId}/{matchId}/{deviceId}` | none | Return the active device-specific match configuration and assigned participants. |
 | `PUT` | `/scorekeeper/{tenantId}/{matchId}/{deviceId}/participants` | none | Replace the device participant assignment and order, subject to match participant policies. |
 | `PUT` | `/scorekeeper/{tenantId}/{matchId}/{deviceId}/scores` | none | Apply optimistic score updates; returns `UPDATE_SCORE_CONFLICT` with per-participant conflicts when needed. |

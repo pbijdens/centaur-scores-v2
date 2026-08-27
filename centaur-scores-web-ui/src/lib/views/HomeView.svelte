@@ -4,7 +4,6 @@
 
   export let matches: Match[]
   export let competitions: Competition[]
-  export let tenantId: string
   export let language: Language
   export let labels: Record<string, string>
   export let quickLinks: [string, string][]
@@ -77,9 +76,9 @@
       <p class="muted">{labels.noNarrowcastLinks}</p>
     {:else}
       {#each narrowcastScopes as scope}
-        <button class="match-row" on:click={() => window.open(`/narrowcast/${tenantId}/${encodeURIComponent(scope)}`, '_blank')}>
+        <button class="match-row" on:click={() => window.open(`/narrowcast/${encodeURIComponent(scope)}`, '_blank')}>
           <span class="competition-icon">▶</span>
-          <span><strong>{scope}</strong><small>{`/narrowcast/${tenantId}/${scope}`}</small></span>
+          <span><strong>{scope}</strong><small>{`/narrowcast/${scope}`}</small></span>
           <span class="arrow">→</span>
         </button>
       {/each}

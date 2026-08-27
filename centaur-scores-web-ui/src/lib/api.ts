@@ -340,14 +340,14 @@ export async function login(username: string, password: string, tenantId: string
   return response.json()
 }
 
-export async function fetchLiveScoringMatches(tenantId: string, scope: string): Promise<LiveScoringMatch[]> {
-  const response = await fetch(`${apiBase}/live-scoring/match/${encodeURIComponent(tenantId)}/${encodeURIComponent(scope)}`)
+export async function fetchLiveScoringMatches(scope: string): Promise<LiveScoringMatch[]> {
+  const response = await fetch(`${apiBase}/live-scoring/match/${encodeURIComponent(scope)}`)
   if (!response.ok) throw await readApiError(response)
   return response.json()
 }
 
-export async function fetchLiveScoringPage(tenantId: string, scope: string, matchId: string): Promise<LiveScoringPage> {
-  const response = await fetch(`${apiBase}/live-scoring/match/${encodeURIComponent(tenantId)}/${encodeURIComponent(scope)}/${encodeURIComponent(matchId)}`)
+export async function fetchLiveScoringPage(scope: string, matchId: string): Promise<LiveScoringPage> {
+  const response = await fetch(`${apiBase}/live-scoring/match/${encodeURIComponent(scope)}/${encodeURIComponent(matchId)}`)
   if (!response.ok) throw await readApiError(response)
   return response.json()
 }

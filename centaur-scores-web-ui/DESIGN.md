@@ -281,18 +281,18 @@ Note that errors from the UI should be coded, and the code should determine whic
 #### UC17 - Live scoring
 
 Note: Two special endpoints, free of authorization, exists on the backend:
-GET /live-scoring/match/{tenant-id}/{scope} that returns a list of all active matches for that scope, for each match the match ID, the date and the name are returned.
-GET /live-scoring/match/{tenant-id}/{scope}/{match-id} that returns the live-score data for the match given the scope.
+GET /live-scoring/match/{scope} that returns a list of all active matches for that scope across all tenants, for each match the match ID, the date and the name are returned.
+GET /live-scoring/match/{scope}/{match-id} that returns the live-score data for the match given the scope, regardless of which tenant owns the match.
 
-As a user (or narrowcasting system) from a web-browser I can navigate to the web-ui at the relative url `/narrowcast/{tenant-id}/{scope}` where `{tenant-id}` identifies the tenant and `{scope}` is a text-string.
+As a user (or narrowcasting system) from a web-browser I can navigate to the web-ui at the relative url `/narrowcast/{scope}` where `{scope}` is a text-string. This shows live results for every tenant that has a currently open match using that scope name, not just one tenant.
 
-When I do so, then the system will check if there are any currently live (active) matches that have rules for the specified scope.
+When I do so, then the system will check if there are any currently live (active) matches, from any tenant, that have rules for the specified scope.
 
-*START* The system will use the `GET /live-scoring/match/{tenant-id}/{scope}` endpoint to load the list of active matches.
+*START* The system will use the `GET /live-scoring/match/{scope}` endpoint to load the list of active matches.
 
 - If there are no matches then the system will display a simple message on a white background "There are currently no active sessions. Will check again in {time remaining} seconds." where {time remaining} starts at 30. When the timer reaches zero, will go to *START*, check again etc..
 - If there are one or more active matches the system will display a result page for each of those, one at a time, switching to the next one when the current page times out. 
-- The `GET /live-scoring/match/{tenant-id}/{scope}/{match-id}` endpoint will return how long the page should be displayed as well as a list of results to display.
+- The `GET /live-scoring/match/{scope}/{match-id}` endpoint will return how long the page should be displayed as well as a list of results to display.
    - When the end of the list is reached, the system will go to *START*, re-load the list, display, and so on. 
 
 The result-page rendering:
@@ -359,7 +359,7 @@ The result-page rendering:
    }
    ```
 
-The `/live-scoring/match/{tenant-id}/{scope}/{match-id}` endpoint should be built in such a way that it follows the rules defined for that live score template. The algorithm to get to the grouped entries should be:
+The `/live-scoring/match/{scope}/{match-id}` endpoint should be built in such a way that it follows the rules defined for that live score template. The algorithm to get to the grouped entries should be:
 - For every participant, calculate their total score and their per-arrow average. 
 - Check the scope for which group categories to use, and create one group for each n-tupe of categories. The name of the group is the concatenation of category values, in the order the categories are put in the match metadata.
 - For each group, sort the scores according to the scoring rules for the match.

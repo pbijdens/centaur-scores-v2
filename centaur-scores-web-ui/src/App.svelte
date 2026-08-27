@@ -77,7 +77,6 @@
   let selectedParticipantId: string | null = null
   let selectedCompetitionId: string | null = null
   let selectedCompetition: Competition | null = null
-  let narrowcastTenantId: string | null = null
   let narrowcastScope: string | null = null
   let selectedResultsScope: string | null = null
 
@@ -267,7 +266,6 @@
   function applyRouteResult(route: ReturnType<typeof resolveRoute>) {
     if (route.invalid) { navigate('/', true); return }
     view = route.view
-    narrowcastTenantId = route.view === 'narrowcast' ? route.tenantId ?? null : null
     narrowcastScope = route.view === 'narrowcast' ? route.scope ?? null : null
     selectedResultsScope = route.view === 'match-results-scope' ? route.scope ?? null : null
     const matchScopedViews: View[] = ['match', 'match-metadata', 'match-devices', 'match-qr', 'match-results-scope', 'match-participant']
@@ -301,8 +299,8 @@
   })
 </script>
 
-{#if view === 'narrowcast' && narrowcastTenantId && narrowcastScope}
-  <LiveScoringView tenantId={narrowcastTenantId} scope={narrowcastScope} />
+{#if view === 'narrowcast' && narrowcastScope}
+  <LiveScoringView scope={narrowcastScope} />
 {:else if view === 'match-qr' && selectedMatch}
   <MatchQrCodesView match={selectedMatch} tenantId={tenant} {language} labels={t} />
 {:else if view === 'match-results-scope' && selectedMatchId && selectedResultsScope}
@@ -316,7 +314,7 @@
     <AppHeader username={headerUsername} {language} {view} labels={t} tenantName={$currentTenant?.name} tenantLogoUrl={$currentTenant?.logoUrl} onNavigate={navigate} onLanguageChange={setLanguage} onLogout={signOut} />
     <main class="content">
       {#if view === 'home'}
-        <HomeView matches={$matches} competitions={$competitions} tenantId={tenant} {language} labels={t} quickLinks={homeQuickLinks} onOpenMatch={openMatch} onNavigate={navigate} onDeactivateAll={deactivateAllMatches} />
+        <HomeView matches={$matches} competitions={$competitions} {language} labels={t} quickLinks={homeQuickLinks} onOpenMatch={openMatch} onNavigate={navigate} onDeactivateAll={deactivateAllMatches} />
       {:else if view === 'matches'}
         <MatchesView {api} matches={$matches} templates={$templates} {language} labels={t} onOpenMatch={openMatch} onChanged={loadMatchesList} />
       {:else if view === 'match' && selectedMatch}

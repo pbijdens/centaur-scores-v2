@@ -4,7 +4,6 @@
   import { formatLocalDate } from '../date'
   import type { Language, LiveScoringMatch, LiveScoringPage } from '../types'
 
-  export let tenantId: string
   export let scope: string
 
   let page: LiveScoringPage | null = null
@@ -28,7 +27,7 @@
     page = null
     progress = 0
     try {
-      const matches = await fetchLiveScoringMatches(tenantId, scope)
+      const matches = await fetchLiveScoringMatches(scope)
       if (currentGeneration !== generation) return
       if (matches.length === 0) {
         startRetryCountdown(currentGeneration)
@@ -50,7 +49,7 @@
 
   async function showMatch(matches: LiveScoringMatch[], index: number, currentGeneration: number) {
     try {
-      page = await fetchLiveScoringPage(tenantId, scope, matches[index].id)
+      page = await fetchLiveScoringPage(scope, matches[index].id)
     } catch {
       if (currentGeneration === generation) void advance(matches, index, currentGeneration)
       return
