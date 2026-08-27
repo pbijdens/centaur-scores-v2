@@ -92,6 +92,7 @@
   $: selectedMember = selectedMemberId && selectedMemberId !== 'new' ? selectedList?.members.find((member) => member.id === selectedMemberId) ?? null : null
   $: selectedTemplate = $templates.find((template) => template.id === selectedTemplateId) ?? null
   $: selectedParticipant = selectedMatch?.participants?.find((participant) => participant.id === selectedParticipantId) ?? null
+  $: document.title = loggedIn && $currentTenant?.name ? `CentaurScores - ${$currentTenant.name}` : 'CentaurScores'
 
   const api = new ApiClient(() => token, signOut)
 
