@@ -4,7 +4,7 @@
   import DropdownMenu from '../DropdownMenu.svelte'
   import { labelForError } from '../errors'
   import { parseMatchKeyboardConfig } from '../matchConfig'
-  import { deriveLastName } from '../participantName'
+  import { deriveLastName, memberDisplayLabel } from '../participantName'
   import type { Category, Language, Match, ParticipantList } from '../types'
 
   export let api: ApiClient
@@ -65,15 +65,6 @@
       .map((category) => category.values.find((value) => value.valueId === participantCategories[category.id])?.name)
       .filter((value): value is string => !!value)
       .join(' / ')
-  }
-
-  function memberDisplayLabel(member: { fullName: string; lastName: string; categories: Record<string, number> }): string {
-    const name = member.fullName || member.lastName
-    const values = categories
-      .map((category) => category.values.find((value) => value.valueId === member.categories[category.id])?.name)
-      .filter((value): value is string => !!value)
-      .join(' / ')
-    return values ? `${name} (${values})` : name
   }
 
   $: totalsByParticipantId = new Map(results.map((row) => [row.participantId, row.total]))
@@ -249,7 +240,7 @@
           <label>{labels.selectParticipantLabel}
             <select bind:value={sourceMemberId}>
               <option value="">{labels.selectValue}</option>
-              {#each availableMembers as member}<option value={member.id}>{memberDisplayLabel(member)}</option>{/each}
+              {#each availableMembers as member}<option value={member.id}>{memberDisplayLabel(categories, member)}</option>{/each}
             </select>
           </label>
           <button class="primary" type="submit" disabled={!sourceMemberId}>{labels.save}</button>

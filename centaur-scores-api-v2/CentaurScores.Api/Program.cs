@@ -23,6 +23,7 @@ builder.Services.AddScoped<IScoringService, ScoringService>();
 builder.Services.AddScoped<ILiveScoringService, LiveScoringService>();
 builder.Services.AddScoped<ICompetitionService, CompetitionService>();
 builder.Services.AddScoped<IScorekeeperService, ScorekeeperService>();
+builder.Services.AddScoped<IParticipantListExcelService, ParticipantListExcelService>();
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>

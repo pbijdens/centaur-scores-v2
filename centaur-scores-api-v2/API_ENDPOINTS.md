@@ -71,6 +71,8 @@ JWTs are returned by `POST /api/auth/login` and contain the account and active t
 | `POST` | `/api/participant-lists/{listId}/members` | manager | Add a participant with `{ lastName, fullName, federationNumber?, categories, isActive? }` (`isActive` defaults to `true`). |
 | `PUT` | `/api/participant-lists/{listId}/members/{memberId}` | manager | Update participant metadata, categories, and `isActive`. |
 | `DELETE` | `/api/participant-lists/{listId}/members/{memberId}` | manager | Remove a participant from a list. |
+| `GET` | `/api/participant-lists/{listId}/export.xlsx?language=en\|nl` | manager | Download the list as an Excel workbook: a `Data` sheet/table (Number/Name/Last name/Active, then every tenant category alphabetically, headers translated by `language`) and a `Metadata` sheet with one lookup table per category (values plus an "Unknown"/"Onbekend" entry), wired up as the Data sheet's category dropdowns via structured table references. |
+| `POST` | `/api/participant-lists/{listId}/import.xlsx` | manager | Upload an Excel workbook (`multipart/form-data`, field `file`) shaped like the export. Detects English/Dutch headers automatically. Rows are matched to existing members by federation number (update) or added as new (no number, or no match) - import never deletes members missing from the file. Returns `{ created, updated, warnings }`; malformed files return a coded `ApiError` (`IMPORT_MISSING_SHEET`, `IMPORT_UNRECOGNIZED_HEADERS`, `IMPORT_INVALID_FILE`, `IMPORT_FILE_MISSING`). |
 
 ## Match templates
 

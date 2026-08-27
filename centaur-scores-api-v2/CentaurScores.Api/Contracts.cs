@@ -12,6 +12,7 @@ public sealed record CreateCategoryValueRequest(int ValueId, string Name);
 public sealed record UpdateCategoryValueRequest(string Name);
 public sealed record CreateParticipantListRequest(string Name, bool IsActive);
 public sealed record CreateParticipantRequest(string LastName, string FullName, string? FederationNumber, Dictionary<Guid, int> Categories, bool IsActive = true);
+public sealed record ImportParticipantListResult(int Created, int Updated, IReadOnlyList<string> Warnings);
 public sealed record CreateTemplateRequest(string Name, Guid? ParticipantListId, bool AllowFreeParticipants = true, string DeviceSelectionMode = "list-and-free", string ConfigurationJson = "");
 public sealed record CreateMatchRequest(string Name, DateOnly Date, string? ShortCode, bool IsOpen, Guid? ParticipantListId, string DeviceSelectionMode, int Ends, int ArrowsPerEnd, int? GroupEnds, bool AllowFreeParticipants = true, string KeyboardJson = "", string ScoringRulesJson = "[]");
 public sealed record CreateMatchParticipantRequest(Guid? ParticipantListMemberId, string LastName, string FullName, string? FederationNumber, Dictionary<Guid, int> Categories);

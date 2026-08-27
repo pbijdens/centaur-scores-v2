@@ -82,6 +82,7 @@
 
   $: t = translationsFor(language)
   $: isAdmin = $profile?.authorization === 'Administrator'
+  $: canManage = isAdmin || $profile?.authorization === 'Manager'
   $: headerUsername = $profile?.displayName || $profile?.username || username
   $: homeQuickLinks = (
     [['participants', t.participants], ['categories', t.categories], ['templates', t.templates]] as [string, string][]
@@ -351,7 +352,7 @@
       {:else if view === 'participants'}
         <ParticipantListsView {api} lists={$participantLists} labels={t} onOpenList={openList} onChanged={refreshParticipantLists} onBack={() => navigate('/')} />
       {:else if view === 'participant-list' && selectedList}
-        <ParticipantListDetailView {api} list={selectedList} categories={$categories} labels={t} onOpenMember={openMember} onAddMember={addMember} onChanged={refreshParticipantLists} onBack={() => navigate('/participants')} />
+        <ParticipantListDetailView {api} list={selectedList} categories={$categories} {language} {canManage} labels={t} onOpenMember={openMember} onAddMember={addMember} onChanged={refreshParticipantLists} onBack={() => navigate('/participants')} />
       {:else if view === 'participant' && selectedListId}
         <ParticipantMemberView {api} listId={selectedListId} member={selectedMember} categories={$categories} labels={t} onBack={() => navigate(`/participants/${selectedListId}`)} onSaved={onMemberSaved} onDeleted={onMemberSaved} />
       {:else if view === 'templates'}

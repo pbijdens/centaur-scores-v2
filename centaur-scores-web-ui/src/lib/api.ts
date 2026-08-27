@@ -311,6 +311,23 @@ export class ApiClient {
     return this.request(`/api/participant-lists/${listId}/members/${memberId}`, { method: 'DELETE' })
   }
 
+  async downloadParticipantListExport(listId: string, language: Language): Promise<{ blob: Blob; filename: string }> {
+    const response = await fetch(`${apiBase}/api/participant-lists/${listId}/export.xlsx?language=${language}`, { headers: { Authorization: `Bearer ${this.getToken()}` } })
+    if (!response.ok) throw await readApiError(response)
+    const disposition = response.headers.get('content-disposition') ?? ''
+    const filenameMatch = /filename="?([^"]+)"?/.exec(disposition)
+    return { blob: await response.blob(), filename: filenameMatch?.[1] ?? 'participants.xlsx' }
+  }
+
+  async importParticipantList(listId: string, file: File): Promise<{ created: number; updated: number; warnings: string[] }> {
+    const formData = new FormData()
+    formData.append('file', file)
+    const response = await fetch(`${apiBase}/api/participant-lists/${listId}/import.xlsx`, { method: 'POST', headers: { Authorization: `Bearer ${this.getToken()}` }, body: formData })
+    if (response.status === 401) this.onUnauthorized()
+    if (!response.ok) throw await readApiError(response)
+    return response.json()
+  }
+
   fetchTemplates(): Promise<MatchTemplate[]> {
     return this.request('/api/match-templates')
   }

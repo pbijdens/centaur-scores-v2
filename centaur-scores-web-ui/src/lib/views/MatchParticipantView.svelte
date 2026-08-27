@@ -3,8 +3,8 @@
   import DropdownMenu from '../DropdownMenu.svelte'
   import { labelForError } from '../errors'
   import { parseMatchKeyboardConfig } from '../matchConfig'
-  import { deriveLastName } from '../participantName'
-  import type { ArrowScore, Category, KeyboardKey, Match, MatchParticipant, ParticipantList, ParticipantListMember } from '../types'
+  import { deriveLastName, memberDisplayLabel } from '../participantName'
+  import type { ArrowScore, Category, KeyboardKey, Match, MatchParticipant, ParticipantList } from '../types'
 
   export let api: ApiClient
   export let match: Match
@@ -56,15 +56,6 @@
       .map((category) => category.values.find((value) => value.valueId === participant.categories[category.id])?.name)
       .filter((value): value is string => !!value)
       .join(' / ')
-  }
-
-  function memberDisplayLabel(member: ParticipantListMember): string {
-    const name = member.fullName || member.lastName
-    const values = categories
-      .map((category) => category.values.find((value) => value.valueId === member.categories[category.id])?.name)
-      .filter((value): value is string => !!value)
-      .join(' / ')
-    return values ? `${name} (${values})` : name
   }
 
   function openMetadataEditor() {
@@ -282,7 +273,7 @@
         <label>{labels.selectParticipantLabel}
           <select bind:value={editSourceMemberId}>
             <option value="">{labels.selectValue}</option>
-            {#each availableMembers as member}<option value={member.id}>{memberDisplayLabel(member)}</option>{/each}
+            {#each availableMembers as member}<option value={member.id}>{memberDisplayLabel(categories, member)}</option>{/each}
           </select>
         </label>
         <button class="primary" type="submit" disabled={!editSourceMemberId}>{labels.save}</button>

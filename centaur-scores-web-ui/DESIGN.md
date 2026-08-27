@@ -111,6 +111,8 @@ In order to save, all values should be filled in.
 
 From the single participant editor it's easy to return to the participant list. Goiing to the tenant homepage is also trivial.
 
+Managers and administrators can export a participant list to an Excel workbook, and import one back, from the list's detail screen (Viewers do not see these options). Export produces a `Data` sheet/table (Number, Name, Last name, Active, then every tenant category alphabetically; missing/unknown category values show as "Unknown"/"Onbekend") sorted active-first then by last name/name, plus a `Metadata` sheet with one lookup table per category (used to constrain the Data sheet's category columns to valid values via dropdowns) - column headers and the "Unknown" constant follow the signed-in user's language. Import reads a file in that same shape, auto-detects English or Dutch headers, and reconciles rows against the list by federation number: a matching number updates that participant, anything else (including any row without a number) is added as a new participant. Import never removes participants missing from the file.
+
 #### UC8 - Managing matches
 
 Selecting that function, or selecting show all will take the user to the list of matches for the tenant.
