@@ -17,8 +17,6 @@
   export let onDeleted: () => void
   export let onBack: () => void
 
-  type GroupBy = 'none' | 'category'
-
   let name = list.name
   let isActive = list.isActive
   let showSettings = false
@@ -33,16 +31,33 @@
   let importing = false
   let fileInput: HTMLInputElement
 
-  const storedGroupBy = localStorage.getItem('centaur-participant-list-group-by')
-  let groupBy: GroupBy = storedGroupBy === 'category' ? 'category' : 'none'
+  let showGroupByOptions = false
+  let groupByCategoryIds: string[] = (() => {
+    try {
+      const parsed = JSON.parse(localStorage.getItem('centaur-participant-list-group-categories') ?? '[]')
+      return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === 'string') : []
+    } catch {
+      return []
+    }
+  })()
 
-  function setGroupBy(value: string) {
-    groupBy = value === 'category' ? 'category' : 'none'
-    localStorage.setItem('centaur-participant-list-group-by', groupBy)
+  function toggleGroupByCategory(categoryId: string) {
+    groupByCategoryIds = groupByCategoryIds.includes(categoryId)
+      ? groupByCategoryIds.filter((id) => id !== categoryId)
+      : [...groupByCategoryIds, categoryId]
+    localStorage.setItem('centaur-participant-list-group-categories', JSON.stringify(groupByCategoryIds))
   }
 
   function displayLabel(member: ParticipantListMember): string {
     return memberDisplayLabel(categories, member)
+  }
+
+  function groupLabel(member: ParticipantListMember): string {
+    return categories
+      .filter((category) => groupByCategoryIds.includes(category.id))
+      .map((category) => category.values.find((value) => value.valueId === member.categories[category.id])?.name)
+      .filter((value): value is string => !!value)
+      .join(' / ')
   }
 
   $: sortedMembers = [...list.members]
@@ -53,10 +68,10 @@
     })
 
   $: groupedMembers = (() => {
-    if (groupBy === 'none') return [{ key: '', items: sortedMembers }]
+    if (groupByCategoryIds.length === 0) return [{ key: '', items: sortedMembers }]
     const groups = new Map<string, typeof sortedMembers>()
     for (const member of sortedMembers) {
-      const key = memberCategoryLabel(categories, member) || labels.unassignedGroup
+      const key = groupLabel(member) || labels.unassignedGroup
       groups.set(key, [...(groups.get(key) ?? []), member])
     }
     const unassignedKey = labels.unassignedGroup
@@ -170,13 +185,20 @@
 {/if}
 <div class="toolbar">
   <input placeholder={labels.filterParticipantsPlaceholder} bind:value={filter} />
-  <label>{labels.groupByLabel}
-    <select value={groupBy} on:change={(event) => setGroupBy(event.currentTarget.value)}>
-      <option value="none">{labels.groupByNone}</option>
-      <option value="category">{labels.groupByCategory}</option>
-    </select>
-  </label>
+  <button type="button" class:active={showGroupByOptions || groupByCategoryIds.length > 0} on:click={() => (showGroupByOptions = !showGroupByOptions)}>
+    {labels.groupByLabel}{#if groupByCategoryIds.length > 0} ({groupByCategoryIds.length}){/if}
+  </button>
 </div>
+{#if showGroupByOptions}
+  <div class="checkbox-grid group-by-options">
+    {#each categories as category}
+      <label class="checkbox-label">
+        <input type="checkbox" checked={groupByCategoryIds.includes(category.id)} on:change={() => toggleGroupByCategory(category.id)} />
+        {category.name}
+      </label>
+    {/each}
+  </div>
+{/if}
 {#if sortedMembers.length === 0}<p class="empty-state">{labels.emptyState}</p>{/if}
 {#each groupedMembers as group}
   {#if group.key}<h2 class="group-heading">{group.key}</h2>{/if}
@@ -199,6 +221,32 @@
 
   .group-heading {
     margin: 24px 0 4px;
+  }
+
+  .toolbar button {
+    border: 1px solid var(--line);
+    background: var(--paper);
+    color: var(--ink);
+    font-weight: 600;
+    padding: 11px 16px;
+    white-space: nowrap;
+  }
+
+  .toolbar button:hover,
+  .toolbar button.active {
+    border-color: var(--green);
+    color: var(--green);
+  }
+
+  .checkbox-grid {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 16px;
+  }
+
+  .group-by-options {
+    margin: -8px 0 16px;
   }
 
   .member-categories {
