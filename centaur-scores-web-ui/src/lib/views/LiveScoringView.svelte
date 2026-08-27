@@ -2,6 +2,8 @@
   import { onMount } from 'svelte'
   import { fetchLiveScoringMatches, fetchLiveScoringPage } from '../api'
   import { formatLocalDate } from '../date'
+  import { translationsFor } from '../i18n'
+  import MatchProgress from '../MatchProgress.svelte'
   import type { Language, LiveScoringMatch, LiveScoringPage } from '../types'
 
   export let scope: string
@@ -13,6 +15,7 @@
   let interval: ReturnType<typeof setInterval> | undefined
   let timeout: ReturnType<typeof setTimeout> | undefined
   const language = (localStorage.getItem('centaur-language') ?? 'en') as Language
+  const labels = translationsFor(language)
 
   function clearTimers() {
     if (interval) clearInterval(interval)
@@ -98,7 +101,10 @@
         <strong>{page.tenant}</strong>
       </div>
       <h1>{page.matchName}</h1>
-      <time datetime={page.matchDate}>{formatLocalDate(page.matchDate, language)}</time>
+      <div class="date-progress">
+        <time datetime={page.matchDate}>{formatLocalDate(page.matchDate, language)}</time>
+        <MatchProgress {page} label={labels.matchProgressLabel} />
+      </div>
     </header>
     <main class="live-results">
       {#each page.blocks as block}
@@ -142,7 +148,7 @@
   }
 
   .live-header {
-    height: 6vh;
+    height: 8vh;
     min-height: 0;
     display: grid;
     grid-template-columns: 1fr minmax(0, 2fr) 1fr;
@@ -154,16 +160,24 @@
 
   .live-header h1 {
     overflow: hidden;
-    font-size: clamp(16px, 2.5vh, 32px);
+    font-size: clamp(15px, 2.1vh, 28px);
     line-height: 1;
     text-align: center;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
-  .live-header time {
-    justify-self: end;
-    font-size: clamp(11px, 1.7vh, 20px);
+  .date-progress {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-end;
+    gap: .4vh;
+    height: 100%;
+  }
+
+  .date-progress time {
+    font-size: clamp(11px, 1.5vh, 18px);
     font-weight: 600;
   }
 
@@ -189,7 +203,7 @@
   }
 
   .live-results {
-    height: calc(94vh - 4px);
+    height: calc(92vh - 4px);
     padding: 1vh 1vw;
     column-count: 3;
     column-fill: auto;

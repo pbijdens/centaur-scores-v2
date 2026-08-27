@@ -38,7 +38,7 @@ public sealed class PublicScoresController(ApplicationDbContext db, ILiveScoring
         var tenant = await db.Tenants.AsNoTracking().SingleOrDefaultAsync(item => item.Id == match.TenantId, cancellationToken);
         if (tenant is null) return NotFound();
         var categories = await db.Categories.AsNoTracking().Include(item => item.Values).Where(item => item.TenantId == match.TenantId).ToListAsync(cancellationToken);
-        return Ok(new LiveScoringPage(15, tenant.LogoUrl, tenant.Name, match.Name, match.Date, liveScoringService.BuildBlocks(match, liveScope, categories)));
+        return Ok(new LiveScoringPage(15, tenant.LogoUrl, tenant.Name, match.Name, match.Date, match.Ends, match.ArrowsPerEnd, match.GroupEnds, liveScoringService.BuildBlocks(match, liveScope, categories)));
     }
 
     [HttpGet("scorekeeper/{tenantId:guid}/{matchId:guid}/{deviceId:guid}")]

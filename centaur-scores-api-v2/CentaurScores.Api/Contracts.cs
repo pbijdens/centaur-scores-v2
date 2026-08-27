@@ -29,7 +29,7 @@ public sealed record CreateScopeRequest(string Scope, List<Guid> GroupByCategory
 public sealed record LiveScoringMatch(Guid Id, DateOnly Date, string Name);
 public sealed record LiveScoringEntry(int Position, bool NeedsTieBreaker, string Line1, string? Line2, string? Line3, double? Average, int Arrows, int Score);
 public sealed record LiveScoringBlock(string Name, IReadOnlyList<LiveScoringEntry> Entries);
-public sealed record LiveScoringPage(int Timeout, string? Logo, string Tenant, string MatchName, DateOnly MatchDate, IReadOnlyList<LiveScoringBlock> Blocks);
+public sealed record LiveScoringPage(int Timeout, string? Logo, string Tenant, string MatchName, DateOnly MatchDate, int Ends, int ArrowsPerEnd, int? GroupEnds, IReadOnlyList<LiveScoringBlock> Blocks);
 public sealed record ScorekeeperCategoryValue(int Id, string Name);
 public sealed record ScorekeeperCategory(Guid Id, string Name, IReadOnlyList<ScorekeeperCategoryValue> Values);
 public sealed record ScorekeeperKey(string Id, string Label, int Value, string Color);
