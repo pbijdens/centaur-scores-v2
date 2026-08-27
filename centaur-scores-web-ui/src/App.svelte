@@ -126,7 +126,7 @@
   }
 
   function signOut() {
-    localStorage.removeItem('centaur-token'); token = ''; loggedIn = false; username = ''; password = ''; loginError = ''; selectedMatch = null; navigate('/', true)
+    localStorage.removeItem('centaur-token'); token = ''; loggedIn = false; username = ''; password = ''; loginError = ''; selectedMatch = null; navigate('/login', true)
   }
 
   function setLanguage(value: string) { language = value as Language; localStorage.setItem('centaur-language', value) }
@@ -300,6 +300,7 @@
     if (view !== 'narrowcast') {
       loadTenants()
       if (loggedIn) loadData()
+      else if (location.pathname !== '/login') history.replaceState({}, '', '/login')
     }
     return () => window.removeEventListener('popstate', handlePopState)
   })

@@ -13,6 +13,7 @@ export function resolveRoute(path = location.pathname): Route {
   const segments = path.split('/').filter(Boolean)
   const section = segments[0]
   if (!section) return { view: 'home' }
+  if (section === 'login') return { view: 'home' }
   if (section === 'narrowcast') {
     return segments[1] ? { view: 'narrowcast', scope: decodeURIComponent(segments[1]) } : { view: 'home', invalid: true }
   }
