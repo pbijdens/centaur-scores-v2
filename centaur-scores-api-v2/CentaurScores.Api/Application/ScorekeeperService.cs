@@ -72,7 +72,7 @@ public sealed class ScorekeeperService(ApplicationDbContext db) : IScorekeeperSe
                 participant.LastName = member.LastName;
                 participant.FullName = member.FullName;
                 participant.FederationNumber = member.FederationNumber;
-                participant.Categories = member.Categories;
+                participant.Categories = new Dictionary<Guid, int>(member.Categories);
             }
             else if (item.MatchParticipantId is { } matchParticipantId && byId.TryGetValue(matchParticipantId, out participant!))
             {
@@ -90,6 +90,7 @@ public sealed class ScorekeeperService(ApplicationDbContext db) : IScorekeeperSe
                 db.MatchParticipants.Add(participant);
                 byId[participant.Id] = participant;
             }
+            FillMissingCategories(participant, categories);
             wanted.Add(participant.Id);
             participant.DeviceId = context.Device.Id;
             participant.DeviceOrder = index;
@@ -183,7 +184,19 @@ public sealed class ScorekeeperService(ApplicationDbContext db) : IScorekeeperSe
     {
         var order = ParseKeyboard(match.KeyboardJson).CategoryOrder;
         var all = await db.Categories.AsNoTracking().Include(item => item.Values).Where(item => item.TenantId == match.TenantId).ToListAsync(cancellationToken);
-        return order.Concat(all.Select(item => item.Id)).Distinct().Select(id => all.SingleOrDefault(item => item.Id == id)).Where(item => item is not null).Select(item => new ScorekeeperCategory(item!.Id, item.Name, item.Values.OrderBy(value => value.ValueId).Select(value => new ScorekeeperCategoryValue(value.ValueId, value.Name)).ToList())).ToList();
+        return order.Distinct().Select(id => all.SingleOrDefault(item => item.Id == id)).Where(item => item is not null).Select(item => new ScorekeeperCategory(item!.Id, item.Name, item.Values.OrderBy(value => value.ValueId).Select(value => new ScorekeeperCategoryValue(value.ValueId, value.Name)).ToList())).ToList();
+    }
+
+    private static void FillMissingCategories(MatchParticipant participant, IReadOnlyList<ScorekeeperCategory> categories)
+    {
+        foreach (var category in categories)
+        {
+            if (participant.Categories.ContainsKey(category.Id))
+                continue;
+            var unknown = category.Values.FirstOrDefault(value => value.Name.Equals("Onbekend", StringComparison.OrdinalIgnoreCase) || value.Name.Equals("Unknown", StringComparison.OrdinalIgnoreCase));
+            if (unknown is not null)
+                participant.Categories[category.Id] = unknown.Id;
+        }
     }
 
     private static ScorekeeperMatchParticipant ToMatchParticipant(MatchParticipant item, Match match, IReadOnlyList<ScorekeeperCategory> categories) => new(item.FederationNumber, item.FullName, Info(item.Categories, categories), CategoryValues(item.Categories, categories), item.Id, item.ParticipantListMemberId, null, Enumerable.Range(0, match.Ends * match.ArrowsPerEnd).Select(index => item.Scores.SingleOrDefault(score => (score.End - 1) * match.ArrowsPerEnd + score.Arrow - 1 == index)?.KeyId).ToList());
