@@ -19,6 +19,13 @@ SyslogIdentifier=centaur-scores-api-${SLOT}
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true
+# Needed alongside ProtectSystem=strict: ASP.NET Core's multipart/form-data
+# handling (IFormFile.OpenReadStream) buffers uploads to a temp file via
+# Path.GetTempPath() to make the stream seekable - without this, /tmp is
+# read-only and every file upload fails with an I/O error that gets reported
+# to callers as a generic "invalid file" error, regardless of the file's
+# actual content.
+PrivateTmp=true
 ReadWritePaths=${CENTAUR_LOG_DIR}
 
 [Install]
