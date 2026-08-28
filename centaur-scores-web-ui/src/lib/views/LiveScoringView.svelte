@@ -14,7 +14,7 @@
   let generation = 0
   let interval: ReturnType<typeof setInterval> | undefined
   let timeout: ReturnType<typeof setTimeout> | undefined
-  const language = (localStorage.getItem('centaur-language') ?? 'en') as Language
+  const language = (localStorage.getItem('centaur-language') ?? 'nl') as Language
   const labels = translationsFor(language)
 
   function clearTimers() {
@@ -24,21 +24,25 @@
     timeout = undefined
   }
 
-  async function start() {
+  async function start(preserveCurrentPage = false) {
     const currentGeneration = ++generation
     clearTimers()
-    page = null
+    if (!preserveCurrentPage) page = null
     progress = 0
     try {
       const matches = await fetchLiveScoringMatches(scope)
       if (currentGeneration !== generation) return
       if (matches.length === 0) {
+        page = null
         startRetryCountdown(currentGeneration)
         return
       }
       await showMatch(matches, 0, currentGeneration)
     } catch {
-      if (currentGeneration === generation) startRetryCountdown(currentGeneration)
+      if (currentGeneration === generation) {
+        page = null
+        startRetryCountdown(currentGeneration)
+      }
     }
   }
 
@@ -72,7 +76,7 @@
     if (currentGeneration !== generation) return
     clearTimers()
     if (index + 1 >= matches.length) {
-      await start()
+      await start(true)
       return
     }
     await showMatch(matches, index + 1, currentGeneration)
@@ -128,7 +132,7 @@
     </main>
     <div class="live-progress" aria-hidden="true"><span style={`width: ${progress}%`}></span></div>
   {:else}
-    <main class="no-live-matches">There are currently no active sessions. Will check again in {retrySeconds} seconds.</main>
+    <main class="no-live-matches">{labels.liveScoringNoSessions.replace('{seconds}', String(retrySeconds))}</main>
   {/if}
 </div>
 
