@@ -15,7 +15,7 @@
   let loadError = ''
 
   onMount(() => {
-    document.body.classList.add('live-scoring-page')
+    document.body.classList.add('match-results-page')
     void (async () => {
       try {
         page = await api.fetchMatchLiveScoringPage(matchId, scope)
@@ -23,7 +23,7 @@
         loadError = labels.matchResultsLoadError ?? 'Unable to load these results.'
       }
     })()
-    return () => document.body.classList.remove('live-scoring-page')
+    return () => document.body.classList.remove('match-results-page')
   })
 </script>
 
@@ -31,6 +31,11 @@
   <title>{page ? `${page.matchName} - ${page.tenant}` : labels.resultsLabel}</title>
 </svelte:head>
 
+{#if page}
+  <div class="results-toolbar">
+    <button class="primary" on:click={() => window.print()}>{labels.printButton}</button>
+  </div>
+{/if}
 <div class="live-scoring">
   {#if page}
     <header class="live-header">
@@ -73,34 +78,41 @@
 </div>
 
 <style>
-  :global(body.live-scoring-page) {
-    overflow: hidden;
+  :global(body.match-results-page) {
     background: #fff;
   }
 
+  .results-toolbar {
+    padding: 16px;
+  }
+
+  .results-toolbar .primary {
+    width: 100%;
+    padding: 16px;
+    font-size: 16px;
+  }
+
   .live-scoring {
-    width: 100vw;
-    height: 100vh;
-    overflow: hidden;
     background: #fff;
     color: #14210f;
   }
 
   .live-header {
-    height: 8vh;
-    min-height: 0;
+    position: static;
+    height: auto;
+    z-index: auto;
     display: grid;
     grid-template-columns: 1fr minmax(0, 2fr) 1fr;
     align-items: center;
-    gap: 1.5vw;
-    padding: 0 1.5vw;
+    gap: 24px;
+    padding: 16px 24px;
     border-bottom: 1px solid #dfe4db;
   }
 
   .live-header h1 {
     overflow: hidden;
-    font-size: clamp(15px, 2.1vh, 28px);
-    line-height: 1;
+    font-size: 22px;
+    line-height: 1.2;
     text-align: center;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -111,12 +123,11 @@
     flex-direction: column;
     justify-content: center;
     align-items: flex-end;
-    gap: .4vh;
-    height: 100%;
+    gap: 6px;
   }
 
   .date-progress time {
-    font-size: clamp(11px, 1.5vh, 18px);
+    font-size: 14px;
     font-weight: 600;
   }
 
@@ -124,13 +135,13 @@
     min-width: 0;
     display: flex;
     align-items: center;
-    gap: .7vw;
-    font-size: clamp(11px, 1.7vh, 20px);
+    gap: 10px;
+    font-size: 16px;
   }
 
   .tenant-identity img {
-    width: 4.5vh;
-    height: 4.5vh;
+    width: 36px;
+    height: 36px;
     object-fit: contain;
     flex: 0 0 auto;
   }
@@ -142,36 +153,33 @@
   }
 
   .live-results {
-    height: calc(92vh - 4px);
-    padding: 1vh 1vw;
+    padding: 16px 24px 32px;
     column-count: 3;
-    column-fill: auto;
-    column-gap: 1.5vw;
+    column-gap: 24px;
     column-rule: 1px solid #e7eae4;
-    overflow: hidden;
   }
 
   .result-block h2 {
-    break-after: avoid-column;
-    margin: .7vh 0 .3vh;
-    padding: .45vh .5vw;
+    break-after: avoid;
+    break-inside: avoid;
+    margin: 12px 0 6px;
+    padding: 6px 8px;
     background: #eef2eb;
     color: #164a13;
-    font-size: clamp(11px, 1.45vh, 17px);
-    line-height: 1.15;
+    font-size: 14px;
+    line-height: 1.2;
   }
 
   .result-entry {
-    min-height: 2.45vh;
     display: grid;
     grid-template-columns: 3ch minmax(0, 1fr) 5ch 5ch;
     align-items: center;
-    gap: .4vw;
-    break-inside: avoid-column;
-    padding: .2vh .5vw;
+    gap: 6px;
+    break-inside: avoid;
+    padding: 3px 8px;
     border-bottom: 1px solid #edf0ea;
-    font-size: clamp(10px, 1.35vh, 16px);
-    line-height: 1.08;
+    font-size: 13px;
+    line-height: 1.3;
   }
 
   .position,
@@ -196,7 +204,7 @@
   .entry-lines {
     min-width: 0;
     display: grid;
-    gap: .1vh;
+    gap: 1px;
   }
 
   .entry-lines strong,
@@ -212,28 +220,34 @@
   }
 
   .no-live-matches {
-    height: 100%;
+    min-height: 50vh;
     display: grid;
     place-items: center;
     padding: 24px;
-    font-size: clamp(18px, 2.5vh, 30px);
+    font-size: 24px;
     text-align: center;
   }
 
-  @media (orientation: portrait) {
+  @media (max-width: 900px) {
     .live-results {
       column-count: 2;
-      column-gap: 2vw;
     }
+  }
 
-    .result-entry {
-      min-height: 3.25vh;
-      font-size: clamp(10px, 1.5vh, 16px);
+  @media (max-width: 550px) {
+    .live-results {
+      column-count: 1;
+    }
+  }
+
+  @media print {
+    .results-toolbar {
+      display: none;
     }
 
     .result-block h2 {
-      margin-top: .9vh;
-      font-size: clamp(11px, 1.6vh, 17px);
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
     }
   }
 </style>

@@ -301,7 +301,7 @@
     }
 
     .result-entry {
-      min-height: 3.25vh;
+      min-height: 2.45vh;
       font-size: clamp(10px, 1.5vh, 16px);
     }
 
@@ -309,5 +309,9 @@
       margin-top: .9vh;
       font-size: clamp(11px, 1.6vh, 17px);
     }
-  }
+
+    .entry-lines strong {
+      font-size: clamp(10px, 2vh, 18px);
+    }
+}
 </style>
