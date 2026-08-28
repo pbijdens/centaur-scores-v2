@@ -17,7 +17,7 @@ public interface IScorekeeperService
     Task<ScorekeeperParticipantOptions> GetParticipantOptionsAsync(ScorekeeperContext context, CancellationToken cancellationToken);
 }
 
-public sealed class ScorekeeperService(ApplicationDbContext db) : IScorekeeperService
+public sealed class ScorekeeperService(ApplicationDbContext db, IPersonalBestLiveLookup personalBestLiveLookup) : IScorekeeperService
 {
     public async Task<ScorekeeperContext?> FindAsync(Guid tenantId, Guid matchId, Guid deviceId, CancellationToken cancellationToken)
     {
@@ -105,6 +105,7 @@ public sealed class ScorekeeperService(ApplicationDbContext db) : IScorekeeperSe
             participant.DeviceOrder = null;
         }
         await db.SaveChangesAsync(cancellationToken);
+        personalBestLiveLookup.Invalidate(context.Match.Id);
         return null;
     }
 

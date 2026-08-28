@@ -3,7 +3,7 @@
   import DropdownMenu from '../DropdownMenu.svelte'
   import { labelForError } from '../errors'
   import { parseMatchKeyboardConfig } from '../matchConfig'
-  import { deriveLastName, memberDisplayLabel } from '../participantName'
+  import { deriveLastName, memberCategoryLabel, memberDisplayLabel } from '../participantName'
   import type { ArrowScore, Category, KeyboardKey, Match, MatchParticipant, ParticipantList } from '../types'
 
   export let api: ApiClient
@@ -46,7 +46,11 @@
       .map((item) => item.participantListMemberId)
       .filter((id): id is string => !!id)
   )
-  $: availableMembers = sourceList ? sourceList.members.filter((member) => member.isActive && !assignedMemberIds.has(member.id)) : []
+  $: availableMembers = sourceList
+    ? sourceList.members
+        .filter((member) => member.isActive && !assignedMemberIds.has(member.id))
+        .sort((a, b) => (a.fullName || a.lastName).localeCompare(b.fullName || b.lastName) || memberCategoryLabel(categories, a).localeCompare(memberCategoryLabel(categories, b)))
+    : []
   $: if (!sourceList) editMode = 'manual'
   $: showGroupRunningTotal = !!match.groupEnds && match.groupEnds > 0 && match.groupEnds < match.ends
 
@@ -115,25 +119,22 @@
     return (participant.scores ?? []).find((score) => score.end === end && score.arrow === arrow)
   }
 
-  function totalForEnd(end: number): number {
-    return totalBetweenEnds(end, end)
+  function sumBetweenEnds(scores: ArrowScore[], firstEnd: number, lastEnd: number): number {
+    return scores.filter((score) => score.end >= firstEnd && score.end <= lastEnd).reduce((sum, score) => sum + score.value, 0)
   }
 
-  function totalBetweenEnds(firstEnd: number, lastEnd: number): number {
-    return (participant.scores ?? [])
-      .filter((score) => score.end >= firstEnd && score.end <= lastEnd)
-      .reduce((sum, score) => sum + score.value, 0)
-  }
-
-  function runningTotal(end: number): number {
-    return totalBetweenEnds(1, end)
-  }
-
-  function groupRunningTotal(end: number): number {
+  // Derived as reactive arrays (rather than plain functions called from the template) so a score change
+  // - which reassigns `participant` rather than mutating it - actually invalidates these: Svelte only
+  // re-runs a `$:` block when a variable referenced directly in its own right-hand side changes, so
+  // `participant.scores` has to appear here rather than buried inside a function the template calls.
+  $: endTotals = Array.from({ length: match.ends }, (_, index) => sumBetweenEnds(participant.scores ?? [], index + 1, index + 1))
+  $: runningTotals = Array.from({ length: match.ends }, (_, index) => sumBetweenEnds(participant.scores ?? [], 1, index + 1))
+  $: groupRunningTotals = Array.from({ length: match.ends }, (_, index) => {
+    const end = index + 1
     const groupEnds = match.groupEnds ?? match.ends
     const firstEnd = Math.floor((end - 1) / groupEnds) * groupEnds + 1
-    return totalBetweenEnds(firstEnd, end)
-  }
+    return sumBetweenEnds(participant.scores ?? [], firstEnd, end)
+  })
 
   async function setScore(end: number, arrow: number, keyId: string) {
     const key = keyboardConfig.keyboard.find((item) => item.keyId === keyId)
@@ -315,8 +316,8 @@
     <div class="editor-row">
       <div class="score-summary">
         <span><span class="muted">{labels.endLabel}</span><strong>{endIndex + 1}</strong></span>
-        <span><span class="muted">{labels.endScoreLabel}</span><strong>{totalForEnd(endIndex + 1)}</strong></span>
-        <span><span class="muted">{labels.runningTotalLabel}</span><strong>{runningTotal(endIndex + 1)}{#if showGroupRunningTotal}<span>&nbsp;({groupRunningTotal(endIndex + 1)})</span>{/if}</strong></span>
+        <span><span class="muted">{labels.endScoreLabel}</span><strong>{endTotals[endIndex]}</strong></span>
+        <span><span class="muted">{labels.runningTotalLabel}</span><strong>{runningTotals[endIndex]}{#if showGroupRunningTotal}<span>&nbsp;({groupRunningTotals[endIndex]})</span>{/if}</strong></span>
       </div>
       {#each Array(match.arrowsPerEnd) as _, arrowIndex}
         <label class="arrow-score-label">{labels.arrowLabel} {arrowIndex + 1}

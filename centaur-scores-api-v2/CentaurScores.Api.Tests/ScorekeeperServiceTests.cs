@@ -4,6 +4,7 @@ using CentaurScores.Api.Domain;
 using CentaurScores.Api.Infrastructure;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace CentaurScores.Api.Tests;
 
@@ -38,7 +39,7 @@ public sealed class ScorekeeperServiceTests
             });
         await db.SaveChangesAsync();
 
-        var service = new ScorekeeperService(db);
+        var service = new ScorekeeperService(db, new PersonalBestLiveLookup(db, new PersonalBestContext(db), new PersonalBestEngine(db), new MemoryCache(new MemoryCacheOptions())));
         var context = await service.FindAsync(tenantId, matchId, deviceId, CancellationToken.None);
         Assert.NotNull(context);
 
@@ -87,7 +88,7 @@ public sealed class ScorekeeperServiceTests
             });
         await db.SaveChangesAsync();
 
-        var service = new ScorekeeperService(db);
+        var service = new ScorekeeperService(db, new PersonalBestLiveLookup(db, new PersonalBestContext(db), new PersonalBestEngine(db), new MemoryCache(new MemoryCacheOptions())));
         var context = await service.FindAsync(tenantId, matchId, deviceId, CancellationToken.None);
         Assert.NotNull(context);
         var request = new ScorekeeperParticipantRequest(null, null, "123", "Robin Archer", null,
@@ -146,7 +147,7 @@ public sealed class ScorekeeperServiceTests
             });
         await db.SaveChangesAsync();
 
-        var service = new ScorekeeperService(db);
+        var service = new ScorekeeperService(db, new PersonalBestLiveLookup(db, new PersonalBestContext(db), new PersonalBestEngine(db), new MemoryCache(new MemoryCacheOptions())));
         var context = await service.FindAsync(tenantId, matchId, deviceId, CancellationToken.None);
         Assert.NotNull(context);
         var request = new ScorekeeperParticipantRequest(null, memberId, null, null, null, null, null, null);

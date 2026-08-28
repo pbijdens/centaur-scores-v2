@@ -1,4 +1,4 @@
-import type { Account, Category, Competition, CompetitionResultsDocument, CompetitionRound, CompetitionScoreRule, Language, LiveScoringMatch, LiveScoringPage, Match, MatchListItem, MatchParticipant, MatchTemplate, ParticipantList, ParticipantListSummary, Profile, ScoreDevice, Tenant } from './types'
+import type { Account, Category, Competition, CompetitionResultsDocument, CompetitionRound, CompetitionScoreRule, Language, LiveScoringMatch, LiveScoringPage, Match, MatchListItem, MatchParticipant, MatchTemplate, ParticipantList, ParticipantListSummary, PersonalBestAvailableValue, PersonalBestConflictResolution, PersonalBestDiscipline, PersonalBestDisciplineValueRef, PersonalBestExportConfig, PersonalBestExportField, PersonalBestExportMode, PersonalBestDateFormat, PersonalBestImportConfig, PersonalBestImportResult, PersonalBestLogRow, PersonalBestStatus, Profile, ScoreDevice, Tenant } from './types'
 
 export const apiBase = import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:5080'
 
@@ -15,6 +15,7 @@ export type MatchInput = {
   allowFreeParticipants: boolean
   keyboardJson: string
   scoringRulesJson: string
+  personalBestClassifier?: string | null
 }
 
 // Carries the API's stable error `code` so callers can map it to a translated message instead of showing server text.
@@ -340,16 +341,89 @@ export class ApiClient {
     return this.request('/api/match-templates')
   }
 
-  createTemplate(body: { name: string; participantListId?: string | null; allowFreeParticipants: boolean; deviceSelectionMode: string; configurationJson: string }): Promise<MatchTemplate> {
+  createTemplate(body: { name: string; participantListId?: string | null; allowFreeParticipants: boolean; deviceSelectionMode: string; configurationJson: string; personalBestClassifier?: string | null }): Promise<MatchTemplate> {
     return this.request('/api/match-templates', { method: 'POST', body: JSON.stringify(body) })
   }
 
-  updateTemplate(id: string, body: { name: string; participantListId?: string | null; allowFreeParticipants: boolean; deviceSelectionMode: string; configurationJson: string }): Promise<MatchTemplate> {
+  updateTemplate(id: string, body: { name: string; participantListId?: string | null; allowFreeParticipants: boolean; deviceSelectionMode: string; configurationJson: string; personalBestClassifier?: string | null }): Promise<MatchTemplate> {
     return this.request(`/api/match-templates/${id}`, { method: 'PUT', body: JSON.stringify(body) })
   }
 
   deleteTemplate(id: string) {
     return this.request(`/api/match-templates/${id}`, { method: 'DELETE' })
+  }
+
+  fetchPersonalBestStatus(): Promise<PersonalBestStatus> {
+    return this.request('/api/personal-best/status')
+  }
+
+  enablePersonalBest(): Promise<PersonalBestStatus> {
+    return this.request('/api/personal-best/enable', { method: 'POST' })
+  }
+
+  disablePersonalBest(): Promise<PersonalBestStatus> {
+    return this.request('/api/personal-best/disable', { method: 'POST' })
+  }
+
+  fetchPersonalBestClassifiers(): Promise<string[]> {
+    return this.request('/api/personal-best/classifiers')
+  }
+
+  savePersonalBestClassifiers(classifiers: string[]): Promise<string[]> {
+    return this.request('/api/personal-best/classifiers', { method: 'PUT', body: JSON.stringify({ classifiers }) })
+  }
+
+  fetchPersonalBestDisciplines(): Promise<PersonalBestDiscipline[]> {
+    return this.request('/api/personal-best/disciplines')
+  }
+
+  fetchPersonalBestAvailableValues(): Promise<PersonalBestAvailableValue[]> {
+    return this.request('/api/personal-best/disciplines/available-values')
+  }
+
+  savePersonalBestDisciplines(disciplines: { id?: string | null; name: string; values: PersonalBestDisciplineValueRef[] }[]): Promise<PersonalBestDiscipline[]> {
+    return this.request('/api/personal-best/disciplines', { method: 'PUT', body: JSON.stringify({ disciplines }) })
+  }
+
+  fetchPersonalBestExportConfig(): Promise<PersonalBestExportConfig> {
+    return this.request('/api/personal-best/export-config')
+  }
+
+  savePersonalBestExportConfig(body: { exportMode: PersonalBestExportMode; tableName: string; columns: { columnName: string; field: PersonalBestExportField; dateFormat?: PersonalBestDateFormat | null }[] }): Promise<PersonalBestExportConfig> {
+    return this.request('/api/personal-best/export-config', { method: 'PUT', body: JSON.stringify(body) })
+  }
+
+  fetchPersonalBestImportConfig(): Promise<PersonalBestImportConfig> {
+    return this.request('/api/personal-best/import-config')
+  }
+
+  savePersonalBestImportConfig(body: PersonalBestImportConfig): Promise<PersonalBestImportConfig> {
+    return this.request('/api/personal-best/import-config', { method: 'PUT', body: JSON.stringify(body) })
+  }
+
+  async importPersonalBestList(file: File): Promise<PersonalBestImportResult> {
+    const formData = new FormData()
+    formData.append('file', file)
+    const response = await fetch(`${apiBase}/api/personal-best/import`, { method: 'POST', headers: { Authorization: `Bearer ${this.getToken()}` }, body: formData })
+    if (response.status === 401) this.onUnauthorized()
+    if (!response.ok) throw await readApiError(response)
+    return response.json()
+  }
+
+  resolvePersonalBestConflicts(batchId: string, resolutions: PersonalBestConflictResolution[]) {
+    return this.request(`/api/personal-best/import/${batchId}/resolve`, { method: 'POST', body: JSON.stringify({ resolutions }) })
+  }
+
+  async downloadPersonalBestExport(): Promise<{ blob: Blob; filename: string }> {
+    const response = await fetch(`${apiBase}/api/personal-best/export.xlsx`, { headers: { Authorization: `Bearer ${this.getToken()}` } })
+    if (!response.ok) throw await readApiError(response)
+    const disposition = response.headers.get('content-disposition') ?? ''
+    const filenameMatch = /filename="?([^"]+)"?/.exec(disposition)
+    return { blob: await response.blob(), filename: filenameMatch?.[1] ?? 'personal-best-updates.xlsx' }
+  }
+
+  fetchPersonalBestLog(): Promise<PersonalBestLogRow[]> {
+    return this.request('/api/personal-best/log')
   }
 }
 

@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 namespace CentaurScores.Api.Controllers;
 
 [Route("api/matches")]
-public sealed class MatchesController(ApplicationDbContext db, ITenantContext tenantContext, IScoringService scoring, ILiveScoringService liveScoringService) : ApiControllerBase(tenantContext)
+public sealed class MatchesController(ApplicationDbContext db, ITenantContext tenantContext, IScoringService scoring, ILiveScoringService liveScoringService, IPersonalBestRegistrationService personalBestRegistrationService, IPersonalBestLiveLookup personalBestLiveLookup) : ApiControllerBase(tenantContext)
 {
     // Lists never send the (potentially huge) Participants collection - callers get aggregate counts here and
     // fetch the full roster per-match via Get/Participants when they actually need it.
@@ -29,7 +29,7 @@ public sealed class MatchesController(ApplicationDbContext db, ITenantContext te
     public async Task<IActionResult> Create(CreateMatchRequest request, CancellationToken cancellationToken)
     {
         if (!CanManage) return Forbid();
-        var match = new Match { Id = Guid.NewGuid(), TenantId = TenantId, Name = request.Name, Date = request.Date, ShortCode = request.ShortCode, IsOpen = request.IsOpen, ParticipantListId = request.ParticipantListId, DeviceSelectionMode = string.IsNullOrWhiteSpace(request.DeviceSelectionMode) ? "list-and-free" : request.DeviceSelectionMode, Ends = request.Ends, ArrowsPerEnd = request.ArrowsPerEnd, GroupEnds = request.GroupEnds, AllowFreeParticipants = request.AllowFreeParticipants, KeyboardJson = string.IsNullOrWhiteSpace(request.KeyboardJson) ? MatchDefaults.KeyboardJson : request.KeyboardJson, ScoringRulesJson = request.ScoringRulesJson };
+        var match = new Match { Id = Guid.NewGuid(), TenantId = TenantId, Name = request.Name, Date = request.Date, ShortCode = request.ShortCode, IsOpen = request.IsOpen, ParticipantListId = request.ParticipantListId, DeviceSelectionMode = string.IsNullOrWhiteSpace(request.DeviceSelectionMode) ? "list-and-free" : request.DeviceSelectionMode, Ends = request.Ends, ArrowsPerEnd = request.ArrowsPerEnd, GroupEnds = request.GroupEnds, AllowFreeParticipants = request.AllowFreeParticipants, KeyboardJson = string.IsNullOrWhiteSpace(request.KeyboardJson) ? MatchDefaults.KeyboardJson : request.KeyboardJson, ScoringRulesJson = request.ScoringRulesJson, PersonalBestClassifier = request.PersonalBestClassifier };
         db.Matches.Add(match);
         await db.SaveChangesAsync(cancellationToken);
         return CreatedAtAction(nameof(Get), new { id = match.Id }, match);
@@ -46,6 +46,7 @@ public sealed class MatchesController(ApplicationDbContext db, ITenantContext te
         if (match is null) return NotFound();
         if (match.ParticipantListId != request.ParticipantListId && await db.MatchParticipants.AnyAsync(item => item.MatchId == id, cancellationToken))
             return Conflict(new ApiError("PARTICIPANT_LIST_LOCKED", "The source participant list cannot change once the match has participants."));
+        var wasOpen = match.IsOpen;
         match.Name = request.Name;
         match.Date = request.Date;
         match.ShortCode = request.ShortCode;
@@ -58,7 +59,9 @@ public sealed class MatchesController(ApplicationDbContext db, ITenantContext te
         match.AllowFreeParticipants = request.AllowFreeParticipants;
         match.KeyboardJson = request.KeyboardJson;
         match.ScoringRulesJson = request.ScoringRulesJson;
+        match.PersonalBestClassifier = request.PersonalBestClassifier;
         await db.SaveChangesAsync(cancellationToken);
+        if (wasOpen && !match.IsOpen) await personalBestRegistrationService.RegisterOnDeactivationAsync(match, cancellationToken);
         return Ok(match);
     }
 
@@ -77,7 +80,12 @@ public sealed class MatchesController(ApplicationDbContext db, ITenantContext te
     public async Task<IActionResult> DeactivateAll(CancellationToken cancellationToken)
     {
         if (!CanManage) return Forbid();
-        await db.Matches.Where(item => item.TenantId == TenantId).ExecuteUpdateAsync(setters => setters.SetProperty(item => item.IsOpen, false), cancellationToken);
+        // Loaded and saved per-match (rather than one ExecuteUpdateAsync) so RegisterOnDeactivationAsync
+        // can run per match - ExecuteUpdateAsync bypasses change tracking entirely and would skip the hook.
+        var openMatches = await db.Matches.Where(item => item.TenantId == TenantId && item.IsOpen).ToListAsync(cancellationToken);
+        foreach (var match in openMatches) match.IsOpen = false;
+        await db.SaveChangesAsync(cancellationToken);
+        foreach (var match in openMatches) await personalBestRegistrationService.RegisterOnDeactivationAsync(match, cancellationToken);
         return NoContent();
     }
 
@@ -95,6 +103,7 @@ public sealed class MatchesController(ApplicationDbContext db, ITenantContext te
         var participant = new MatchParticipant { Id = Guid.NewGuid(), TenantId = TenantId, MatchId = id, ParticipantListMemberId = request.ParticipantListMemberId, LastName = request.LastName, FullName = request.FullName, FederationNumber = request.FederationNumber, Categories = request.Categories };
         db.MatchParticipants.Add(participant);
         await db.SaveChangesAsync(cancellationToken);
+        personalBestLiveLookup.Invalidate(id);
         return Created($"api/matches/{id}/participants/{participant.Id}", participant);
     }
 
@@ -111,6 +120,7 @@ public sealed class MatchesController(ApplicationDbContext db, ITenantContext te
         participant.FederationNumber = request.FederationNumber;
         participant.Categories = request.Categories;
         await db.SaveChangesAsync(cancellationToken);
+        personalBestLiveLookup.Invalidate(id);
         return Ok(participant);
     }
 
@@ -122,6 +132,7 @@ public sealed class MatchesController(ApplicationDbContext db, ITenantContext te
         if (participant is null) return NotFound();
         db.MatchParticipants.Remove(participant);
         await db.SaveChangesAsync(cancellationToken);
+        personalBestLiveLookup.Invalidate(id);
         return NoContent();
     }
 
@@ -176,7 +187,8 @@ public sealed class MatchesController(ApplicationDbContext db, ITenantContext te
         var tenant = await db.Tenants.AsNoTracking().SingleOrDefaultAsync(item => item.Id == TenantId, cancellationToken);
         if (tenant is null) return NotFound();
         var categories = await db.Categories.AsNoTracking().Include(item => item.Values).Where(item => item.TenantId == TenantId).ToListAsync(cancellationToken);
-        return Ok(new LiveScoringPage(15, tenant.LogoUrl, tenant.Name, match.Name, match.Date, match.Ends, match.ArrowsPerEnd, match.GroupEnds, liveScoringService.BuildBlocks(match, liveScope, categories)));
+        var personalBests = await personalBestLiveLookup.BuildAsync(match, liveScope, cancellationToken);
+        return Ok(new LiveScoringPage(15, tenant.LogoUrl, tenant.Name, match.Name, match.Date, match.Ends, match.ArrowsPerEnd, match.GroupEnds, liveScoringService.BuildBlocks(match, liveScope, categories, personalBests)));
     }
 
     [HttpPost("{id:guid}/devices")]

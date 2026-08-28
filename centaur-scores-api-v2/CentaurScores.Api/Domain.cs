@@ -17,6 +17,7 @@ public sealed class Tenant
     public string Name { get; set; } = "";
     public string? LogoUrl { get; set; }
     public Guid? ParentTenantId { get; set; }
+    public bool PersonalBestEnabled { get; set; }
 }
 
 public sealed class Account : TenantOwnedEntity
@@ -68,6 +69,7 @@ public sealed class MatchTemplate : TenantOwnedEntity
     public bool AllowFreeParticipants { get; set; } = true;
     public string DeviceSelectionMode { get; set; } = "list-and-free";
     public string ConfigurationJson { get; set; } = MatchDefaults.KeyboardJson;
+    public string? PersonalBestClassifier { get; set; }
 }
 
 public sealed class Match : TenantOwnedEntity
@@ -84,6 +86,7 @@ public sealed class Match : TenantOwnedEntity
     public bool AllowFreeParticipants { get; set; } = true;
     public string KeyboardJson { get; set; } = MatchDefaults.KeyboardJson;
     public string ScoringRulesJson { get; set; } = "[]";
+    public string? PersonalBestClassifier { get; set; }
     public List<MatchParticipant> Participants { get; set; } = [];
     public List<ScoreDevice> Devices { get; set; } = [];
     public List<LiveScoreScope> LiveScopes { get; set; } = [];
@@ -163,4 +166,97 @@ public sealed class CompetitionScoreRule : TenantOwnedEntity
     public int MinimumScores { get; set; }
     public string Aggregation { get; set; } = "total";
     public int SortOrder { get; set; }
+}
+
+// Personal Best tracking. TenantId on all of these is the *owning* tenant - the tenant on which the
+// feature was enabled - not necessarily the tenant of the current request. See IPersonalBestContext,
+// which resolves the owning tenant by walking up the Tenant.ParentTenantId chain.
+public sealed class PersonalBestClassifier : TenantOwnedEntity
+{
+    public string Name { get; set; } = "";
+}
+
+public sealed class PersonalBestDiscipline : TenantOwnedEntity
+{
+    public string Name { get; set; } = "";
+    public List<PersonalBestDisciplineMapping> Mappings { get; set; } = [];
+}
+
+// One row per {tenant, category, value} triple attached to a discipline. SourceTenantId/CategoryId/ValueId
+// may point at a category owned by a sub-tenant of TenantId (the owning tenant), which is why these are
+// plain Guids/ints rather than navigation properties - there's no cross-tenant FK to attach them to.
+public sealed class PersonalBestDisciplineMapping : TenantOwnedEntity
+{
+    public Guid DisciplineId { get; init; }
+    public Guid SourceTenantId { get; init; }
+    public Guid CategoryId { get; init; }
+    public int ValueId { get; init; }
+}
+
+public sealed class PersonalBestExportConfig : TenantOwnedEntity
+{
+    public string ExportMode { get; set; } = "all";
+    public string TableName { get; set; } = "PersonalBestExport";
+    public List<PersonalBestExportColumn> Columns { get; set; } = [];
+}
+
+public sealed class PersonalBestExportColumn : TenantOwnedEntity
+{
+    public Guid ExportConfigId { get; init; }
+    public int SortOrder { get; set; }
+    public string ColumnName { get; set; } = "";
+    public string Field { get; set; } = "";
+    public string? DateFormat { get; set; }
+}
+
+public sealed class PersonalBestImportConfig : TenantOwnedEntity
+{
+    public string TableName { get; set; } = "Resultaten";
+    public string DateColumn { get; set; } = "Datum";
+    public string FederationNumberColumn { get; set; } = "Bondsnummer";
+    public string NameColumn { get; set; } = "Naam";
+    public string DisciplineColumn { get; set; } = "Discipline";
+    public string MatchClassifierColumn { get; set; } = "Wedstrijd";
+    public string ScoreColumn { get; set; } = "Score";
+    public string UpdateDateColumn { get; set; } = "Toegevoegd";
+}
+
+// Single canonical current name per federation number. Log entries never carry their own name -
+// see documentation/PERSONAL-BEST-FEATUE.md's Q&A on this.
+public sealed class PersonalBestArcherName : TenantOwnedEntity
+{
+    public string FederationNumber { get; set; } = "";
+    public string Name { get; set; } = "";
+}
+
+// Discipline/MatchClassifier are stored as the configured label text at the time, not FKs, so historical
+// rows stay meaningful even if the classifier/discipline configuration later changes or is deleted.
+public sealed class PersonalBestLogEntry : TenantOwnedEntity
+{
+    public string FederationNumber { get; set; } = "";
+    public string Discipline { get; set; } = "";
+    public string MatchClassifier { get; set; } = "";
+    public int Score { get; set; }
+    public DateOnly Date { get; set; }
+    public DateTime RecordedAt { get; set; }
+    public string Source { get; set; } = "automatic";
+}
+
+// Holds the "archer has higher scores than imported" conflicts produced by one import run until the
+// user resolves them (UC7); deleted once resolved.
+public sealed class PersonalBestImportBatch : TenantOwnedEntity
+{
+    public DateTime CreatedAt { get; set; }
+    public List<PersonalBestImportConflict> Conflicts { get; set; } = [];
+}
+
+public sealed class PersonalBestImportConflict : TenantOwnedEntity
+{
+    public Guid BatchId { get; init; }
+    public string FederationNumber { get; set; } = "";
+    public string Discipline { get; set; } = "";
+    public string MatchClassifier { get; set; } = "";
+    public string ConflictType { get; set; } = "";
+    public string OffendingLogEntryIdsJson { get; set; } = "[]";
+    public string? RelatedImportRecordJson { get; set; }
 }

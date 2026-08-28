@@ -6,6 +6,7 @@ using CentaurScores.Api.Infrastructure;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using System.Text;
 
 namespace CentaurScores.Api.Tests;
@@ -63,7 +64,9 @@ public sealed class MatchesControllerTests
             match);
         await db.SaveChangesAsync();
         var scoring = new ScoringService();
-        var controller = new MatchesController(db, new TestTenantContext(tenantId), scoring, new LiveScoringService(scoring));
+        var personalBestContext = new PersonalBestContext(db);
+        var personalBestEngine = new PersonalBestEngine(db);
+        var controller = new MatchesController(db, new TestTenantContext(tenantId), scoring, new LiveScoringService(scoring), new PersonalBestRegistrationService(db, personalBestContext, personalBestEngine), new PersonalBestLiveLookup(db, personalBestContext, personalBestEngine, new MemoryCache(new MemoryCacheOptions())));
 
         var result = Assert.IsType<FileContentResult>(await controller.Export(matchId, CancellationToken.None));
 
@@ -101,7 +104,9 @@ public sealed class MatchesControllerTests
         db.AddRange(new Tenant { Id = tenantId, Name = "Tenant" }, match);
         await db.SaveChangesAsync();
         var scoring = new ScoringService();
-        var controller = new MatchesController(db, new TestTenantContext(tenantId), scoring, new LiveScoringService(scoring));
+        var personalBestContext = new PersonalBestContext(db);
+        var personalBestEngine = new PersonalBestEngine(db);
+        var controller = new MatchesController(db, new TestTenantContext(tenantId), scoring, new LiveScoringService(scoring), new PersonalBestRegistrationService(db, personalBestContext, personalBestEngine), new PersonalBestLiveLookup(db, personalBestContext, personalBestEngine, new MemoryCache(new MemoryCacheOptions())));
 
         var result = Assert.IsType<OkObjectResult>(await controller.List(CancellationToken.None));
         var items = Assert.IsAssignableFrom<IReadOnlyList<MatchListItem>>(result.Value);

@@ -115,9 +115,8 @@
               <div class="result-entry">
                 <span class="position">{entry.position}{entry.needsTieBreaker ? '*' : ''}</span>
                 <span class="entry-lines">
-                  <strong>{entry.line1}</strong>
+                  <strong>{#if entry.aboveTarget}<span class="pb-star" aria-hidden="true">★</span>{/if}{entry.line1}</strong>
                   {#if entry.line2}<small>{entry.line2}</small>{/if}
-                  {#if entry.line3}<small>{entry.line3}</small>{/if}
                 </span>
                 {#if entry.average != null}<span class="average">{entry.average.toFixed(2)}</span>{/if}
                 <strong class="score">{entry.score}</strong>
@@ -244,6 +243,13 @@
   .average,
   .score {
     text-align: right;
+  }
+
+  .pb-star {
+    color: #e0a300;
+    font-size: .85em;
+    margin-right: .3em;
+    text-shadow: 0 0 2px rgba(224, 163, 0, .5);
   }
 
   .average {

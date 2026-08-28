@@ -45,7 +45,22 @@ public sealed class LiveScoringServiceTests
         Assert.Collection(block.Entries,
             entry => { Assert.Equal((1, false, "Alice"), (entry.Position, entry.NeedsTieBreaker, entry.Line1)); Assert.Contains("1xX", entry.Line2); Assert.DoesNotContain("x10", entry.Line2); },
             entry => { Assert.Equal((2, true, "Bob"), (entry.Position, entry.NeedsTieBreaker, entry.Line1)); Assert.Contains("0xX", entry.Line2); Assert.Contains("1x10", entry.Line2); },
-            entry => { Assert.Equal((2, true, "Cara"), (entry.Position, entry.NeedsTieBreaker, entry.Line1)); Assert.Equal("personal best is not supported yet", entry.Line3); });
+            entry => { Assert.Equal((2, true, "Cara"), (entry.Position, entry.NeedsTieBreaker, entry.Line1)); Assert.DoesNotContain("Personal best", entry.Line2); Assert.False(entry.AboveTarget); });
+    }
+
+    [Fact]
+    public void BuildBlocks_renders_and_highlights_personal_best_when_a_lookup_is_supplied()
+    {
+        var participant = Participant("Alice", Guid.NewGuid(), Guid.NewGuid(), ("X", 10), ("9", 9));
+        var match = new Match { Id = Guid.NewGuid(), ArrowsPerEnd = 3, Participants = [participant] };
+        var scope = new LiveScoreScope { IncludePersonalBest = true };
+        var personalBests = new Dictionary<Guid, double> { [participant.Id] = 9.0 };
+
+        var blocks = new LiveScoringService(new ScoringService()).BuildBlocks(match, scope, [], personalBests);
+
+        var entry = Assert.Single(Assert.Single(blocks).Entries);
+        Assert.Equal("Personal best: 9.00", entry.Line2);
+        Assert.True(entry.AboveTarget); // (10 + 9) / 2 = 9.5 average, above the 9.0 personal best
     }
 
     private static MatchParticipant Participant(string name, Guid disciplineId, Guid classId, params (string Key, int Value)[] scores) => new()

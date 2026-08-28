@@ -9,6 +9,7 @@
     currentTenant,
     matches,
     participantLists,
+    personalBestStatus,
     profile,
     templates,
     tenants,
@@ -20,6 +21,7 @@
     loadChildTenants as fetchChildTenantsList,
     refreshCategories as fetchCategoriesList,
     refreshParticipantLists as fetchParticipantListsList,
+    refreshPersonalBestStatus as fetchPersonalBestStatus,
     refreshTemplates as fetchTemplatesList,
     resetMatchesAndCompetitions
   } from './lib/data'
@@ -48,6 +50,12 @@
   import ParticipantListDetailView from './lib/views/ParticipantListDetailView.svelte'
   import ParticipantListsView from './lib/views/ParticipantListsView.svelte'
   import ParticipantMemberView from './lib/views/ParticipantMemberView.svelte'
+  import PersonalBestClassifiersView from './lib/views/PersonalBestClassifiersView.svelte'
+  import PersonalBestDisciplinesView from './lib/views/PersonalBestDisciplinesView.svelte'
+  import PersonalBestExportConfigView from './lib/views/PersonalBestExportConfigView.svelte'
+  import PersonalBestImportConfigView from './lib/views/PersonalBestImportConfigView.svelte'
+  import PersonalBestLogView from './lib/views/PersonalBestLogView.svelte'
+  import PersonalBestView from './lib/views/PersonalBestView.svelte'
   import ProfileView from './lib/views/ProfileView.svelte'
   import TemplateEditView from './lib/views/TemplateEditView.svelte'
   import TemplatesView from './lib/views/TemplatesView.svelte'
@@ -86,9 +94,11 @@
   $: isAdmin = $profile?.authorization === 'Administrator'
   $: canManage = isAdmin || $profile?.authorization === 'Manager'
   $: headerUsername = $profile?.displayName || $profile?.username || username
+  $: showPersonalBestButton = $personalBestStatus !== null && (!$personalBestStatus.enabled || $personalBestStatus.ownedHere)
   $: homeQuickLinks = (
     [['participants', t.participants], ['categories', t.categories], ['templates', t.templates]] as [string, string][]
   ).concat(isAdmin ? [['accounts', t.accounts], ['tenants', t.tenants]] : [])
+    .concat(showPersonalBestButton ? [['personal-best', t.personalBest]] : [])
   $: selectedCategory = $categories.find((category) => category.id === selectedCategoryId) ?? null
   $: selectedMember = selectedMemberId && selectedMemberId !== 'new' ? selectedList?.members.find((member) => member.id === selectedMemberId) ?? null : null
   $: selectedTemplate = $templates.find((template) => template.id === selectedTemplateId) ?? null
@@ -277,6 +287,10 @@
     refreshTemplates()
   }
 
+  async function refreshPersonalBestStatus() {
+    await fetchPersonalBestStatus(api)
+  }
+
   function navigate(path: string, replace = false) {
     const route = navigateTo(path, replace)
     applyRouteResult(route)
@@ -384,6 +398,18 @@
         <TemplatesView {api} templates={$templates} participantLists={$participantLists} labels={t} onOpenTemplate={openTemplate} onChanged={refreshTemplates} onBack={() => navigate('/')} />
       {:else if view === 'template' && selectedTemplate}
         <TemplateEditView {api} template={selectedTemplate} categories={$categories} participantLists={$participantLists} labels={t} onBack={() => navigate('/templates')} onSaved={refreshTemplates} onDeleted={onTemplateDeleted} />
+      {:else if view === 'personal-best'}
+        <PersonalBestView {api} status={$personalBestStatus} labels={t} onBack={() => navigate('/')} onNavigate={navigate} onChanged={refreshPersonalBestStatus} />
+      {:else if view === 'personal-best-classifiers'}
+        <PersonalBestClassifiersView {api} labels={t} onBack={() => navigate('/personal-best')} />
+      {:else if view === 'personal-best-disciplines'}
+        <PersonalBestDisciplinesView {api} labels={t} onBack={() => navigate('/personal-best')} />
+      {:else if view === 'personal-best-export-config'}
+        <PersonalBestExportConfigView {api} labels={t} onBack={() => navigate('/personal-best')} />
+      {:else if view === 'personal-best-import-config'}
+        <PersonalBestImportConfigView {api} labels={t} onBack={() => navigate('/personal-best')} />
+      {:else if view === 'personal-best-log'}
+        <PersonalBestLogView {api} {language} labels={t} onBack={() => navigate('/personal-best')} />
       {/if}
       {#if loading}<p class="loading">{t.loadingTenantData}</p>{/if}
     </main>

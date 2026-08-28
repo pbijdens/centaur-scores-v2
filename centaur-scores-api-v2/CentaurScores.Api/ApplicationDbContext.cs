@@ -25,6 +25,16 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
     public DbSet<CompetitionRound> CompetitionRounds => Set<CompetitionRound>();
     public DbSet<CompetitionRoundMatch> CompetitionRoundMatches => Set<CompetitionRoundMatch>();
     public DbSet<CompetitionScoreRule> CompetitionScoreRules => Set<CompetitionScoreRule>();
+    public DbSet<PersonalBestClassifier> PersonalBestClassifiers => Set<PersonalBestClassifier>();
+    public DbSet<PersonalBestDiscipline> PersonalBestDisciplines => Set<PersonalBestDiscipline>();
+    public DbSet<PersonalBestDisciplineMapping> PersonalBestDisciplineMappings => Set<PersonalBestDisciplineMapping>();
+    public DbSet<PersonalBestExportConfig> PersonalBestExportConfigs => Set<PersonalBestExportConfig>();
+    public DbSet<PersonalBestExportColumn> PersonalBestExportColumns => Set<PersonalBestExportColumn>();
+    public DbSet<PersonalBestImportConfig> PersonalBestImportConfigs => Set<PersonalBestImportConfig>();
+    public DbSet<PersonalBestArcherName> PersonalBestArcherNames => Set<PersonalBestArcherName>();
+    public DbSet<PersonalBestLogEntry> PersonalBestLogEntries => Set<PersonalBestLogEntry>();
+    public DbSet<PersonalBestImportBatch> PersonalBestImportBatches => Set<PersonalBestImportBatch>();
+    public DbSet<PersonalBestImportConflict> PersonalBestImportConflicts => Set<PersonalBestImportConflict>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -44,6 +54,33 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
         modelBuilder.Entity<CompetitionRound>().ToTable("competition_rounds").HasKey(item => item.Id);
         modelBuilder.Entity<CompetitionRoundMatch>().ToTable("competition_round_matches").HasKey(item => item.Id);
         modelBuilder.Entity<CompetitionScoreRule>().ToTable("competition_score_rules").HasKey(item => item.Id);
+        modelBuilder.Entity<PersonalBestClassifier>().ToTable("personal_best_classifiers").HasKey(item => item.Id);
+        modelBuilder.Entity<PersonalBestDiscipline>().ToTable("personal_best_disciplines").HasKey(item => item.Id);
+        modelBuilder.Entity<PersonalBestDisciplineMapping>().ToTable("personal_best_discipline_mappings").HasKey(item => item.Id);
+        modelBuilder.Entity<PersonalBestExportConfig>().ToTable("personal_best_export_configs").HasKey(item => item.Id);
+        modelBuilder.Entity<PersonalBestExportColumn>().ToTable("personal_best_export_columns").HasKey(item => item.Id);
+        modelBuilder.Entity<PersonalBestImportConfig>().ToTable("personal_best_import_configs").HasKey(item => item.Id);
+        modelBuilder.Entity<PersonalBestArcherName>().ToTable("personal_best_archer_names").HasKey(item => item.Id);
+        modelBuilder.Entity<PersonalBestLogEntry>().ToTable("personal_best_log_entries").HasKey(item => item.Id);
+        modelBuilder.Entity<PersonalBestImportBatch>().ToTable("personal_best_import_batches").HasKey(item => item.Id);
+        modelBuilder.Entity<PersonalBestImportConflict>().ToTable("personal_best_import_conflicts").HasKey(item => item.Id);
+        // Explicit lengths keep these string columns as indexable varchar rather than the longtext that a
+        // bare `string` property maps to by default - without this, the 5-column composite index below
+        // exceeds MySQL's 3072-byte max key length.
+        modelBuilder.Entity<PersonalBestClassifier>().Property(item => item.Name).HasMaxLength(100);
+        modelBuilder.Entity<PersonalBestDiscipline>().Property(item => item.Name).HasMaxLength(100);
+        modelBuilder.Entity<PersonalBestArcherName>().Property(item => item.FederationNumber).HasMaxLength(32);
+        modelBuilder.Entity<PersonalBestLogEntry>().Property(item => item.FederationNumber).HasMaxLength(32);
+        modelBuilder.Entity<PersonalBestLogEntry>().Property(item => item.Discipline).HasMaxLength(100);
+        modelBuilder.Entity<PersonalBestLogEntry>().Property(item => item.MatchClassifier).HasMaxLength(100);
+        modelBuilder.Entity<PersonalBestClassifier>().HasIndex(item => new { item.TenantId, item.Name }).IsUnique();
+        modelBuilder.Entity<PersonalBestDiscipline>().HasIndex(item => new { item.TenantId, item.Name }).IsUnique();
+        modelBuilder.Entity<PersonalBestDisciplineMapping>().HasIndex(item => new { item.TenantId, item.SourceTenantId, item.CategoryId, item.ValueId }).IsUnique();
+        modelBuilder.Entity<PersonalBestArcherName>().HasIndex(item => new { item.TenantId, item.FederationNumber }).IsUnique();
+        modelBuilder.Entity<PersonalBestLogEntry>().HasIndex(item => new { item.TenantId, item.FederationNumber, item.Discipline, item.MatchClassifier, item.Date });
+        modelBuilder.Entity<PersonalBestDiscipline>().HasMany(item => item.Mappings).WithOne().HasForeignKey(item => item.DisciplineId).OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<PersonalBestExportConfig>().HasMany(item => item.Columns).WithOne().HasForeignKey(item => item.ExportConfigId).OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<PersonalBestImportBatch>().HasMany(item => item.Conflicts).WithOne().HasForeignKey(item => item.BatchId).OnDelete(DeleteBehavior.Cascade);
         modelBuilder.Entity<Account>().Property(item => item.Authorization).HasConversion(
             value => value == AuthorizationProfile.Administrator ? "admin" : value == AuthorizationProfile.Manager ? "manager" : "viewer",
             value => value == "admin" ? AuthorizationProfile.Administrator : value == "manager" ? AuthorizationProfile.Manager : AuthorizationProfile.Viewer);

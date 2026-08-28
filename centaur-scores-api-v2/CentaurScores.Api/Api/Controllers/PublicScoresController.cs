@@ -9,9 +9,9 @@ namespace CentaurScores.Api.Controllers;
 
 [ApiController]
 [AllowAnonymous]
-public sealed class PublicScoresController(ApplicationDbContext db, ILiveScoringService liveScoringService, IScorekeeperService? scorekeeperService = null, ILogger<PublicScoresController>? logger = null) : ControllerBase
+public sealed class PublicScoresController(ApplicationDbContext db, ILiveScoringService liveScoringService, IPersonalBestLiveLookup personalBestLiveLookup, IScorekeeperService? scorekeeperService = null, ILogger<PublicScoresController>? logger = null) : ControllerBase
 {
-    private IScorekeeperService ScorekeeperService => scorekeeperService ?? new ScorekeeperService(db);
+    private IScorekeeperService ScorekeeperService => scorekeeperService ?? new ScorekeeperService(db, personalBestLiveLookup);
 
     [HttpGet("live-scoring/match/{scope}")]
     public async Task<ActionResult<IReadOnlyList<LiveScoringMatch>>> LiveScoringMatches(string scope, CancellationToken cancellationToken)
@@ -38,7 +38,8 @@ public sealed class PublicScoresController(ApplicationDbContext db, ILiveScoring
         var tenant = await db.Tenants.AsNoTracking().SingleOrDefaultAsync(item => item.Id == match.TenantId, cancellationToken);
         if (tenant is null) return NotFound();
         var categories = await db.Categories.AsNoTracking().Include(item => item.Values).Where(item => item.TenantId == match.TenantId).ToListAsync(cancellationToken);
-        return Ok(new LiveScoringPage(15, tenant.LogoUrl, tenant.Name, match.Name, match.Date, match.Ends, match.ArrowsPerEnd, match.GroupEnds, liveScoringService.BuildBlocks(match, liveScope, categories)));
+        var personalBests = await personalBestLiveLookup.BuildAsync(match, liveScope, cancellationToken);
+        return Ok(new LiveScoringPage(15, tenant.LogoUrl, tenant.Name, match.Name, match.Date, match.Ends, match.ArrowsPerEnd, match.GroupEnds, liveScoringService.BuildBlocks(match, liveScope, categories, personalBests)));
     }
 
     [HttpGet("scorekeeper/{tenantId:guid}/{matchId:guid}/{deviceId:guid}")]

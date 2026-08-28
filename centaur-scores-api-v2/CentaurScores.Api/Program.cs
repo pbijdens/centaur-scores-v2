@@ -16,6 +16,7 @@ var connectionString = builder.Configuration.GetConnectionString("Default") ?? t
 var jwtSecret = builder.Configuration["Jwt:Secret"] ?? throw new InvalidOperationException("Jwt:Secret is required");
 
 builder.Services.AddHttpContextAccessor();
+builder.Services.AddMemoryCache();
 builder.Services.AddDbContext<ApplicationDbContext>(options => options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString)).UseSnakeCaseNamingConvention());
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<ITenantContext, TenantContext>();
@@ -24,6 +25,11 @@ builder.Services.AddScoped<ILiveScoringService, LiveScoringService>();
 builder.Services.AddScoped<ICompetitionService, CompetitionService>();
 builder.Services.AddScoped<IScorekeeperService, ScorekeeperService>();
 builder.Services.AddScoped<IParticipantListExcelService, ParticipantListExcelService>();
+builder.Services.AddScoped<IPersonalBestContext, PersonalBestContext>();
+builder.Services.AddScoped<IPersonalBestEngine, PersonalBestEngine>();
+builder.Services.AddScoped<IPersonalBestExcelService, PersonalBestExcelService>();
+builder.Services.AddScoped<IPersonalBestRegistrationService, PersonalBestRegistrationService>();
+builder.Services.AddScoped<IPersonalBestLiveLookup, PersonalBestLiveLookup>();
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>

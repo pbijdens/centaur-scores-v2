@@ -1,4 +1,4 @@
-export type View = 'home' | 'matches' | 'match' | 'match-metadata' | 'match-devices' | 'match-qr' | 'match-results-scope' | 'match-participant' | 'competitions' | 'competition' | 'competition-results' | 'participants' | 'participant-list' | 'participant' | 'categories' | 'category' | 'templates' | 'template' | 'accounts' | 'account' | 'profile' | 'tenants' | 'tenant' | 'narrowcast'
+export type View = 'home' | 'matches' | 'match' | 'match-metadata' | 'match-devices' | 'match-qr' | 'match-results-scope' | 'match-participant' | 'competitions' | 'competition' | 'competition-results' | 'participants' | 'participant-list' | 'participant' | 'categories' | 'category' | 'templates' | 'template' | 'accounts' | 'account' | 'profile' | 'tenants' | 'tenant' | 'narrowcast' | 'personal-best' | 'personal-best-classifiers' | 'personal-best-disciplines' | 'personal-best-export-config' | 'personal-best-import-config' | 'personal-best-log'
 export type Language = 'en' | 'nl'
 export type Tenant = { id: string; name: string; logoUrl?: string | null }
 export type Match = {
@@ -15,6 +15,7 @@ export type Match = {
   allowFreeParticipants: boolean
   keyboardJson: string
   scoringRulesJson: string
+  personalBestClassifier?: string | null
   participants?: MatchParticipant[]
   devices?: ScoreDevice[]
   liveScopes?: LiveScoreScope[]
@@ -55,7 +56,7 @@ export type ArrowScore = { id: string; matchParticipantId: string; end: number; 
 export type ScoreDevice = { id: string; matchId: string; name: string; sortOrder?: number }
 export type LiveScoreScope = { id: string; matchId: string; scope: string; groupByCategoryIdsJson: string; includeAverage: boolean; includeGroupScores: boolean; includeEqualizers: boolean; includePersonalBest: boolean }
 export type LiveScoringMatch = { id: string; date: string; name: string }
-export type LiveScoringEntry = { position: number; needsTieBreaker: boolean; line1: string; line2?: string | null; line3?: string | null; average?: number | null; arrows: number; score: number }
+export type LiveScoringEntry = { position: number; needsTieBreaker: boolean; line1: string; line2?: string | null; average?: number | null; arrows: number; score: number; aboveTarget: boolean }
 export type LiveScoringBlock = { name: string; entries: LiveScoringEntry[] }
 export type LiveScoringPage = { timeout: number; logo?: string | null; tenant: string; matchName: string; matchDate: string; ends: number; arrowsPerEnd: number; groupEnds?: number | null; blocks: LiveScoringBlock[] }
 export type CompetitionRoundMatch = { id: string; competitionRoundId: string; matchId: string }
@@ -76,7 +77,7 @@ export type ParticipantList = { id: string; name: string; isActive: boolean; mem
 // Shape of GET /api/participant-lists: unlike ParticipantList (one list's full detail, with members),
 // this never carries the (potentially huge) members collection - just counts for list rendering.
 export type ParticipantListSummary = { id: string; name: string; isActive: boolean; memberCount: number; activeMemberCount: number }
-export type MatchTemplate = { id: string; name: string; participantListId?: string | null; allowFreeParticipants: boolean; deviceSelectionMode: string; configurationJson: string }
+export type MatchTemplate = { id: string; name: string; participantListId?: string | null; allowFreeParticipants: boolean; deviceSelectionMode: string; configurationJson: string; personalBestClassifier?: string | null }
 
 export type KeyboardKeyColor = 'Yellow' | 'Red' | 'Blue' | 'Black' | 'White'
 export type KeyboardKey = { keyId: string; label: string; color: KeyboardKeyColor; value: number }
@@ -94,4 +95,30 @@ export type TemplateConfiguration = {
   scoringRules: ScoringRule[]
   liveScopes: LiveScopeConfig[]
 }
+
+// Personal Best tracking
+export type PersonalBestStatus = { enabled: boolean; ownedHere: boolean; owningTenantId?: string | null }
+export type PersonalBestDisciplineValue = { tenantId: string; tenantName: string; categoryId: string; categoryName: string; valueId: number; valueName: string }
+export type PersonalBestDiscipline = { id: string; name: string; values: PersonalBestDisciplineValue[] }
+export type PersonalBestAvailableValue = { tenantId: string; tenantName: string; categoryId: string; categoryName: string; valueId: number; valueName: string; takenByDisciplineId?: string | null }
+export type PersonalBestDisciplineValueRef = { tenantId: string; categoryId: string; valueId: number }
+export type PersonalBestExportField = 'federationNumber' | 'fullName' | 'discipline' | 'matchClassifier' | 'score' | 'date' | 'exportDate'
+export type PersonalBestExportMode = 'all' | 'changesSinceLastImport'
+export type PersonalBestDateFormat = 'ymd' | 'dmy' | 'mdy'
+export type PersonalBestExportColumn = { columnName: string; field: PersonalBestExportField; dateFormat?: PersonalBestDateFormat | null }
+export type PersonalBestExportConfig = { exportMode: PersonalBestExportMode; tableName: string; columns: PersonalBestExportColumn[] }
+export type PersonalBestImportConfig = {
+  tableName: string
+  dateColumn: string
+  federationNumberColumn: string
+  nameColumn: string
+  disciplineColumn: string
+  matchClassifierColumn: string
+  scoreColumn: string
+  updateDateColumn: string
+}
+export type PersonalBestImportConflict = { federationNumber: string; discipline: string; matchClassifier: string; conflictType: 'cannotInsertLowerScore' | 'archerHasHigherScore'; actionable: boolean }
+export type PersonalBestImportResult = { newArchers: number; newRegistrations: number; warnings: string[]; batchId?: string | null; conflicts: PersonalBestImportConflict[] }
+export type PersonalBestConflictResolution = { federationNumber: string; discipline: string; matchClassifier: string; action: 'deleteOffending' | 'ignoreImported' }
+export type PersonalBestLogRow = { federationNumber: string; name: string; discipline: string; matchClassifier: string; date: string; score: number }
 

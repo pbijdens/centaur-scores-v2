@@ -49,5 +49,13 @@ export function resolveRoute(path = location.pathname): Route {
   if (section === 'templates') {
     return segments[1] ? { view: 'template', templateId: segments[1] } : { view: 'templates' }
   }
+  if (section === 'personal-best') {
+    if (segments[1] === 'classifiers') return { view: 'personal-best-classifiers' }
+    if (segments[1] === 'disciplines') return { view: 'personal-best-disciplines' }
+    if (segments[1] === 'export-configuration') return { view: 'personal-best-export-config' }
+    if (segments[1] === 'import-configuration') return { view: 'personal-best-import-config' }
+    if (segments[1] === 'log') return { view: 'personal-best-log' }
+    return { view: 'personal-best' }
+  }
   return { view: 'home', invalid: true }
 }

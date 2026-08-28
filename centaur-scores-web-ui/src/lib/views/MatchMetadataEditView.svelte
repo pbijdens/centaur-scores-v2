@@ -39,6 +39,17 @@
   let saveMessage = ''
   let saveError = ''
   let deleteError = ''
+  let personalBestClassifier = match.personalBestClassifier ?? ''
+  let personalBestClassifiers: string[] = []
+
+  async function loadPersonalBestClassifiers() {
+    try {
+      personalBestClassifiers = await api.fetchPersonalBestClassifiers()
+    } catch {
+      personalBestClassifiers = []
+    }
+  }
+  loadPersonalBestClassifiers()
 
   $: hasParticipants = (match.participants ?? []).length > 0
   $: orderedCategories = [
@@ -160,7 +171,8 @@
         groupEnds,
         allowFreeParticipants,
         keyboardJson: JSON.stringify(keyboardConfig),
-        scoringRulesJson: JSON.stringify(scoringRules)
+        scoringRulesJson: JSON.stringify(scoringRules),
+        personalBestClassifier: personalBestClassifier || null
       })
       for (const scope of match.liveScopes ?? []) await api.deleteLiveScope(match.id, scope.id)
       for (const scope of liveScopes) {
@@ -212,6 +224,14 @@
   <label>{labels.endsLabel}<input type="number" min="1" bind:value={ends} /></label>
   <label>{labels.arrowsPerEndLabel}<input type="number" min="1" bind:value={arrowsPerEnd} /></label>
   <label>{labels.groupEndsLabel}<input type="number" min="1" bind:value={groupEnds} /></label>
+  {#if personalBestClassifiers.length > 0}
+    <label>{labels.personalBestClassifierLabel}
+      <select bind:value={personalBestClassifier}>
+        <option value="">{labels.noPersonalBestClassifier}</option>
+        {#each personalBestClassifiers as classifier}<option value={classifier}>{classifier}</option>{/each}
+      </select>
+    </label>
+  {/if}
 </section>
 
 <section class="panel section-gap">

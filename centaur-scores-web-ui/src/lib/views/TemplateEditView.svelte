@@ -23,6 +23,17 @@
   let saveMessage = ''
   let saveError = ''
   let deleteError = ''
+  let personalBestClassifier = template.personalBestClassifier ?? ''
+  let personalBestClassifiers: string[] = []
+
+  async function loadPersonalBestClassifiers() {
+    try {
+      personalBestClassifiers = await api.fetchPersonalBestClassifiers()
+    } catch {
+      personalBestClassifiers = []
+    }
+  }
+  loadPersonalBestClassifiers()
 
   $: orderedCategories = [
     ...config.categoryOrder.map((id) => categories.find((category) => category.id === id)).filter((category): category is Category => !!category),
@@ -147,7 +158,8 @@
         participantListId: participantListId || null,
         allowFreeParticipants,
         deviceSelectionMode,
-        configurationJson: JSON.stringify(config)
+        configurationJson: JSON.stringify(config),
+        personalBestClassifier: personalBestClassifier || null
       })
       saveMessage = labels.templateSaved
       onSaved()
@@ -200,6 +212,14 @@
       {#each deviceSelectionModes as mode}<option value={mode}>{modeLabel(mode)}</option>{/each}
     </select>
   </label>
+  {#if personalBestClassifiers.length > 0}
+    <label>{labels.personalBestClassifierLabel}
+      <select bind:value={personalBestClassifier}>
+        <option value="">{labels.noPersonalBestClassifier}</option>
+        {#each personalBestClassifiers as classifier}<option value={classifier}>{classifier}</option>{/each}
+      </select>
+    </label>
+  {/if}
 </section>
 
 <section class="panel section-gap">

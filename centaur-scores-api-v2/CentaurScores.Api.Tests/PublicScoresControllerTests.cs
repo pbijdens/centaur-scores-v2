@@ -6,6 +6,7 @@ using CentaurScores.Api.Infrastructure;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace CentaurScores.Api.Tests;
 
@@ -29,7 +30,7 @@ public sealed class PublicScoresControllerTests
         db.AddRange(tenant, otherTenant, visibleMatch, otherScope, closedMatch, otherTenantMatch);
         await db.SaveChangesAsync();
 
-        var controller = new PublicScoresController(db, new LiveScoringService(new ScoringService()));
+        var controller = new PublicScoresController(db, new LiveScoringService(new ScoringService()), new PersonalBestLiveLookup(db, new PersonalBestContext(db), new PersonalBestEngine(db), new MemoryCache(new MemoryCacheOptions())));
 
         var listResult = await controller.LiveScoringMatches("club", CancellationToken.None);
         var matches = Assert.IsAssignableFrom<IReadOnlyList<LiveScoringMatch>>(Assert.IsType<OkObjectResult>(listResult.Result).Value);

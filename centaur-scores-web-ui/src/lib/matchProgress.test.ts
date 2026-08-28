@@ -9,7 +9,7 @@ function page(overrides: Partial<LiveScoringPage> & { blocks: LiveScoringBlock[]
 function block(arrowsList: number[]): LiveScoringBlock {
   return {
     name: 'block',
-    entries: arrowsList.map((arrows, index) => ({ position: index + 1, needsTieBreaker: false, line1: `p${index}`, arrows, score: 0 }))
+    entries: arrowsList.map((arrows, index) => ({ position: index + 1, needsTieBreaker: false, line1: `p${index}`, arrows, score: 0, aboveTarget: false }))
   }
 }
 
