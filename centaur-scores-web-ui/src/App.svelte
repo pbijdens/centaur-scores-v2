@@ -70,7 +70,7 @@
   let tenantsError = ''
   let username = ''
   let password = ''
-  let language = (localStorage.getItem('centaur-language') ?? 'en') as Language
+  let language = (localStorage.getItem('centaur-language') ?? 'nl') as Language
   let view: View = 'home'
   let selectedMatch: Match | null = null
   let matchSourceList: ParticipantList | null = null
