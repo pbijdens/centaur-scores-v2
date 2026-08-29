@@ -22,6 +22,7 @@
   let startDate = competition.startDate.slice(0, 10)
   let endDate = competition.endDate.slice(0, 10)
   let groupByCategoryIds: string[] = JSON.parse(competition.groupByCategoryIdsJson || '[]')
+  let saveMessage = ''
   let saveError = ''
   let deleteError = ''
   let roundError = ''
@@ -75,10 +76,12 @@
   }
 
   async function saveMetadata() {
+    saveMessage = ''
     saveError = ''
     try {
       await api.updateCompetition(competition.id, { name: name.trim(), startDate, endDate, groupByCategoryIds })
       await onChanged()
+      saveMessage = labels.competitionSaved
     } catch (error) {
       saveError = labelForError(error, labels, 'competitionSaveError')
     }
@@ -334,6 +337,7 @@
   </div>
   <button class="primary save-button" on:click={saveMetadata} disabled={!name.trim() || !startDate || !endDate}>{labels.save}</button>
   {#if saveError}<p class="error">{saveError}</p>{/if}
+  {#if saveMessage}<p class="success">{saveMessage}</p>{/if}
 </section>
 
 <section class="panel section-gap">

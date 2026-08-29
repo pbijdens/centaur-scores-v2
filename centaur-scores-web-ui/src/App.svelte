@@ -166,6 +166,12 @@
     if (selectedCompetitionId) await loadSelectedCompetition(selectedCompetitionId)
   }
 
+  // CompetitionDetailView mutates settings/rounds/rules of the currently open competition, so refresh both
+  // the full detail (shown on screen) and the lightweight list (shown on the competitions overview).
+  async function onCompetitionChanged() {
+    await Promise.all([refreshSelectedCompetition(), loadCompetitionsList()])
+  }
+
   function openCompetition(competition: Competition) { navigate(competitionPath(competition.id)) }
 
   async function loadCompetitionsList() {
@@ -362,7 +368,7 @@
         <MatchDetailView {api} match={currentMatch} categories={$categories} sourceList={matchSourceList} {language} labels={t} onBack={() => navigate('/matches')} onToggleOpen={toggleSelectedMatch} onChanged={refreshSelectedMatch} onDeleted={onMatchDeleted} onEditMetadata={() => navigate(matchEditPath(currentMatch.id))} onManageDevices={() => navigate(matchDevicesPath(currentMatch.id))} onOpenParticipant={openParticipant} />
       {:else if view === 'match-metadata' && selectedMatch}
         {@const currentMatch = selectedMatch}
-        <MatchMetadataEditView {api} match={currentMatch} categories={$categories} participantLists={$participantLists} labels={t} onBack={() => navigate(`/matches/${currentMatch.id}`)} onSaved={() => navigate(`/matches/${currentMatch.id}`)} onDeleted={onMatchDeleted} />
+        <MatchMetadataEditView {api} match={currentMatch} categories={$categories} participantLists={$participantLists} labels={t} onBack={() => navigate(`/matches/${currentMatch.id}`)} onSaved={refreshSelectedMatch} onDeleted={onMatchDeleted} />
       {:else if view === 'match-devices' && selectedMatch}
         {@const currentMatch = selectedMatch}
         <MatchDevicesView {api} match={currentMatch} categories={$categories} labels={t} onBack={() => navigate(`/matches/${currentMatch.id}`)} onChanged={refreshSelectedMatch} />
@@ -373,7 +379,7 @@
         <CompetitionsView {api} competitions={$competitions} {language} labels={t} onOpenCompetition={openCompetition} onChanged={loadCompetitionsList} />
       {:else if view === 'competition' && selectedCompetition}
         {@const currentCompetition = selectedCompetition}
-        <CompetitionDetailView {api} competition={currentCompetition} categories={$categories} matches={$matches} {language} labels={t} onBack={() => navigate('/competitions')} onChanged={refreshSelectedCompetition} onDeleted={onCompetitionDeleted} onViewResults={() => window.open(`/competitions/${currentCompetition.id}/results`, '_blank')} onCopied={(copy) => { loadCompetitionsList(); openCompetition(copy) }} />
+        <CompetitionDetailView {api} competition={currentCompetition} categories={$categories} matches={$matches} {language} labels={t} onBack={() => navigate('/competitions')} onChanged={onCompetitionChanged} onDeleted={onCompetitionDeleted} onViewResults={() => window.open(`/competitions/${currentCompetition.id}/results`, '_blank')} onCopied={(copy) => { loadCompetitionsList(); openCompetition(copy) }} />
       {:else if view === 'profile'}
         <ProfileView {api} labels={t} onBack={() => navigate('/')} />
       {:else if view === 'tenants' && isAdmin}
