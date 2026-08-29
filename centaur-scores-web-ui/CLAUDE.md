@@ -16,7 +16,7 @@ There is also a running project memory file at [MEMORY.md](MEMORY.md) in this re
 - `npm test` — run the Vitest suite (`vitest run`)
 - `npm run check` — type-check: `svelte-check` against `tsconfig.app.json`, then `tsc` against `tsconfig.node.json`
 
-Run `npm test`, `npm run check`, and `npm run build` after any frontend change — this is the project's required validation trio (see COPILOT.md).
+Run `npm test`, `npm run check`, and `npm run build` after any frontend change — this is the project's required validation trio.
 
 To run a single test file: `npx vitest run src/lib/router.test.ts`. Utility test files sit next to the module they cover (`date.test.ts`, `router.test.ts`, `templateConfig.test.ts`).
 
@@ -46,4 +46,5 @@ The API defaults to `http://127.0.0.1:5080`; override with the `VITE_API_BASE_UR
 - Use standard browser controls for forms, filters, dates, and option selection (no custom form-widget library).
 - Render API timestamps as UTC-aware; render date-only values using local calendar semantics (see `src/lib/date.ts` / `formatLocalDate`), never shifted by timezone.
 - Universal list-rendering rule (applies wherever a participant-list member appears in a selection UI, this web app only — the Flutter and scoring apps have their own established member-selection UI): render as "full name (federation number / concatenated category values)" using the tenant's full `categories` list, and always exclude members with `isActive === false`. Implemented once in `src/lib/participantName.ts` (`memberDisplayLabel`/`memberDetailLabel`/`memberCategoryLabel`) — reuse those rather than reimplementing per view.
+- For an icon+title+description action grid (backup/restore actions, personal-best actions, the home screen's nav tiles), reuse the shared global `.pb-tile-grid`/`.pb-tile`/`.pb-tile-icon`/`.pb-tile-title`/`.pb-tile-description` classes from `app.scss` rather than redefining them in a component's local `<style>` block.
 - **Navigation to another route must be a real `<a href>`, never a `<button onclick>`** — this lets right-click/middle-click/ctrl-click open the target in a new tab. Build the `href` from a `router.ts` path-builder function (never hand-roll the template string), and wrap the `on:click` handler with `navigateOnClick(event, action)` from `router.ts`: it lets modifier/middle clicks fall through to the browser's native new-tab handling, and otherwise `preventDefault()`s and runs `action` so a plain left click stays client-side SPA navigation with no reload. A destination that must always open in a new tab regardless of click type (results/QR views) uses a plain `<a href=... target="_blank" rel="noopener">` with no click handler at all, instead of `window.open()`.

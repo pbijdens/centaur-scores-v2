@@ -17,7 +17,7 @@ JWTs are returned by `POST /api/auth/login` and contain the account and active t
 - Match and competition dates are date-only values in `yyyy-MM-dd` format and have no timezone conversion.
 - Successful creates return `201 Created`; deletes return `204 No Content`.
 - Validation or business-rule conflicts return `400 Bad Request` or `409 Conflict`.
-- Endpoints that the UI must react to programmatically (currently login, change-password, account creation, and match updates) return a coded body `{ "code": "SOME_CODE", "message": "developer-facing text" }` instead of a plain `message`. `code` is a stable machine-readable identifier the client maps to a translated message; `message` is for logs/debugging only and must not be shown to end users. Known codes: `INVALID_CREDENTIALS` (401, login), `CURRENT_PASSWORD_INVALID` (400, change-password), `NEW_PASSWORD_REQUIRED` (400, change-password), `USERNAME_REQUIRED` (400, create account), `USERNAME_TAKEN` (409, create account), `INVALID_AUTHORIZATION` (400, create account), `PARTICIPANT_LIST_LOCKED` (409, update match).
+- Endpoints that the UI must react to programmatically (currently login, change-password, account creation/update, match updates, backup/restore, and personal-best configuration/import) return a coded body `{ "code": "SOME_CODE", "message": "developer-facing text" }` instead of a plain `message`. `code` is a stable machine-readable identifier the client maps to a translated message; `message` is for logs/debugging only and must not be shown to end users. Known codes: `INVALID_CREDENTIALS` (401, login), `CURRENT_PASSWORD_INVALID` (400, change-password), `NEW_PASSWORD_REQUIRED` (400, change-password), `USERNAME_REQUIRED` (400, create/update account), `USERNAME_TAKEN` (409, create/update account), `INVALID_AUTHORIZATION` (400, create account), `PARTICIPANT_LIST_LOCKED` (409, update match). Feature-specific codes (participant-list import, personal-best, backup/restore) are listed inline in their own endpoint rows below.
 
 ## Health and discovery
 
@@ -51,7 +51,7 @@ JWTs are returned by `POST /api/auth/login` and contain the account and active t
 | `GET` | `/api/accounts` | manager | List accounts in the active tenant. |
 | `GET` | `/api/accounts/{id}` | admin | Get a single account's details for editing. |
 | `POST` | `/api/accounts` | admin | Create an account with `{ username, password?, displayName?, email?, authorization? }`. `password` defaults to a random server-generated value and `authorization` defaults to `Viewer` when omitted. `409` with a coded error body (`USERNAME_TAKEN`) if the username is already used in the tenant. |
-| `PUT` | `/api/accounts/{id}` | admin | Update account identity, password, email, and authorization. |
+| `PUT` | `/api/accounts/{id}` | admin | Update an account's `{ username, password?, displayName?, email?, authorization? }`; `password` only changes when non-empty. `400` (`USERNAME_REQUIRED`) or `409` (`USERNAME_TAKEN`) if the new username is blank or already used by another account in the tenant. |
 | `DELETE` | `/api/accounts/{id}` | admin | Delete an account. |
 
 ## Categories and participant lists
@@ -80,7 +80,7 @@ JWTs are returned by `POST /api/auth/login` and contain the account and active t
 | Method | Path | Auth | Description |
 |---|---|---|---|
 | `GET` | `/api/match-templates` | user | List reusable match templates. |
-| `POST` | `/api/match-templates` | manager | Create a template with an optional source `participantListId`, `allowFreeParticipants`, `deviceSelectionMode` (`restricted`, `list`, or `list-and-free`), and configuration JSON. |
+| `POST` | `/api/match-templates` | manager | Create a template with an optional source `participantListId`, `allowFreeParticipants`, `deviceSelectionMode` (`restricted`, `list`, or `list-and-free`), configuration JSON, and an optional `personalBestClassifier` (the match classifier applied to matches created from this template, for personal-best registration). |
 | `PUT` | `/api/match-templates/{id}` | manager | Update a template. |
 | `DELETE` | `/api/match-templates/{id}` | admin | Delete a template. |
 
@@ -89,11 +89,11 @@ JWTs are returned by `POST /api/auth/login` and contain the account and active t
 | Method | Path | Auth | Description |
 |---|---|---|---|
 | `GET` | `/api/matches` | user | List matches, open matches first and then by date, as lightweight items (match fields plus `participantCount`/`unlistedParticipantCount` aggregates and `liveScopes` - no `participants`/`devices`, so this stays cheap regardless of roster size). |
-| `POST` | `/api/matches` | manager | Create match metadata, end configuration, an optional `participantListId` (the match's single source list), `deviceSelectionMode` (`restricted`, `list`, or `list-and-free`), keyboard, and scoring rules. |
+| `POST` | `/api/matches` | manager | Create match metadata, end configuration, an optional `participantListId` (the match's single source list), `deviceSelectionMode` (`restricted`, `list`, or `list-and-free`), keyboard, scoring rules, and an optional `personalBestClassifier` (the match classifier used for personal-best registration when the match closes). |
 | `GET` | `/api/matches/{id}` | user | Get match metadata, participants, devices, and live scopes. |
-| `PUT` | `/api/matches/{id}` | manager | Update match configuration or open state. `409` with a coded error body (`PARTICIPANT_LIST_LOCKED`) if `participantListId` changes after the match already has participants. |
+| `PUT` | `/api/matches/{id}` | manager | Update match configuration or open state. `409` with a coded error body (`PARTICIPANT_LIST_LOCKED`) if `participantListId` changes after the match already has participants. When this call transitions the match from open to closed and personal-best tracking is active with a `personalBestClassifier` set, eligible participants (on a source list, with a federation number, scoring higher than their prior best) are automatically registered into the personal-best log as a side effect. |
 | `DELETE` | `/api/matches/{id}` | admin | Delete a match and its dependent scoring data. |
-| `POST` | `/api/matches/deactivate-all` | manager | Close all matches in the active tenant. |
+| `POST` | `/api/matches/deactivate-all` | manager | Close all open matches in the active tenant; each closed match triggers the same automatic personal-best registration as `PUT /api/matches/{id}`. |
 | `GET` | `/api/matches/{id}/participants` | user | List match participants and entered scores. |
 | `POST` | `/api/matches/{id}/participants` | manager | Add a source-list or free participant. |
 | `PUT` | `/api/matches/{id}/participants/{participantId}` | manager | Update a participant's metadata: `{ participantListMemberId?, lastName, fullName, federationNumber?, categories }`. Used to edit details or "replace" the participant with another source-list member. `409` if `participantListMemberId` is already assigned to a different participant in the match. |
@@ -106,8 +106,9 @@ JWTs are returned by `POST /api/auth/login` and contain the account and active t
 | `PUT` | `/api/matches/{id}/devices/order` | manager | Persist device display/selection order with `{ deviceIds: Guid[] }` (all devices must be included). |
 | `PUT` | `/api/matches/{id}/devices/{deviceId}/participants/order` | manager | Persist the selected participant order for one device with `{ participantIds: Guid[] }` (all participants currently assigned to that device must be included). |
 | `DELETE` | `/api/matches/{id}/devices/{deviceId}` | manager | Remove a score-entry device. |
-| `POST` | `/api/matches/{id}/live-scopes` | manager | Configure a live score scope and display fields. |
+| `POST` | `/api/matches/{id}/live-scopes` | manager | Configure a live score scope and display fields, including `includePersonalBest` (when on, each entry's live-scoring line is checked against that archer's personal best for the match's classifier/discipline). |
 | `DELETE` | `/api/matches/{id}/live-scopes/{scopeId}` | manager | Remove a live score scope. |
+| `GET` | `/api/matches/{id}/live-scoring/{scope}` | user | Return the same live-scoring page shape as the public `/live-scoring/match/{scope}/{matchId}` endpoint, for one specific match/scope, regardless of whether the match is still open. Authenticated static equivalent of the public narrowcast page, for previewing/reviewing a scope from the management UI. |
 
 ## Competitions
 
@@ -126,6 +127,38 @@ JWTs are returned by `POST /api/auth/login` and contain the account and active t
 | `DELETE` | `/api/competitions/{id}/scoring-rules/{ruleId}` | manager | Remove a scoring rule. |
 | `GET` | `/api/competitions/{id}/results` | user | Return aggregated participant results from assigned matches. |
 
+## Personal best
+
+Tracks personal-best archery scores per archer, on top of data (archer identity, discipline, match classifier) whose authoritative source is external to this system. The feature is enabled per tenant and, once enabled, is inherited read-only by every sub-tenant (sub-tenants cannot re-configure or independently enable/disable it) — endpoints below resolve to whichever tenant in the current tenant's ancestor chain actually owns the configuration ("the owning tenant"), and return `404` if the feature isn't enabled anywhere in that chain. See [../documentation/PERSONAL-BEST-FEATUE.md](../documentation/PERSONAL-BEST-FEATUE.md) for the full feature design.
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| `GET` | `/api/personal-best/status` | user | Return `{ enabled, ownedHere, owningTenantId }` for the active tenant: whether tracking is active (enabled here or inherited from an ancestor) and, if so, whether the active tenant is the one that owns the configuration. |
+| `POST` | `/api/personal-best/enable` | admin | Enable personal-best tracking for the active tenant and seed a default export/import configuration. `409` (`PERSONAL_BEST_ALREADY_ENABLED`) if already enabled on this tenant or an ancestor. |
+| `POST` | `/api/personal-best/disable` | admin | Disable tracking for the active tenant. The log and configuration are preserved (still visible via `GET` endpoints below) but excluded from exports and from live-scoring `includePersonalBest` output. |
+| `GET` | `/api/personal-best/classifiers` | user | List the owning tenant's configured match classifiers. |
+| `PUT` | `/api/personal-best/classifiers` | manager | Replace the classifier list with `{ classifiers: string[] }`. `400` (`DUPLICATE_CLASSIFIER`) if any name repeats case-insensitively. |
+| `GET` | `/api/personal-best/disciplines` | user | List configured disciplines, each with its mapped `{ tenantId, tenantName, categoryId, categoryName, valueId, valueName }` values. |
+| `GET` | `/api/personal-best/disciplines/available-values` | user | List every category value across the owning tenant and its sub-tenants, flagging which discipline (if any) each value is already mapped to (`takenByDisciplineId`). |
+| `PUT` | `/api/personal-best/disciplines` | manager | Replace the discipline list with `{ disciplines: [{ id?, name, values: [{ tenantId, categoryId, valueId }] }] }` (a value may be attached to at most one discipline). `400` (`DUPLICATE_DISCIPLINE`) for a duplicate or empty name, `400` (`VALUE_ALREADY_MAPPED`) if a value is assigned to more than one discipline in the request. |
+| `GET` | `/api/personal-best/export-config` | user | Get the export configuration: `{ exportMode, tableName, columns: [{ columnName, field, dateFormat? }] }`. |
+| `PUT` | `/api/personal-best/export-config` | manager | Update the export configuration (`exportMode` is `"all"` or `"changesSinceLastImport"`). `400` (`INVALID_EXPORT_CONFIG`) for an empty table name or column name. |
+| `GET` | `/api/personal-best/import-config` | user | Get the import configuration: which Excel table/column names to read authoritative scores from. |
+| `PUT` | `/api/personal-best/import-config` | manager | Update the import configuration; every field is required. `400` (`INVALID_IMPORT_CONFIG`) if any is blank. |
+| `POST` | `/api/personal-best/import` | manager | Upload an authoritative scores workbook (`multipart/form-data`, field `file`, max 10 MB) and process it row by row per the import configuration: new entries are added, entries superseded by a later higher score replace older lower ones, and rows that would overwrite a still-higher existing score are collected as conflicts instead of applied. Returns `{ newArchers, newRegistrations, warnings, batchId?, conflicts }` — `batchId` is set only when there are actionable conflicts awaiting resolution. `400` (`IMPORT_FILE_MISSING`, or `IMPORT_INVALID_FILE`/`IMPORT_UNRECOGNIZED_HEADERS` from a malformed workbook). |
+| `POST` | `/api/personal-best/import/{batchId}/resolve` | manager | Resolve a prior import's conflicts with `{ resolutions: [{ federationNumber, discipline, matchClassifier, action }] }` — `action: "deleteOffending"` removes the pre-existing higher-scored log entries in favor of the import; any other action keeps them. Deletes the batch either way. |
+| `GET` | `/api/personal-best/export.xlsx` | manager | Download the personal-best log as `"{tenant} personal best updates.xlsx"`, filtered/shaped per the export configuration. |
+| `GET` | `/api/personal-best/log` | user | List the current personal best per archer/discipline/match classifier (most recent log entry per group), sorted by name. |
+
+## Backup and restore
+
+Lets a tenant administrator export a tenant (optionally with its whole sub-tenant tree) to a downloadable ZIP, and restore such a ZIP back in as a brand-new sub-tenant. Restore is strictly additive — it never overwrites or links to pre-existing data; every id is re-minted and every backup-internal reference is remapped. See [../documentation/BACKUP-RESTORE.md](../documentation/BACKUP-RESTORE.md) for the full format and behavior.
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| `POST` | `/api/backup/export` | admin | Build a backup ZIP for the active tenant with `{ includeSubTenants }` and return it as `application/zip` (synchronous, in-memory, single request/response). |
+| `POST` | `/api/backup/restore` | admin | Upload a backup ZIP (`multipart/form-data`, field `file`, max 200 MB) and restore it as a new sub-tenant under the active tenant, inside a single database transaction. Returns `{ newTenantId, newTenantName, warnings }` on success. `400` with a coded error body on failure: `RESTORE_FILE_MISSING`, `RESTORE_INVALID_FILE`, `RESTORE_MISSING_INDEX`, `RESTORE_INVALID_INDEX`, `RESTORE_UNSUPPORTED_VERSION`, `RESTORE_INVALID_ROOT_TENANT`. |
+
 ## Public score consumers
 
 These endpoints intentionally do not require a JWT. They are intended for display systems and printed score-entry device QR URLs.
@@ -133,7 +166,7 @@ These endpoints intentionally do not require a JWT. They are intended for displa
 | Method | Path | Auth | Description |
 |---|---|---|---|
 | `GET` | `/live-scoring/match/{scope}` | none | List open matches, across all tenants, configured for the given live display scope. |
-| `GET` | `/live-scoring/match/{scope}/{matchId}` | none | Return the configured grouped and ranked live-scoring page for one open match (any tenant). |
+| `GET` | `/live-scoring/match/{scope}/{matchId}` | none | Return the configured grouped and ranked live-scoring page for one open match (any tenant). When the scope has `includePersonalBest` on and personal-best tracking is active for the match's tenant, each entry carries an `aboveTarget` flag set when the archer's current per-arrow average projects a finish above their registered personal best for that match's classifier/discipline. |
 | `GET` | `/scorekeeper/{tenantId}/{matchId}/{deviceId}` | none | Return the active device-specific match configuration and assigned participants. |
 | `PUT` | `/scorekeeper/{tenantId}/{matchId}/{deviceId}/participants` | none | Replace the device participant assignment and order, subject to match participant policies. |
 | `PUT` | `/scorekeeper/{tenantId}/{matchId}/{deviceId}/scores` | none | Apply optimistic score updates; returns `UPDATE_SCORE_CONFLICT` with per-participant conflicts when needed. |
