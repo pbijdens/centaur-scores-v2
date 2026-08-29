@@ -291,6 +291,11 @@ nav a {
   white-space: nowrap;
 }
 
+nav a {
+  display: flex;
+  align-items: center;
+}
+
 nav button.active,
 nav a.active {
   color: var(--ink);
