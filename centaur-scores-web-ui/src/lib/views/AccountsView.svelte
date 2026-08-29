@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { ApiClient } from '../api'
+  import { authorizationLabel } from '../authorization'
   import { labelForError } from '../errors'
   import { accountPath, navigateOnClick } from '../router'
   import type { Account } from '../types'
@@ -13,12 +14,6 @@
   let showAddForm = false
   let newAccountUsername = ''
   let createError = ''
-
-  function authorizationLabel(authorization: string): string {
-    if (authorization === 'Administrator') return labels.authAdministrator
-    if (authorization === 'Manager') return labels.authManager
-    return labels.authViewer
-  }
 
   async function submitAdd() {
     if (!newAccountUsername.trim()) return
@@ -52,7 +47,7 @@
     <a class="list-row" href={accountPath(account.id)} on:click={(event) => navigateOnClick(event, () => onOpenAccount(account))}>
       <span class="management-icon">◇</span>
       <span><strong>{account.username}</strong><small>{account.displayName ?? ''}</small></span>
-      <span class="tag">{authorizationLabel(account.authorization)}</span>
+      <span class="tag">{authorizationLabel(account.authorization, labels)}</span>
       <span class="arrow">→</span>
     </a>
   {/each}

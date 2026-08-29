@@ -9,6 +9,7 @@
   export let labels: Record<string, string>
   export let tenantName: string | null | undefined = undefined
   export let tenantLogoUrl: string | null | undefined = undefined
+  export let showTenantSwitch: boolean = false
   export let onNavigate: (path: string) => void
   export let onLanguageChange: (value: string) => void
   export let onLogout: () => void
@@ -51,6 +52,9 @@
         >🇳🇱</button>
       </div>
       <hr class="menu-separator" />
+      {#if showTenantSwitch}
+        <a class="menu-item" class:active={view === 'select-tenant'} href="/select-tenant" on:click={(event) => navigateOnClick(event, () => onNavigate('/select-tenant'))}>{labels.switchTenant}</a>
+      {/if}
       <a class="menu-item" class:active={view === 'profile'} href="/profile" on:click={(event) => navigateOnClick(event, () => onNavigate('/profile'))}>{labels.editMyProfile}</a>
       <button class="menu-item" on:click={onLogout}>{labels.logout}</button>
     </DropdownMenu>

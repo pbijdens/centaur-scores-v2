@@ -26,7 +26,7 @@ public sealed class AccountsController(ApplicationDbContext db, ITenantContext t
     {
         if (!IsAdministrator) return Forbid();
         if (string.IsNullOrWhiteSpace(request.Username)) return BadRequest(new ApiError("USERNAME_REQUIRED", "Username is required."));
-        if (await db.Accounts.AnyAsync(item => item.TenantId == TenantId && item.Username == request.Username, cancellationToken))
+        if (await db.Accounts.AnyAsync(item => item.Username == request.Username, cancellationToken))
             return Conflict(new ApiError("USERNAME_TAKEN", "An account with this username already exists."));
         AuthorizationProfile authorization;
         try { authorization = string.IsNullOrWhiteSpace(request.Authorization) ? AuthorizationProfile.Viewer : Enum.Parse<AuthorizationProfile>(request.Authorization, true); }
@@ -45,7 +45,7 @@ public sealed class AccountsController(ApplicationDbContext db, ITenantContext t
         var account = await db.Accounts.SingleOrDefaultAsync(item => item.Id == id && item.TenantId == TenantId, cancellationToken);
         if (account is null) return NotFound();
         if (string.IsNullOrWhiteSpace(request.Username)) return BadRequest(new ApiError("USERNAME_REQUIRED", "Username is required."));
-        if (await db.Accounts.AnyAsync(item => item.TenantId == TenantId && item.Id != id && item.Username == request.Username, cancellationToken))
+        if (await db.Accounts.AnyAsync(item => item.Id != id && item.Username == request.Username, cancellationToken))
             return Conflict(new ApiError("USERNAME_TAKEN", "An account with this username already exists."));
         account.Username = request.Username;
         account.DisplayName = request.DisplayName;

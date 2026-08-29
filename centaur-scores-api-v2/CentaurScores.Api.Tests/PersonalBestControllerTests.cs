@@ -67,5 +67,6 @@ public sealed class PersonalBestControllerTests
         public Guid AccountId { get; } = Guid.NewGuid();
         public bool IsAdministrator => true;
         public bool CanManage => true;
+        public DateTime TokenExpiresAtUtc => DateTime.UtcNow.AddHours(4);
     }
 }

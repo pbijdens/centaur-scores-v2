@@ -17,6 +17,7 @@ export function participantListPath(listId: string): string { return `/participa
 export function participantMemberPath(listId: string, memberId: string): string { return `/participants/${listId}/members/${memberId}` }
 export function templatePath(templateId: string): string { return `/templates/${templateId}` }
 export function narrowcastPath(scope: string): string { return `/narrowcast/${encodeURIComponent(scope)}` }
+export function selectTenantPath(): string { return '/select-tenant' }
 
 // Lets list-row-style <a href> elements keep native right-click/middle-click/ctrl-click
 // "open in new tab" while a plain left click still does client-side SPA navigation.
@@ -57,6 +58,7 @@ export function resolveRoute(path = location.pathname): Route {
   }
   if (section === 'profile') return { view: 'profile' }
   if (section === 'tenant-settings') return { view: 'tenant-settings' }
+  if (section === 'select-tenant') return { view: 'select-tenant' }
   if (section === 'tenants') {
     return segments[1] ? { view: 'tenant', tenantId: segments[1] } : { view: 'tenants' }
   }

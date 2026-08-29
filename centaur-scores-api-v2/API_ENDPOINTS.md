@@ -8,7 +8,7 @@ The API uses JSON unless an endpoint explicitly returns CSV. Authenticated endpo
 Authorization: Bearer <jwt>
 ```
 
-JWTs are returned by `POST /api/auth/login` and contain the account and active tenant. All query and mutation endpoints enforce the tenant in that claim. Administrator-only operations are marked `admin`; manager operations require the `manager` or `admin` authorization profile.
+JWTs are returned by `POST /api/auth/login` and contain the account and active tenant. Login itself carries no tenant - the issued token starts with an empty tenant claim, and `POST /api/auth/select-tenant` mints a new token scoped to a specific tenant once one is chosen (see below). All tenant-scoped query and mutation endpoints enforce the tenant in that claim and reject a token whose tenant claim is still empty. Administrator-only operations are marked `admin`; manager operations require the `manager` or `admin` authorization profile.
 
 ## Conventions
 
@@ -17,7 +17,7 @@ JWTs are returned by `POST /api/auth/login` and contain the account and active t
 - Match and competition dates are date-only values in `yyyy-MM-dd` format and have no timezone conversion.
 - Successful creates return `201 Created`; deletes return `204 No Content`.
 - Validation or business-rule conflicts return `400 Bad Request` or `409 Conflict`.
-- Endpoints that the UI must react to programmatically (currently login, change-password, account creation/update, match updates, backup/restore, and personal-best configuration/import) return a coded body `{ "code": "SOME_CODE", "message": "developer-facing text" }` instead of a plain `message`. `code` is a stable machine-readable identifier the client maps to a translated message; `message` is for logs/debugging only and must not be shown to end users. Known codes: `INVALID_CREDENTIALS` (401, login), `CURRENT_PASSWORD_INVALID` (400, change-password), `NEW_PASSWORD_REQUIRED` (400, change-password), `USERNAME_REQUIRED` (400, create/update account), `USERNAME_TAKEN` (409, create/update account), `INVALID_AUTHORIZATION` (400, create account), `PARTICIPANT_LIST_LOCKED` (409, update match). Feature-specific codes (participant-list import, personal-best, backup/restore) are listed inline in their own endpoint rows below.
+- Endpoints that the UI must react to programmatically (currently login, change-password, account creation/update, match updates, backup/restore, and personal-best configuration/import) return a coded body `{ "code": "SOME_CODE", "message": "developer-facing text" }` instead of a plain `message`. `code` is a stable machine-readable identifier the client maps to a translated message; `message` is for logs/debugging only and must not be shown to end users. Known codes: `INVALID_CREDENTIALS` (401, login), `TENANT_NOT_AUTHORIZED` (403, select-tenant, requested tenant isn't in the account's authorized set), `TENANT_NOT_SELECTED` (403, any tenant-scoped endpoint called with a token whose tenant claim is still empty), `CURRENT_PASSWORD_INVALID` (400, change-password), `NEW_PASSWORD_REQUIRED` (400, change-password), `USERNAME_REQUIRED` (400, create/update account), `USERNAME_TAKEN` (409, create/update account), `INVALID_AUTHORIZATION` (400, create account), `PARTICIPANT_LIST_LOCKED` (409, update match). Feature-specific codes (participant-list import, personal-best, backup/restore) are listed inline in their own endpoint rows below.
 
 ## Health and discovery
 
@@ -31,9 +31,10 @@ JWTs are returned by `POST /api/auth/login` and contain the account and active t
 
 | Method | Path | Auth | Description |
 |---|---|---|---|
-| `GET` | `/api/tenants` | none | List tenants available on the login screen. |
-| `POST` | `/api/auth/login` | none | Authenticate with `{ username, password, tenantId }`; returns `{ token, expiresAt, account }`. `401` with a coded error body on failure. |
-| `GET` | `/api/auth/me` | user | Return the current account's profile: `{ id, username, displayName, email, authorization }`. |
+| `GET` | `/api/tenants` | none | List all tenants. No longer used by the login screen (login no longer selects a tenant); kept for other public/administrative lookups. |
+| `POST` | `/api/auth/login` | none | Authenticate with `{ username, password }`; returns `{ token, expiresAt, account }`. The issued token's `tenant_id` claim is empty (no tenant selected yet) - call `POST /api/auth/select-tenant` next, using `authorizedForTenants` from `GET /api/auth/me` to pick one. `401` with a coded error body on failure. |
+| `GET` | `/api/auth/me` | user | Return the current account's profile: `{ id, username, displayName, email, authorization, authorizedForTenants }`. `authorizedForTenants` lists the account's home tenant plus every descendant found by walking `Tenant.ParentTenantId` downward, each as `{ tenantId, tenantName, logoUrl, authorization }` - `authorization` is always the account's own home-tenant level, applied uniformly across the whole sub-tree. |
+| `POST` | `/api/auth/select-tenant` | user | Re-mint the caller's bearer token with a different `tenant_id` claim, after verifying the account is authorized for it (see `authorizedForTenants`). Body: `{ tenantId }`. Returns the same `{ token, expiresAt, account }` shape as login; `expiresAt` is identical to the original token's expiry, not extended - this is a re-mint, not a refresh. `403` with a coded error body (`TENANT_NOT_AUTHORIZED`) if not authorized for that tenant. |
 | `PUT` | `/api/auth/me` | user | Update the current account's `{ displayName, email }`. |
 | `POST` | `/api/auth/change-password` | user | Change the current account's password with `{ currentPassword, newPassword }`; `400` with a coded error body if the current password does not match or the new password is missing. |
 | `GET` | `/api/tenants/current` | user | Return the active tenant configuration. |
@@ -52,8 +53,8 @@ JWTs are returned by `POST /api/auth/login` and contain the account and active t
 |---|---|---|---|
 | `GET` | `/api/accounts` | manager | List accounts in the active tenant. |
 | `GET` | `/api/accounts/{id}` | admin | Get a single account's details for editing. |
-| `POST` | `/api/accounts` | admin | Create an account with `{ username, password?, displayName?, email?, authorization? }`. `password` defaults to a random server-generated value and `authorization` defaults to `Viewer` when omitted. `409` with a coded error body (`USERNAME_TAKEN`) if the username is already used in the tenant. |
-| `PUT` | `/api/accounts/{id}` | admin | Update an account's `{ username, password?, displayName?, email?, authorization? }`; `password` only changes when non-empty. `400` (`USERNAME_REQUIRED`) or `409` (`USERNAME_TAKEN`) if the new username is blank or already used by another account in the tenant. |
+| `POST` | `/api/accounts` | admin | Create an account with `{ username, password?, displayName?, email?, authorization? }`. `password` defaults to a random server-generated value and `authorization` defaults to `Viewer` when omitted. `409` with a coded error body (`USERNAME_TAKEN`) if the username is already used by any account, in any tenant. |
+| `PUT` | `/api/accounts/{id}` | admin | Update an account's `{ username, password?, displayName?, email?, authorization? }`; `password` only changes when non-empty. `400` (`USERNAME_REQUIRED`) or `409` (`USERNAME_TAKEN`) if the new username is blank or already used by another account, in any tenant. |
 | `DELETE` | `/api/accounts/{id}` | admin | Delete an account. |
 
 ## Categories and participant lists
@@ -187,7 +188,6 @@ Content-Type: application/json
 
 {
   "username": "centaurscores",
-  "password": "centaurscores",
-  "tenantId": "00000000-0000-0000-0000-000000000001"
+  "password": "centaurscores"
 }
 ```

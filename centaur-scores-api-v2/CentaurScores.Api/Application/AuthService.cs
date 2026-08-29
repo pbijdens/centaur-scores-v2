@@ -14,45 +14,76 @@ public sealed record AuthenticatedAccount(string Token, DateTime ExpiresAt, Acco
 public interface IAuthService
 {
     Task<AuthenticatedAccount?> AuthenticateAsync(LoginRequest request, CancellationToken cancellationToken);
+    Task<IReadOnlyList<TenantAccessView>> GetAuthorizedTenantsAsync(Guid accountId, CancellationToken cancellationToken);
+    Task<AuthenticatedAccount?> SelectTenantAsync(Guid accountId, Guid tenantId, DateTime expiresAtUtc, CancellationToken cancellationToken);
 }
 
 public sealed class AuthService(ApplicationDbContext db, IConfiguration configuration) : IAuthService
 {
     public async Task<AuthenticatedAccount?> AuthenticateAsync(LoginRequest request, CancellationToken cancellationToken)
     {
-        var account = await FindAccountAsync(request, cancellationToken);
+        // Username is now globally unique (see the Account.Username index), so no tenant is needed to find
+        // the account. FirstOrDefault (not Single) so a stale duplicate from before that index was enforced
+        // fails safely as "not found" rather than throwing.
+        var account = await db.Accounts.AsNoTracking().FirstOrDefaultAsync(item => item.Username == request.Username, cancellationToken);
         if (account is null || !Passwords.Verify(request.Password, account.PasswordHash)) return null;
-        var secret = configuration["Jwt:Secret"] ?? throw new InvalidOperationException("Jwt:Secret is required");
-        var expires = DateTime.UtcNow.AddHours(configuration.GetValue("Jwt:Hours", 4));
-        var authorization = account.TenantId == request.TenantId ? account.Authorization : AuthorizationProfile.Administrator;
-        var claims = new[] { new Claim(JwtRegisteredClaimNames.Sub, account.Id.ToString()), new Claim("tenant_id", request.TenantId.ToString()), new Claim(ClaimTypes.Name, account.DisplayName ?? account.Username), new Claim(ClaimTypes.Email, account.Email ?? ""), new Claim(ClaimTypes.Role, authorization.ToString()) };
-        var credentials = new SigningCredentials(new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secret)), SecurityAlgorithms.HmacSha256);
-        var token = new JwtSecurityToken(claims: claims, expires: expires, signingCredentials: credentials);
-        return new AuthenticatedAccount(new JwtSecurityTokenHandler().WriteToken(token), expires, account);
+        var expiresAtUtc = DateTime.UtcNow.AddHours(configuration.GetValue("Jwt:Hours", 4));
+        // No tenant has been selected yet - tenant_id is empty until POST /api/auth/select-tenant is called.
+        // ApiControllerBase rejects an empty tenant on every tenant-scoped endpoint, so this token can only
+        // be used for /api/auth/me and /api/auth/select-tenant until then.
+        var token = BuildToken(account, Guid.Empty, expiresAtUtc);
+        return new AuthenticatedAccount(token, expiresAtUtc, account);
     }
 
-    private async Task<Account?> FindAccountAsync(LoginRequest request, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<TenantAccessView>> GetAuthorizedTenantsAsync(Guid accountId, CancellationToken cancellationToken)
     {
-        var tenant = await db.Tenants.AsNoTracking().SingleOrDefaultAsync(item => item.Id == request.TenantId, cancellationToken);
-        if (tenant is null) return null;
-
-        var account = await FindAccountInTenantAsync(tenant.Id, request.Username, cancellationToken);
-        if (account is not null) return account;
-
-        // Walk upward only when the requested tenant has no local account for this username.
-        while (tenant.ParentTenantId is { } parentTenantId)
-        {
-            tenant = await db.Tenants.AsNoTracking().SingleOrDefaultAsync(item => item.Id == parentTenantId, cancellationToken);
-            if (tenant is null) return null;
-            account = await FindAccountInTenantAsync(tenant.Id, request.Username, cancellationToken);
-            if (account is not null) return account.Authorization == AuthorizationProfile.Administrator ? account : null;
-        }
-
-        return null;
+        var account = await db.Accounts.AsNoTracking().SingleOrDefaultAsync(item => item.Id == accountId, cancellationToken);
+        return account is null ? [] : await ResolveAuthorizedTenantsAsync(account, cancellationToken);
     }
 
-    private Task<Account?> FindAccountInTenantAsync(Guid tenantId, string username, CancellationToken cancellationToken) =>
-        db.Accounts.AsNoTracking().SingleOrDefaultAsync(item => item.TenantId == tenantId && item.Username == username, cancellationToken);
+    public async Task<AuthenticatedAccount?> SelectTenantAsync(Guid accountId, Guid tenantId, DateTime expiresAtUtc, CancellationToken cancellationToken)
+    {
+        var account = await db.Accounts.AsNoTracking().SingleOrDefaultAsync(item => item.Id == accountId, cancellationToken);
+        if (account is null) return null;
+        var authorizedTenants = await ResolveAuthorizedTenantsAsync(account, cancellationToken);
+        if (!authorizedTenants.Any(item => item.TenantId == tenantId)) return null;
+        // expiresAtUtc is the caller's original token expiry - this re-mints a token for a different
+        // tenant, it does not refresh or extend the session.
+        var token = BuildToken(account, tenantId, expiresAtUtc);
+        return new AuthenticatedAccount(token, expiresAtUtc, account);
+    }
+
+    // Walks down Tenant.ParentTenantId from the account's home tenant, collecting the home tenant plus
+    // every descendant, all at the account's own unchanged Authorization level. There is no per-tenant
+    // grant table - access is derived purely from the existing hierarchy.
+    private async Task<IReadOnlyList<TenantAccessView>> ResolveAuthorizedTenantsAsync(Account account, CancellationToken cancellationToken)
+    {
+        var allTenants = await db.Tenants.AsNoTracking().ToListAsync(cancellationToken);
+        var homeTenant = allTenants.SingleOrDefault(item => item.Id == account.TenantId);
+        if (homeTenant is null) return [];
+        var childrenByParent = allTenants.Where(item => item.ParentTenantId is not null).ToLookup(item => item.ParentTenantId!.Value);
+        var result = new List<TenantAccessView>();
+        var visited = new HashSet<Guid>();
+        var queue = new Queue<Tenant>();
+        queue.Enqueue(homeTenant);
+        while (queue.Count > 0)
+        {
+            var current = queue.Dequeue();
+            if (!visited.Add(current.Id)) continue;
+            result.Add(new TenantAccessView(current.Id, current.Name, current.LogoUrl, account.Authorization.ToString()));
+            foreach (var child in childrenByParent[current.Id]) queue.Enqueue(child);
+        }
+        return result;
+    }
+
+    private string BuildToken(Account account, Guid tenantId, DateTime expiresAtUtc)
+    {
+        var secret = configuration["Jwt:Secret"] ?? throw new InvalidOperationException("Jwt:Secret is required");
+        var claims = new[] { new Claim(JwtRegisteredClaimNames.Sub, account.Id.ToString()), new Claim("tenant_id", tenantId.ToString()), new Claim(ClaimTypes.Name, account.DisplayName ?? account.Username), new Claim(ClaimTypes.Email, account.Email ?? ""), new Claim(ClaimTypes.Role, account.Authorization.ToString()) };
+        var credentials = new SigningCredentials(new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secret)), SecurityAlgorithms.HmacSha256);
+        var token = new JwtSecurityToken(claims: claims, expires: expiresAtUtc, signingCredentials: credentials);
+        return new JwtSecurityTokenHandler().WriteToken(token);
+    }
 }
 
 public static class Passwords

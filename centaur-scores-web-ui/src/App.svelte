@@ -13,9 +13,8 @@
     personalBestStatus,
     profile,
     templates,
-    tenants,
     loadData as loadAllData,
-    loadTenants as fetchTenantsList,
+    loadProfile,
     loadMatchesList as fetchMatchesList,
     loadCompetitionsList as fetchCompetitionsList,
     loadAccounts as fetchAccountsList,
@@ -24,13 +23,12 @@
     refreshParticipantLists as fetchParticipantListsList,
     refreshPersonalBestStatus as fetchPersonalBestStatus,
     refreshTemplates as fetchTemplatesList,
-    refreshDefaultScopeSettings as fetchDefaultScopeSettings,
-    resetMatchesAndCompetitions
+    refreshDefaultScopeSettings as fetchDefaultScopeSettings
   } from './lib/data'
   import { labelForError } from './lib/errors'
   import { translationsFor } from './lib/i18n'
   import { accountPath, categoryPath, competitionPath, matchDevicesPath, matchEditPath, matchParticipantPath, matchPath, navigateTo, participantListPath, participantMemberPath, resolveRoute, templatePath, tenantPath } from './lib/router'
-  import type { Account, Category, Competition, Language, Match, MatchTemplate, ParticipantList, ParticipantListSummary, Tenant, View } from './lib/types'
+  import type { Account, Category, Competition, Language, Match, MatchTemplate, ParticipantList, ParticipantListSummary, TenantAccess, Tenant, View } from './lib/types'
   import AccountEditView from './lib/views/AccountEditView.svelte'
   import AccountsView from './lib/views/AccountsView.svelte'
   import BackupRestoreView from './lib/views/BackupRestoreView.svelte'
@@ -50,6 +48,7 @@
   import MatchParticipantView from './lib/views/MatchParticipantView.svelte'
   import MatchQrCodesView from './lib/views/MatchQrCodesView.svelte'
   import MatchResultsScopeView from './lib/views/MatchResultsScopeView.svelte'
+  import NoTenantAccessView from './lib/views/NoTenantAccessView.svelte'
   import ParticipantListDetailView from './lib/views/ParticipantListDetailView.svelte'
   import ParticipantListsView from './lib/views/ParticipantListsView.svelte'
   import ParticipantMemberView from './lib/views/ParticipantMemberView.svelte'
@@ -60,18 +59,18 @@
   import PersonalBestLogView from './lib/views/PersonalBestLogView.svelte'
   import PersonalBestView from './lib/views/PersonalBestView.svelte'
   import ProfileView from './lib/views/ProfileView.svelte'
+  import SelectTenantView from './lib/views/SelectTenantView.svelte'
   import TemplateEditView from './lib/views/TemplateEditView.svelte'
   import TemplatesView from './lib/views/TemplatesView.svelte'
   import TenantEditView from './lib/views/TenantEditView.svelte'
   import TenantSettingsView from './lib/views/TenantSettingsView.svelte'
   import TenantsView from './lib/views/TenantsView.svelte'
 
-  const rootTenant = '00000000-0000-0000-0000-000000000001'
   let loggedIn = localStorage.getItem('centaur-token') !== null
   let token = localStorage.getItem('centaur-token') ?? ''
-  let tenant = localStorage.getItem('centaur-tenant') ?? rootTenant
-  let tenantsLoading = false
-  let tenantsError = ''
+  let tenant = localStorage.getItem('centaur-tenant') ?? ''
+  let tenantAccessError = false
+  let sessionReady = false
   let username = ''
   let password = ''
   let language = (localStorage.getItem('centaur-language') ?? 'nl') as Language
@@ -121,38 +120,64 @@
 
   const api = new ApiClient(() => token, signOut)
 
-  async function loadTenants() {
-    tenantsLoading = true
-    tenantsError = ''
-    try {
-      const result = await fetchTenantsList()
-      if (result.length > 0 && !result.some((item) => item.id === tenant)) tenant = result[0].id
-    } catch {
-      tenants.set([])
-      tenantsError = t.tenantsLoadError
-    } finally { tenantsLoading = false }
+  function resolveTenantSelection(authorizedForTenants: TenantAccess[]): string {
+    if (authorizedForTenants.length === 1) return authorizedForTenants[0].tenantId
+    const hint = localStorage.getItem('centaur-tenant')
+    if (hint && authorizedForTenants.some((item) => item.tenantId === hint)) return hint
+    return [...authorizedForTenants].sort((a, b) => a.tenantName.localeCompare(b.tenantName))[0].tenantId
   }
 
-  async function loadData() {
+  // Runs identically on a fresh login and on a page refresh with an existing token: fetches the account's
+  // authorized tenants, silently resolves one (single tenant / stored hint / alphabetical fallback), and
+  // re-mints the token for it before the rest of the app's tenant-scoped data loads. This always calls
+  // selectTenant() even when the stored token already carries a valid tenant - one cheap extra round trip
+  // in exchange for a single code path that also self-heals if the account's tenant tree changed since the
+  // token was minted.
+  async function bootstrapSession() {
     if (!token) return
     loading = true
+    tenantAccessError = false
     try {
+      const fetchedProfile = await loadProfile(api)
+      if (fetchedProfile.authorizedForTenants.length === 0) {
+        tenantAccessError = true
+        return
+      }
+      tenant = resolveTenantSelection(fetchedProfile.authorizedForTenants)
+      const selected = await api.selectTenant(tenant)
+      token = selected.token
+      localStorage.setItem('centaur-token', token)
+      localStorage.setItem('centaur-tenant', tenant)
       await loadAllData(api)
+      sessionReady = true
       applyRoute()
-    } catch { resetMatchesAndCompetitions() } finally { loading = false }
+    } catch {
+      signOut()
+    } finally { loading = false }
+  }
+
+  async function onTenantSelected(tenantId: string) {
+    const result = await api.selectTenant(tenantId)
+    token = result.token
+    tenant = tenantId
+    localStorage.setItem('centaur-token', token)
+    localStorage.setItem('centaur-tenant', tenant)
+    await loadAllData(api)
+    navigate('/')
   }
 
   async function signIn() {
     try {
-      const result = await login(username, password, tenant)
+      const result = await login(username, password)
       token = result.token; loggedIn = true; loginError = ''
-      localStorage.setItem('centaur-token', token); localStorage.setItem('centaur-tenant', tenant); await loadData()
+      localStorage.setItem('centaur-token', token)
+      await bootstrapSession()
       navigate('/')
     } catch (error) { loginError = labelForError(error, t, 'signInError') }
   }
 
   function signOut() {
-    localStorage.removeItem('centaur-token'); token = ''; loggedIn = false; username = ''; password = ''; loginError = ''; selectedMatch = null; navigate('/login', true)
+    localStorage.removeItem('centaur-token'); token = ''; loggedIn = false; username = ''; password = ''; loginError = ''; selectedMatch = null; sessionReady = false; tenantAccessError = false; navigate('/login', true)
   }
 
   function setLanguage(value: string) { language = value as Language; localStorage.setItem('centaur-language', value) }
@@ -351,8 +376,7 @@
     window.addEventListener('popstate', handlePopState)
     applyRoute()
     if (view !== 'narrowcast') {
-      loadTenants()
-      if (loggedIn) loadData()
+      if (loggedIn) bootstrapSession()
       else if (location.pathname !== '/login') history.replaceState({}, '', '/login')
     }
     return () => window.removeEventListener('popstate', handlePopState)
@@ -368,10 +392,14 @@
 {:else if view === 'competition-results' && selectedCompetitionId}
   <CompetitionResultsView {api} competitionId={selectedCompetitionId} tenantLogoUrl={$currentTenant?.logoUrl} {language} labels={t} />
 {:else if !loggedIn}
-  <LoginView bind:tenant tenants={$tenants} {tenantsLoading} {tenantsError} bind:username bind:password {loginError} {language} labels={t} onSubmit={signIn} onLanguageChange={setLanguage} />
+  <LoginView bind:username bind:password {loginError} {language} labels={t} onSubmit={signIn} onLanguageChange={setLanguage} />
+{:else if tenantAccessError}
+  <NoTenantAccessView labels={t} onLogout={signOut} />
+{:else if !sessionReady}
+  <p class="loading">{t.loadingTenantData}</p>
 {:else}
   <div class="app-shell">
-    <AppHeader username={headerUsername} {language} {view} labels={t} tenantName={$currentTenant?.name} tenantLogoUrl={$currentTenant?.logoUrl} onNavigate={navigate} onLanguageChange={setLanguage} onLogout={signOut} />
+    <AppHeader username={headerUsername} {language} {view} labels={t} tenantName={$currentTenant?.name} tenantLogoUrl={$currentTenant?.logoUrl} showTenantSwitch={($profile?.authorizedForTenants?.length ?? 0) > 1} onNavigate={navigate} onLanguageChange={setLanguage} onLogout={signOut} />
     <main class="content">
       {#if view === 'home'}
         <HomeView matches={$matches} competitions={$competitions} {language} labels={t} quickLinks={homeQuickLinks} onOpenMatch={openMatch} onNavigate={navigate} onDeactivateAll={deactivateAllMatches} />
@@ -396,6 +424,8 @@
         <CompetitionDetailView {api} competition={currentCompetition} categories={$categories} matches={$matches} {language} labels={t} onBack={() => navigate('/competitions')} onChanged={onCompetitionChanged} onDeleted={onCompetitionDeleted} onViewResults={() => window.open(`/competitions/${currentCompetition.id}/results`, '_blank')} onCopied={(copy) => { loadCompetitionsList(); openCompetition(copy) }} />
       {:else if view === 'profile'}
         <ProfileView {api} labels={t} onBack={() => navigate('/')} />
+      {:else if view === 'select-tenant'}
+        <SelectTenantView authorizedForTenants={$profile?.authorizedForTenants ?? []} labels={t} onSelectTenant={onTenantSelected} onBack={() => navigate('/')} />
       {:else if view === 'tenants' && isAdmin}
         <TenantsView tenants={$childTenants} labels={t} onOpenTenant={openTenant} onCreateTenant={createChildTenant} onBack={() => navigate('/')} />
       {:else if view === 'tenant' && selectedTenantId && isAdmin}

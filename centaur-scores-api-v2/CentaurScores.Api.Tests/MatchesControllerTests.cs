@@ -327,5 +327,6 @@ public sealed class MatchesControllerTests
         public Guid AccountId { get; } = Guid.NewGuid();
         public bool IsAdministrator => true;
         public bool CanManage => canManage;
+        public DateTime TokenExpiresAtUtc => DateTime.UtcNow.AddHours(4);
     }
 }

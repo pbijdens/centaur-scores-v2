@@ -1,8 +1,7 @@
 import { writable } from 'svelte/store'
-import { fetchTenants, type ApiClient } from './api'
+import type { ApiClient } from './api'
 import type { Account, Category, Competition, DefaultScopeSettings, MatchListItem, MatchTemplate, ParticipantListSummary, PersonalBestStatus, Profile, Tenant } from './types'
 
-export const tenants = writable<Tenant[]>([])
 export const matches = writable<MatchListItem[]>([])
 export const competitions = writable<Competition[]>([])
 export const profile = writable<Profile | null>(null)
@@ -15,16 +14,16 @@ export const participantLists = writable<ParticipantListSummary[]>([])
 export const templates = writable<MatchTemplate[]>([])
 export const personalBestStatus = writable<PersonalBestStatus | null>(null)
 
-export async function loadTenants(): Promise<Tenant[]> {
-  const result = await fetchTenants()
-  tenants.set(result)
+// Fetched and resolved before loadData(), since every call below requires an already-selected tenant.
+export async function loadProfile(api: ApiClient): Promise<Profile> {
+  const result = await api.fetchProfile()
+  profile.set(result)
   return result
 }
 
 export async function loadData(api: ApiClient) {
   matches.set(await api.fetchMatches())
   competitions.set(await api.fetchCompetitions())
-  profile.set(await api.fetchProfile())
   currentTenant.set(await api.fetchCurrentTenant())
   defaultScopeSettings.set(await api.fetchDefaultScopeSettings())
   categories.set(await api.fetchCategories())

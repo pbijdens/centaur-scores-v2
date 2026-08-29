@@ -22,60 +22,96 @@ public sealed class SecurityTests
     }
 
     [Fact]
-    public async Task Parent_administrator_can_log_in_to_descendant_tenant()
+    public async Task Login_issues_a_token_with_an_empty_tenant_claim_and_the_account_own_role()
     {
         await using var fixture = await AuthFixture.CreateAsync();
         var root = new Tenant { Id = Guid.NewGuid(), Name = "Root" };
-        var child = new Tenant { Id = Guid.NewGuid(), Name = "Child", ParentTenantId = root.Id };
-        var account = new Account
-        {
-            Id = Guid.NewGuid(),
-            TenantId = root.Id,
-            Username = "admin",
-            PasswordHash = Passwords.Hash("password"),
-            Authorization = AuthorizationProfile.Administrator
-        };
-        fixture.Db.Tenants.AddRange(root, child);
+        var account = new Account { Id = Guid.NewGuid(), TenantId = root.Id, Username = "manager", PasswordHash = Passwords.Hash("password"), Authorization = AuthorizationProfile.Manager };
+        fixture.Db.Tenants.Add(root);
         fixture.Db.Accounts.Add(account);
         await fixture.Db.SaveChangesAsync();
 
-        var result = await fixture.Service.AuthenticateAsync(new LoginRequest("admin", "password", child.Id), CancellationToken.None);
+        var result = await fixture.Service.AuthenticateAsync(new LoginRequest("manager", "password"), CancellationToken.None);
 
         Assert.NotNull(result);
         var claims = new JwtSecurityTokenHandler().ReadJwtToken(result.Token).Claims.ToList();
-        Assert.Equal(child.Id.ToString(), claims.Single(item => item.Type == "tenant_id").Value);
-        Assert.Equal(AuthorizationProfile.Administrator.ToString(), claims.Single(item => item.Type == ClaimTypes.Role).Value);
+        Assert.Equal(Guid.Empty.ToString(), claims.Single(item => item.Type == "tenant_id").Value);
+        Assert.Equal(AuthorizationProfile.Manager.ToString(), claims.Single(item => item.Type == ClaimTypes.Role).Value);
         Assert.Equal(account.Id, result.Account.Id);
     }
 
     [Fact]
-    public async Task Local_account_takes_precedence_over_parent_account()
+    public async Task GetAuthorizedTenants_includes_home_tenant_and_all_descendants_at_the_account_own_level()
     {
         await using var fixture = await AuthFixture.CreateAsync();
         var root = new Tenant { Id = Guid.NewGuid(), Name = "Root" };
         var child = new Tenant { Id = Guid.NewGuid(), Name = "Child", ParentTenantId = root.Id };
-        fixture.Db.Tenants.AddRange(root, child);
-        fixture.Db.Accounts.AddRange(
-            new Account { Id = Guid.NewGuid(), TenantId = root.Id, Username = "admin", PasswordHash = Passwords.Hash("parent-password"), Authorization = AuthorizationProfile.Administrator },
-            new Account { Id = Guid.NewGuid(), TenantId = child.Id, Username = "admin", PasswordHash = Passwords.Hash("local-password"), Authorization = AuthorizationProfile.Viewer });
+        var grandchild = new Tenant { Id = Guid.NewGuid(), Name = "Grandchild", ParentTenantId = child.Id };
+        var account = new Account { Id = Guid.NewGuid(), TenantId = root.Id, Username = "manager", PasswordHash = Passwords.Hash("password"), Authorization = AuthorizationProfile.Manager };
+        fixture.Db.Tenants.AddRange(root, child, grandchild);
+        fixture.Db.Accounts.Add(account);
         await fixture.Db.SaveChangesAsync();
 
-        var result = await fixture.Service.AuthenticateAsync(new LoginRequest("admin", "parent-password", child.Id), CancellationToken.None);
+        var result = await fixture.Service.GetAuthorizedTenantsAsync(account.Id, CancellationToken.None);
 
-        Assert.Null(result);
+        Assert.Equal(3, result.Count);
+        Assert.All(result, item => Assert.Equal(AuthorizationProfile.Manager.ToString(), item.Authorization));
+        Assert.Contains(result, item => item.TenantId == root.Id);
+        Assert.Contains(result, item => item.TenantId == child.Id);
+        Assert.Contains(result, item => item.TenantId == grandchild.Id);
     }
 
     [Fact]
-    public async Task Non_administrator_parent_account_cannot_log_in_to_descendant_tenant()
+    public async Task GetAuthorizedTenants_excludes_ancestors_and_unrelated_tenants()
     {
         await using var fixture = await AuthFixture.CreateAsync();
         var root = new Tenant { Id = Guid.NewGuid(), Name = "Root" };
         var child = new Tenant { Id = Guid.NewGuid(), Name = "Child", ParentTenantId = root.Id };
-        fixture.Db.Tenants.AddRange(root, child);
-        fixture.Db.Accounts.Add(new Account { Id = Guid.NewGuid(), TenantId = root.Id, Username = "user", PasswordHash = Passwords.Hash("password"), Authorization = AuthorizationProfile.Manager });
+        var sibling = new Tenant { Id = Guid.NewGuid(), Name = "Sibling", ParentTenantId = root.Id };
+        var account = new Account { Id = Guid.NewGuid(), TenantId = child.Id, Username = "viewer", PasswordHash = Passwords.Hash("password"), Authorization = AuthorizationProfile.Viewer };
+        fixture.Db.Tenants.AddRange(root, child, sibling);
+        fixture.Db.Accounts.Add(account);
         await fixture.Db.SaveChangesAsync();
 
-        var result = await fixture.Service.AuthenticateAsync(new LoginRequest("user", "password", child.Id), CancellationToken.None);
+        var result = await fixture.Service.GetAuthorizedTenantsAsync(account.Id, CancellationToken.None);
+
+        Assert.Single(result);
+        Assert.Equal(child.Id, result[0].TenantId);
+    }
+
+    [Fact]
+    public async Task SelectTenant_succeeds_for_an_authorized_descendant_and_preserves_the_original_expiry()
+    {
+        await using var fixture = await AuthFixture.CreateAsync();
+        var root = new Tenant { Id = Guid.NewGuid(), Name = "Root" };
+        var child = new Tenant { Id = Guid.NewGuid(), Name = "Child", ParentTenantId = root.Id };
+        var account = new Account { Id = Guid.NewGuid(), TenantId = root.Id, Username = "viewer", PasswordHash = Passwords.Hash("password"), Authorization = AuthorizationProfile.Viewer };
+        fixture.Db.Tenants.AddRange(root, child);
+        fixture.Db.Accounts.Add(account);
+        await fixture.Db.SaveChangesAsync();
+        var expiresAtUtc = new DateTime(2030, 1, 1, 12, 0, 0, DateTimeKind.Utc);
+
+        var result = await fixture.Service.SelectTenantAsync(account.Id, child.Id, expiresAtUtc, CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Equal(expiresAtUtc, result.ExpiresAt);
+        var claims = new JwtSecurityTokenHandler().ReadJwtToken(result.Token).Claims.ToList();
+        Assert.Equal(child.Id.ToString(), claims.Single(item => item.Type == "tenant_id").Value);
+        Assert.Equal(AuthorizationProfile.Viewer.ToString(), claims.Single(item => item.Type == ClaimTypes.Role).Value);
+    }
+
+    [Fact]
+    public async Task SelectTenant_returns_null_for_a_tenant_outside_the_authorized_set()
+    {
+        await using var fixture = await AuthFixture.CreateAsync();
+        var root = new Tenant { Id = Guid.NewGuid(), Name = "Root" };
+        var unrelated = new Tenant { Id = Guid.NewGuid(), Name = "Unrelated" };
+        var account = new Account { Id = Guid.NewGuid(), TenantId = root.Id, Username = "viewer", PasswordHash = Passwords.Hash("password"), Authorization = AuthorizationProfile.Viewer };
+        fixture.Db.Tenants.AddRange(root, unrelated);
+        fixture.Db.Accounts.Add(account);
+        await fixture.Db.SaveChangesAsync();
+
+        var result = await fixture.Service.SelectTenantAsync(account.Id, unrelated.Id, DateTime.UtcNow.AddHours(4), CancellationToken.None);
 
         Assert.Null(result);
     }

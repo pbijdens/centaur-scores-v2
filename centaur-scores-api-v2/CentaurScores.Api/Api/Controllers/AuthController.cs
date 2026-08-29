@@ -24,7 +24,19 @@ public sealed class AuthController(IAuthService authService, ApplicationDbContex
     public async Task<IActionResult> Me(CancellationToken cancellationToken)
     {
         var account = await db.Accounts.AsNoTracking().SingleOrDefaultAsync(item => item.Id == tenantContext.AccountId, cancellationToken);
-        return account is null ? NotFound() : Ok(new { account.Id, account.Username, account.DisplayName, account.Email, Authorization = account.Authorization.ToString() });
+        if (account is null) return NotFound();
+        var authorizedForTenants = await authService.GetAuthorizedTenantsAsync(account.Id, cancellationToken);
+        return Ok(new { account.Id, account.Username, account.DisplayName, account.Email, Authorization = account.Authorization.ToString(), AuthorizedForTenants = authorizedForTenants });
+    }
+
+    [Authorize]
+    [HttpPost("select-tenant")]
+    public async Task<IActionResult> SelectTenant(SelectTenantRequest request, CancellationToken cancellationToken)
+    {
+        var result = await authService.SelectTenantAsync(tenantContext.AccountId, request.TenantId, tenantContext.TokenExpiresAtUtc, cancellationToken);
+        return result is null
+            ? StatusCode(StatusCodes.Status403Forbidden, new ApiError("TENANT_NOT_AUTHORIZED", "You are not authorized for this tenant."))
+            : Ok(new { token = result.Token, expiresAt = result.ExpiresAt, account = new { result.Account.Id, result.Account.Username, result.Account.DisplayName, result.Account.Email } });
     }
 
     [Authorize]

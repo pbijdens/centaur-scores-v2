@@ -228,6 +228,10 @@ export class ApiClient {
     return this.request('/api/auth/change-password', { method: 'POST', body: JSON.stringify({ currentPassword, newPassword }) })
   }
 
+  selectTenant(tenantId: string): Promise<{ token: string; expiresAt: string }> {
+    return this.request('/api/auth/select-tenant', { method: 'POST', body: JSON.stringify({ tenantId }) })
+  }
+
   fetchCurrentTenant(): Promise<Tenant> {
     return this.request('/api/tenants/current')
   }
@@ -461,14 +465,8 @@ export class ApiClient {
   }
 }
 
-export async function fetchTenants(): Promise<Tenant[]> {
-  const response = await fetch(`${apiBase}/api/tenants`)
-  if (!response.ok) throw new Error('tenant request failed')
-  return response.json()
-}
-
-export async function login(username: string, password: string, tenantId: string): Promise<{ token: string }> {
-  const response = await fetch(`${apiBase}/api/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password, tenantId }) })
+export async function login(username: string, password: string): Promise<{ token: string }> {
+  const response = await fetch(`${apiBase}/api/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password }) })
   if (!response.ok) throw await readApiError(response)
   return response.json()
 }

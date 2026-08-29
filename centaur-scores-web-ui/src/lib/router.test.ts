@@ -13,6 +13,10 @@ describe('resolveRoute', () => {
     expect(resolveRoute('/narrowcast')).toEqual({ view: 'home', invalid: true })
   })
 
+  it('resolves the select-tenant route', () => {
+    expect(resolveRoute('/select-tenant')).toEqual({ view: 'select-tenant' })
+  })
+
   it('resolves the personal best control, configuration, and log routes', () => {
     expect(resolveRoute('/personal-best')).toEqual({ view: 'personal-best' })
     expect(resolveRoute('/personal-best/classifiers')).toEqual({ view: 'personal-best-classifiers' })

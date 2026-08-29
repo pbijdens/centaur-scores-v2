@@ -78,5 +78,6 @@ public sealed class TenantsControllerTests
         public Guid AccountId { get; } = Guid.NewGuid();
         public bool IsAdministrator => isAdministrator;
         public bool CanManage => canManage || isAdministrator;
+        public DateTime TokenExpiresAtUtc => DateTime.UtcNow.AddHours(4);
     }
 }

@@ -85,7 +85,13 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
             value => value == AuthorizationProfile.Administrator ? "admin" : value == AuthorizationProfile.Manager ? "manager" : "viewer",
             value => value == "admin" ? AuthorizationProfile.Administrator : value == "manager" ? AuthorizationProfile.Manager : AuthorizationProfile.Viewer);
         modelBuilder.Entity<CategoryValue>().HasIndex(item => new { item.CategoryId, item.ValueId }).IsUnique();
-        modelBuilder.Entity<Account>().HasIndex(item => new { item.TenantId, item.Username }).IsUnique();
+        modelBuilder.Entity<Account>().HasIndex(item => item.Username).IsUnique();
+        // Non-unique - keeps a supporting index on tenant_id after the composite (tenant_id, username)
+        // index above was replaced by the username-only one. The live database has an undocumented
+        // FK_accounts_tenants_tenant_id foreign key (schema drift, never captured in the EF model or an
+        // earlier migration) that requires an index with tenant_id as its leading column; dropping the
+        // composite index without this one fails with "needed in a foreign key constraint".
+        modelBuilder.Entity<Account>().HasIndex(item => item.TenantId);
         modelBuilder.Entity<ParticipantListMember>().Property(item => item.Categories).HasJsonConversion();
         modelBuilder.Entity<MatchParticipant>().Property(item => item.Categories).HasJsonConversion();
         modelBuilder.Entity<Match>().HasMany(item => item.Participants).WithOne().HasForeignKey(item => item.MatchId).OnDelete(DeleteBehavior.Cascade);
