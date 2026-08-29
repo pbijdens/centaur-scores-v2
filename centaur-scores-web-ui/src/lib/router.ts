@@ -73,6 +73,7 @@ export function resolveRoute(path = location.pathname): Route {
   if (section === 'templates') {
     return segments[1] ? { view: 'template', templateId: segments[1] } : { view: 'templates' }
   }
+  if (section === 'backup-restore') return { view: 'backup-restore' }
   if (section === 'personal-best') {
     if (segments[1] === 'classifiers') return { view: 'personal-best-classifiers' }
     if (segments[1] === 'disciplines') return { view: 'personal-best-disciplines' }

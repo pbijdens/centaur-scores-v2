@@ -30,6 +30,8 @@ builder.Services.AddScoped<IPersonalBestEngine, PersonalBestEngine>();
 builder.Services.AddScoped<IPersonalBestExcelService, PersonalBestExcelService>();
 builder.Services.AddScoped<IPersonalBestRegistrationService, PersonalBestRegistrationService>();
 builder.Services.AddScoped<IPersonalBestLiveLookup, PersonalBestLiveLookup>();
+builder.Services.AddScoped<IBackupService, BackupService>();
+builder.Services.AddScoped<IRestoreService, RestoreService>();
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>

@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { ApiClient } from '../api'
+  import { labelForError } from '../errors'
   import type { Account } from '../types'
 
   export let api: ApiClient
@@ -9,6 +10,7 @@
   export let onBack: () => void
 
   let account: Account | null = null
+  let username = ''
   let displayName = ''
   let email = ''
   let authorization = ''
@@ -18,6 +20,7 @@
 
   async function loadAccount() {
     account = await api.fetchAccount(accountId)
+    username = account.username
     displayName = account.displayName ?? ''
     email = account.email ?? ''
     authorization = account.authorization
@@ -32,16 +35,17 @@
     saveError = ''
     try {
       account = await api.updateAccount(account.id, {
-        username: account.username,
+        username,
         password: newPassword || undefined,
         displayName,
         email,
         authorization
       })
+      username = account.username
       newPassword = ''
       saveMessage = labels.accountSaved
-    } catch {
-      saveError = labels.accountSaveError
+    } catch (error) {
+      saveError = labelForError(error, labels, 'accountSaveError')
     }
   }
 </script>
@@ -53,6 +57,7 @@
   </div>
   <section class="panel">
     <form on:submit|preventDefault={save}>
+      <label>{labels.usernameLabel}<input bind:value={username} /></label>
       <label>{labels.accountRealName}<input bind:value={displayName} /></label>
       <label>{labels.email}<input type="email" bind:value={email} /></label>
       <label>{labels.accountAuthorization}

@@ -1,4 +1,4 @@
-import type { Account, Category, Competition, CompetitionResultsDocument, CompetitionRound, CompetitionScoreRule, Language, LiveScoringMatch, LiveScoringPage, Match, MatchListItem, MatchParticipant, MatchTemplate, ParticipantList, ParticipantListSummary, PersonalBestAvailableValue, PersonalBestConflictResolution, PersonalBestDiscipline, PersonalBestDisciplineValueRef, PersonalBestExportConfig, PersonalBestExportField, PersonalBestExportMode, PersonalBestDateFormat, PersonalBestImportConfig, PersonalBestImportResult, PersonalBestLogRow, PersonalBestStatus, Profile, ScoreDevice, Tenant } from './types'
+import type { Account, Category, Competition, CompetitionResultsDocument, CompetitionRound, CompetitionScoreRule, Language, LiveScoringMatch, LiveScoringPage, Match, MatchListItem, MatchParticipant, MatchTemplate, ParticipantList, ParticipantListSummary, PersonalBestAvailableValue, PersonalBestConflictResolution, PersonalBestDiscipline, PersonalBestDisciplineValueRef, PersonalBestExportConfig, PersonalBestExportField, PersonalBestExportMode, PersonalBestDateFormat, PersonalBestImportConfig, PersonalBestImportResult, PersonalBestLogRow, PersonalBestStatus, Profile, RestoreBackupResult, ScoreDevice, Tenant } from './types'
 
 export const apiBase = import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:5080'
 
@@ -424,6 +424,24 @@ export class ApiClient {
 
   fetchPersonalBestLog(): Promise<PersonalBestLogRow[]> {
     return this.request('/api/personal-best/log')
+  }
+
+  async downloadBackupExport(includeSubTenants: boolean): Promise<{ blob: Blob; filename: string }> {
+    const response = await fetch(`${apiBase}/api/backup/export`, { method: 'POST', headers: this.headers(), body: JSON.stringify({ includeSubTenants }) })
+    if (response.status === 401) this.onUnauthorized()
+    if (!response.ok) throw await readApiError(response)
+    const disposition = response.headers.get('content-disposition') ?? ''
+    const filenameMatch = /filename="?([^"]+)"?/.exec(disposition)
+    return { blob: await response.blob(), filename: filenameMatch?.[1] ?? 'backup.zip' }
+  }
+
+  async restoreBackup(file: File): Promise<RestoreBackupResult> {
+    const formData = new FormData()
+    formData.append('file', file)
+    const response = await fetch(`${apiBase}/api/backup/restore`, { method: 'POST', headers: { Authorization: `Bearer ${this.getToken()}` }, body: formData })
+    if (response.status === 401) this.onUnauthorized()
+    if (!response.ok) throw await readApiError(response)
+    return response.json()
   }
 }
 

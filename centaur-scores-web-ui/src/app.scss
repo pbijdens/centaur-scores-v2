@@ -608,35 +608,52 @@ nav a.active:after {
   flex: 0 0 auto;
 }
 
-.quick-links {
-  display: flex;
-  gap: 8px;
+.pb-tile-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
   margin-top: 16px;
 }
 
-.quick-links button,
-.quick-links a {
+.pb-tile {
   display: flex;
-  align-items: center;
-  border: 1px solid var(--line);
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  text-align: left;
   background: var(--paper);
-  color: var(--ink);
-  padding: 12px 18px;
-  font-size: 12px;
-  font-weight: 600;
+  border: 1px solid var(--line);
+  padding: 20px;
   box-shadow: 0 2px 6px rgba($color-text, .06);
 }
 
-.quick-links button:hover,
-.quick-links a:hover {
-  background: #{$tint-accent};
+.pb-tile:hover:not(:disabled),
+.pb-tile:focus-visible {
   border-color: var(--green);
+  background: var(--neutral);
 }
 
-.quick-links span {
-  color: var(--green);
-  font-size: 17px;
-  margin-right: 8px;
+.pb-tile:disabled {
+  opacity: .5;
+  cursor: default;
+}
+
+.pb-tile-icon {
+  font-size: 28px;
+  line-height: 1;
+}
+
+.pb-tile-title {
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--ink);
+}
+
+.pb-tile-description {
+  font-size: 12.5px;
+  font-weight: 400;
+  color: var(--muted);
+  line-height: 1.4;
 }
 
 .toolbar {
@@ -859,11 +876,6 @@ nav a.active:after {
 
   .wide {
     grid-column: auto;
-  }
-
-  .quick-links {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
   }
 
   .toolbar {

@@ -31,6 +31,7 @@
   import type { Account, Category, Competition, Language, Match, MatchTemplate, ParticipantList, ParticipantListSummary, Tenant, View } from './lib/types'
   import AccountEditView from './lib/views/AccountEditView.svelte'
   import AccountsView from './lib/views/AccountsView.svelte'
+  import BackupRestoreView from './lib/views/BackupRestoreView.svelte'
   import AppHeader from './lib/AppHeader.svelte'
   import CategoriesView from './lib/views/CategoriesView.svelte'
   import CategoryDetailView from './lib/views/CategoryDetailView.svelte'
@@ -96,9 +97,17 @@
   $: headerUsername = $profile?.displayName || $profile?.username || username
   $: showPersonalBestButton = $personalBestStatus !== null && (!$personalBestStatus.enabled || $personalBestStatus.ownedHere)
   $: homeQuickLinks = (
-    [['participants', t.participants], ['categories', t.categories], ['templates', t.templates]] as [string, string][]
-  ).concat(isAdmin ? [['accounts', t.accounts], ['tenants', t.tenants]] : [])
-    .concat(showPersonalBestButton ? [['personal-best', t.personalBest]] : [])
+    [
+      { path: 'categories', icon: '🏷️', title: t.homeTileCategoriesTitle, description: t.homeTileCategoriesDescription },
+      { path: 'participants', icon: '👥', title: t.homeTileParticipantsTitle, description: t.homeTileParticipantsDescription },
+      { path: 'templates', icon: '📋', title: t.homeTileTemplatesTitle, description: t.homeTileTemplatesDescription }
+    ]
+  ).concat(showPersonalBestButton ? [{ path: 'personal-best', icon: '🏆', title: t.personalBest, description: t.homeTilePersonalBestDescription }] : [])
+    .concat(isAdmin ? [
+      { path: 'accounts', icon: '👤', title: t.accounts, description: t.homeTileAccountsDescription },
+      { path: 'tenants', icon: '🏢', title: t.tenants, description: t.homeTileTenantsDescription },
+      { path: 'backup-restore', icon: '💾', title: t.backupRestore, description: t.homeTileBackupRestoreDescription }
+    ] : [])
   $: selectedCategory = $categories.find((category) => category.id === selectedCategoryId) ?? null
   $: selectedMember = selectedMemberId && selectedMemberId !== 'new' ? selectedList?.members.find((member) => member.id === selectedMemberId) ?? null : null
   $: selectedTemplate = $templates.find((template) => template.id === selectedTemplateId) ?? null
@@ -390,6 +399,8 @@
         <AccountsView {api} accounts={$accounts} labels={t} onOpenAccount={openAccount} onBack={() => navigate('/')} />
       {:else if view === 'account' && selectedAccountId && isAdmin}
         <AccountEditView {api} accountId={selectedAccountId} currentAccountId={$profile?.id ?? null} labels={t} onBack={() => navigate('/accounts')} />
+      {:else if view === 'backup-restore' && isAdmin}
+        <BackupRestoreView {api} labels={t} onBack={() => navigate('/')} />
       {:else if view === 'categories'}
         <CategoriesView {api} categories={$categories} labels={t} onOpenCategory={openCategory} onChanged={refreshCategories} onBack={() => navigate('/')} />
       {:else if view === 'category' && selectedCategory}

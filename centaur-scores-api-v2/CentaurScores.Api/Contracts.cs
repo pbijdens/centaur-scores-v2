@@ -58,6 +58,10 @@ public sealed record CompetitionResultGroup(string Name, IReadOnlyList<Competiti
 public sealed record CompetitionResultRound(Guid Id, string ShortName, string LongName, int Order);
 public sealed record CompetitionResultsDocument(string CompetitionName, DateOnly StartDate, DateOnly EndDate, IReadOnlyList<CompetitionResultRound> Rounds, IReadOnlyList<CompetitionResultGroup> Groups);
 
+// Backup and restore
+public sealed record CreateBackupRequest(bool IncludeSubTenants);
+public sealed record RestoreBackupResult(Guid NewTenantId, string NewTenantName, IReadOnlyList<string> Warnings);
+
 // Personal Best tracking
 public sealed record PersonalBestStatus(bool Enabled, bool OwnedHere, Guid? OwningTenantId);
 public sealed record SavePersonalBestClassifiersRequest(List<string> Classifiers);

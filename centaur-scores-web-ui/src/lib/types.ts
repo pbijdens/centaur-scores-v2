@@ -1,4 +1,4 @@
-export type View = 'home' | 'matches' | 'match' | 'match-metadata' | 'match-devices' | 'match-qr' | 'match-results-scope' | 'match-participant' | 'competitions' | 'competition' | 'competition-results' | 'participants' | 'participant-list' | 'participant' | 'categories' | 'category' | 'templates' | 'template' | 'accounts' | 'account' | 'profile' | 'tenants' | 'tenant' | 'narrowcast' | 'personal-best' | 'personal-best-classifiers' | 'personal-best-disciplines' | 'personal-best-export-config' | 'personal-best-import-config' | 'personal-best-log'
+export type View = 'home' | 'matches' | 'match' | 'match-metadata' | 'match-devices' | 'match-qr' | 'match-results-scope' | 'match-participant' | 'competitions' | 'competition' | 'competition-results' | 'participants' | 'participant-list' | 'participant' | 'categories' | 'category' | 'templates' | 'template' | 'accounts' | 'account' | 'profile' | 'tenants' | 'tenant' | 'narrowcast' | 'personal-best' | 'personal-best-classifiers' | 'personal-best-disciplines' | 'personal-best-export-config' | 'personal-best-import-config' | 'personal-best-log' | 'backup-restore'
 export type Language = 'en' | 'nl'
 export type Tenant = { id: string; name: string; logoUrl?: string | null }
 export type Match = {
@@ -121,4 +121,7 @@ export type PersonalBestImportConflict = { federationNumber: string; discipline:
 export type PersonalBestImportResult = { newArchers: number; newRegistrations: number; warnings: string[]; batchId?: string | null; conflicts: PersonalBestImportConflict[] }
 export type PersonalBestConflictResolution = { federationNumber: string; discipline: string; matchClassifier: string; action: 'deleteOffending' | 'ignoreImported' }
 export type PersonalBestLogRow = { federationNumber: string; name: string; discipline: string; matchClassifier: string; date: string; score: number }
+
+// Backup and restore
+export type RestoreBackupResult = { newTenantId: string; newTenantName: string; warnings: string[] }
 

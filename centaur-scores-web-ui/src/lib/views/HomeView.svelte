@@ -7,7 +7,7 @@
   export let competitions: Competition[]
   export let language: Language
   export let labels: Record<string, string>
-  export let quickLinks: [string, string][]
+  export let quickLinks: { path: string; icon: string; title: string; description: string }[]
   export let onOpenMatch: (match: MatchListItem) => void
   export let onNavigate: (path: string) => void
   export let onDeactivateAll: () => void
@@ -86,8 +86,12 @@
     {/if}
   </section>
 </div>
-<div class="quick-links">
+<div class="pb-tile-grid">
   {#each quickLinks as item}
-    <a href={`/${item[0]}`} on:click={(event) => navigateOnClick(event, () => onNavigate(`/${item[0]}`))}><span>◇</span>{item[1]}</a>
+    <a class="pb-tile" href={`/${item.path}`} on:click={(event) => navigateOnClick(event, () => onNavigate(`/${item.path}`))}>
+      <span class="pb-tile-icon" aria-hidden="true">{item.icon}</span>
+      <span class="pb-tile-title">{item.title}</span>
+      <span class="pb-tile-description">{item.description}</span>
+    </a>
   {/each}
 </div>
