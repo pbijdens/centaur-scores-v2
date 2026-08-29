@@ -5,6 +5,7 @@
   import { labelForError } from '../errors'
   import { parseMatchKeyboardConfig } from '../matchConfig'
   import { deriveLastName, memberDisplayLabel } from '../participantName'
+  import { matchDevicesPath, matchEditPath, matchParticipantPath, matchQrPath, matchResultsPath, navigateOnClick } from '../router'
   import type { Category, Language, Match, MatchParticipant, ParticipantList } from '../types'
 
   export let api: ApiClient
@@ -46,9 +47,6 @@
   $: liveScopes = match.liveScopes ?? []
   $: sortedLiveScopes = [...liveScopes].sort((a, b) => a.scope.localeCompare(b.scope))
 
-  function openResults(scope: string) {
-    window.open(`/matches/${match.id}/results/${encodeURIComponent(scope)}`, '_blank')
-  }
   $: keyboardConfig = parseMatchKeyboardConfig(match.keyboardJson)
   $: matchCategories = keyboardConfig.categoryOrder.map((id) => categories.find((category) => category.id === id)).filter((category): category is Category => !!category)
   $: assignedMemberIds = new Set(participants.map((participant) => participant.participantListMemberId).filter((id): id is string => !!id))
@@ -193,12 +191,12 @@
   <div><p class="eyebrow">{labels.eyebrowMatch}</p><h1>{match.name}</h1><p class="muted">{formatLocalDate(match.date, language)}</p></div>
   <div class="match-header-actions">
     <button class="highlight-button" class:is-live={match.isOpen} on:click={onToggleOpen}>{match.isOpen ? labels.deactivate : labels.activate}</button>
-    <button class="qr-button" aria-label={labels.viewQrCodes} title={labels.viewQrCodes} on:click={() => window.open(`/matches/${match.id}/qr`, '_blank')}>▦</button>
+    <a class="qr-button" aria-label={labels.viewQrCodes} title={labels.viewQrCodes} href={matchQrPath(match.id)} target="_blank" rel="noopener">▦</a>
     <DropdownMenu ariaLabel={labels.matchActions} buttonClass="actions-trigger" align="right">
       <svelte:fragment slot="trigger">⋯</svelte:fragment>
-      <button class="menu-item" on:click={onEditMetadata}>{labels.editMetadata}</button>
-      <button class="menu-item" on:click={onManageDevices}>{labels.manageDevices}</button>
-      <button class="menu-item" on:click={() => window.open(`/matches/${match.id}/qr`, '_blank')}>{labels.viewQrCodes}</button>
+      <a class="menu-item" href={matchEditPath(match.id)} on:click={(event) => navigateOnClick(event, onEditMetadata)}>{labels.editMetadata}</a>
+      <a class="menu-item" href={matchDevicesPath(match.id)} on:click={(event) => navigateOnClick(event, onManageDevices)}>{labels.manageDevices}</a>
+      <a class="menu-item" href={matchQrPath(match.id)} target="_blank" rel="noopener">{labels.viewQrCodes}</a>
       <button class="menu-item" on:click={exportCsv}>{labels.exportCsv}</button>
       <hr class="menu-separator" />
       <button class="menu-item menu-item-danger" on:click={remove}>{labels.deleteMatch}</button>
@@ -209,14 +207,14 @@
 {#if deleteError}<p class="error">{deleteError}</p>{/if}
 {#if sortedLiveScopes.length === 1}
   <div class="results-row">
-    <button class="actions-trigger results-trigger" on:click={() => openResults(sortedLiveScopes[0].scope)}>{labels.resultsLabel}</button>
+    <a class="actions-trigger results-trigger" href={matchResultsPath(match.id, sortedLiveScopes[0].scope)} target="_blank" rel="noopener">{labels.resultsLabel}</a>
   </div>
 {:else if sortedLiveScopes.length > 1}
   <div class="results-row">
     <DropdownMenu ariaLabel={labels.resultsLabel} buttonClass="actions-trigger results-trigger" align="right">
       <svelte:fragment slot="trigger">{labels.resultsLabel}</svelte:fragment>
       {#each sortedLiveScopes as scope}
-        <button class="menu-item" on:click={() => openResults(scope.scope)}>{scope.scope}</button>
+        <a class="menu-item" href={matchResultsPath(match.id, scope.scope)} target="_blank" rel="noopener">{scope.scope}</a>
       {/each}
     </DropdownMenu>
   </div>
@@ -290,12 +288,12 @@
     {#if group.key}<h2 class="group-heading">{group.key}</h2>{/if}
     <div class="list-panel">
       {#each group.items as participant}
-        <button class="list-row match-participant-row" class:unlisted-row={!participant.participantListMemberId} on:click={() => onOpenParticipant(participant.id)}>
+        <a class="list-row match-participant-row" class:unlisted-row={!participant.participantListMemberId} href={matchParticipantPath(match.id, participant.id)} on:click={(event) => navigateOnClick(event, () => onOpenParticipant(participant.id))}>
           <span class="management-icon">◇</span>
           <span class="participant-name"><strong>{participant.fullName || participant.lastName}</strong>{#if !participant.participantListMemberId}<span class="unlisted-tag">{labels.unlistedParticipantsWarning}</span>{/if}{#if participantDetailLabel(participant)}<span class="member-categories"> ({participantDetailLabel(participant)})</span>{/if}</span>
           <strong class="participant-score">{participantTotal(participant.id, totalsByParticipantId)}</strong>
           <span class="arrow">→</span>
-        </button>
+        </a>
       {/each}
     </div>
   {/each}

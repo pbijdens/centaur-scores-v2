@@ -2,6 +2,7 @@
   import type { ApiClient } from '../api'
   import { formatLocalDate } from '../date'
   import { labelForError } from '../errors'
+  import { competitionPath, navigateOnClick } from '../router'
   import type { Competition, Language } from '../types'
 
   export let api: ApiClient
@@ -73,31 +74,31 @@
 <section class="list-panel">
   {#if activeCompetitions.length === 0 && futureCompetitions.length === 0 && pastCompetitions.length === 0}<p class="empty-state">{labels.emptyState}</p>{/if}
   {#each activeCompetitions as competition}
-    <button class="list-row" on:click={() => onOpenCompetition(competition)}>
+    <a class="list-row" href={competitionPath(competition.id)} on:click={(event) => navigateOnClick(event, () => onOpenCompetition(competition))}>
       <span class="competition-icon">◎</span>
       <span><strong>{competition.name}</strong><small>{formatLocalDate(competition.startDate, language)} – {formatLocalDate(competition.endDate, language)} · {competition.rounds?.length ?? 0} rounds</small></span>
       <span class="tag">{labels.statusActive}</span>
       <span class="arrow">→</span>
-    </button>
+    </a>
   {/each}
   {#if showFuture}
     {#each futureCompetitions as competition}
-      <button class="list-row" on:click={() => onOpenCompetition(competition)}>
+      <a class="list-row" href={competitionPath(competition.id)} on:click={(event) => navigateOnClick(event, () => onOpenCompetition(competition))}>
         <span class="competition-icon">◎</span>
         <span><strong>{competition.name}</strong><small>{formatLocalDate(competition.startDate, language)} – {formatLocalDate(competition.endDate, language)} · {competition.rounds?.length ?? 0} rounds</small></span>
         <span class="tag">{labels.statusPlanned}</span>
         <span class="arrow">→</span>
-      </button>
+      </a>
     {/each}
   {/if}
   {#if showPast}
     {#each pastCompetitions as competition}
-      <button class="list-row past" on:click={() => onOpenCompetition(competition)}>
+      <a class="list-row past" href={competitionPath(competition.id)} on:click={(event) => navigateOnClick(event, () => onOpenCompetition(competition))}>
         <span class="competition-icon">◎</span>
         <span><strong>{competition.name}</strong><small>{formatLocalDate(competition.startDate, language)} – {formatLocalDate(competition.endDate, language)} · {competition.rounds?.length ?? 0} rounds</small></span>
         <span class="tag">{labels.statusPast}</span>
         <span class="arrow">→</span>
-      </button>
+      </a>
     {/each}
   {/if}
 </section>

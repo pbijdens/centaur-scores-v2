@@ -3,6 +3,7 @@
   import DropdownMenu from '../DropdownMenu.svelte'
   import { labelForError } from '../errors'
   import { memberCategoryLabel, memberDetailLabel, memberDisplayLabel } from '../participantName'
+  import { navigateOnClick, participantMemberPath } from '../router'
   import type { Category, Language, ParticipantList, ParticipantListMember } from '../types'
 
   export let api: ApiClient
@@ -204,12 +205,12 @@
   {#if group.key}<h2 class="group-heading">{group.key}</h2>{/if}
   <section class="list-panel">
     {#each group.items as member}
-      <button class="list-row" on:click={() => onOpenMember(member.id)}>
+      <a class="list-row" href={participantMemberPath(list.id, member.id)} on:click={(event) => navigateOnClick(event, () => onOpenMember(member.id))}>
         <span class="management-icon">◇</span>
         <span><strong>{member.fullName || member.lastName}</strong>{#if memberDetailLabel(categories, member)}<span class="member-categories"> ({memberDetailLabel(categories, member)})</span>{/if}</span>
         {#if !member.isActive}<span class="tag">{labels.statusInactive}</span>{/if}
         <span class="arrow">→</span>
-      </button>
+      </a>
     {/each}
   </section>
 {/each}

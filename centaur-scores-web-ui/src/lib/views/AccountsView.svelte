@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { ApiClient } from '../api'
   import { labelForError } from '../errors'
+  import { accountPath, navigateOnClick } from '../router'
   import type { Account } from '../types'
 
   export let api: ApiClient
@@ -48,11 +49,11 @@
 <section class="list-panel">
   {#if accounts.length === 0}<p class="empty-state">{labels.emptyState}</p>{/if}
   {#each accounts as account}
-    <button class="list-row" on:click={() => onOpenAccount(account)}>
+    <a class="list-row" href={accountPath(account.id)} on:click={(event) => navigateOnClick(event, () => onOpenAccount(account))}>
       <span class="management-icon">◇</span>
       <span><strong>{account.username}</strong><small>{account.displayName ?? ''}</small></span>
       <span class="tag">{authorizationLabel(account.authorization)}</span>
       <span class="arrow">→</span>
-    </button>
+    </a>
   {/each}
 </section>

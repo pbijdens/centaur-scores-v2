@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { ApiClient } from '../api'
   import { labelForError } from '../errors'
+  import { categoryPath, navigateOnClick } from '../router'
   import type { Category } from '../types'
 
   export let api: ApiClient
@@ -43,10 +44,10 @@
 <section class="list-panel">
   {#if categories.length === 0}<p class="empty-state">{labels.emptyState}</p>{/if}
   {#each categories as category}
-    <button class="list-row" on:click={() => onOpenCategory(category)}>
+    <a class="list-row" href={categoryPath(category.id)} on:click={(event) => navigateOnClick(event, () => onOpenCategory(category))}>
       <span class="management-icon">◇</span>
       <span><strong>{category.name}</strong><small>{category.values.length} {labels.categoryValues.toLowerCase()}</small></span>
       <span class="arrow">→</span>
-    </button>
+    </a>
   {/each}
 </section>

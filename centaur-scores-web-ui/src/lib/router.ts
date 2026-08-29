@@ -2,6 +2,30 @@ import type { View } from './types'
 
 export type Route = { view: View; matchId?: string; tenantId?: string; scope?: string; accountId?: string; categoryId?: string; listId?: string; memberId?: string; templateId?: string; participantId?: string; competitionId?: string; invalid?: boolean }
 
+export function matchPath(matchId: string): string { return `/matches/${matchId}` }
+export function matchEditPath(matchId: string): string { return `/matches/${matchId}/edit` }
+export function matchDevicesPath(matchId: string): string { return `/matches/${matchId}/devices` }
+export function matchQrPath(matchId: string): string { return `/matches/${matchId}/qr` }
+export function matchResultsPath(matchId: string, scope: string): string { return `/matches/${matchId}/results/${encodeURIComponent(scope)}` }
+export function matchParticipantPath(matchId: string, participantId: string): string { return `/matches/${matchId}/participants/${participantId}` }
+export function competitionPath(competitionId: string): string { return `/competitions/${competitionId}` }
+export function competitionResultsPath(competitionId: string): string { return `/competitions/${competitionId}/results` }
+export function tenantPath(tenantId: string): string { return `/tenants/${tenantId}` }
+export function accountPath(accountId: string): string { return `/accounts/${accountId}` }
+export function categoryPath(categoryId: string): string { return `/categories/${categoryId}` }
+export function participantListPath(listId: string): string { return `/participants/${listId}` }
+export function participantMemberPath(listId: string, memberId: string): string { return `/participants/${listId}/members/${memberId}` }
+export function templatePath(templateId: string): string { return `/templates/${templateId}` }
+export function narrowcastPath(scope: string): string { return `/narrowcast/${encodeURIComponent(scope)}` }
+
+// Lets list-row-style <a href> elements keep native right-click/middle-click/ctrl-click
+// "open in new tab" while a plain left click still does client-side SPA navigation.
+export function navigateOnClick(event: MouseEvent, action: () => void): void {
+  if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+  event.preventDefault()
+  action()
+}
+
 export function navigateTo(path: string, replace = false) {
   const normalizedPath = path || '/'
   if (replace) history.replaceState({}, '', normalizedPath)

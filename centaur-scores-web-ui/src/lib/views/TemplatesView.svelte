@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { ApiClient } from '../api'
   import { labelForError } from '../errors'
+  import { navigateOnClick, templatePath } from '../router'
   import { defaultTemplateConfigurationJson } from '../templateConfig'
   import type { MatchTemplate, ParticipantListSummary } from '../types'
 
@@ -58,10 +59,10 @@
 <section class="list-panel">
   {#if sortedTemplates.length === 0}<p class="empty-state">{labels.emptyState}</p>{/if}
   {#each sortedTemplates as template}
-    <button class="list-row" on:click={() => onOpenTemplate(template)}>
+    <a class="list-row" href={templatePath(template.id)} on:click={(event) => navigateOnClick(event, () => onOpenTemplate(template))}>
       <span class="management-icon">◇</span>
       <span><strong>{template.name}</strong><small>{modeLabel(template.deviceSelectionMode)}{#if participantListName(template.participantListId)} · {participantListName(template.participantListId)}{/if}</small></span>
       <span class="arrow">→</span>
-    </button>
+    </a>
   {/each}
 </section>

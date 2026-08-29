@@ -27,7 +27,7 @@
   } from './lib/data'
   import { labelForError } from './lib/errors'
   import { translationsFor } from './lib/i18n'
-  import { navigateTo, resolveRoute } from './lib/router'
+  import { accountPath, categoryPath, competitionPath, matchDevicesPath, matchEditPath, matchParticipantPath, matchPath, navigateTo, participantListPath, participantMemberPath, resolveRoute, templatePath, tenantPath } from './lib/router'
   import type { Account, Category, Competition, Language, Match, MatchTemplate, ParticipantList, ParticipantListSummary, Tenant, View } from './lib/types'
   import AccountEditView from './lib/views/AccountEditView.svelte'
   import AccountsView from './lib/views/AccountsView.svelte'
@@ -143,7 +143,7 @@
 
   function setLanguage(value: string) { language = value as Language; localStorage.setItem('centaur-language', value) }
 
-  function openMatch(match: { id: string }) { navigate(`/matches/${match.id}`) }
+  function openMatch(match: { id: string }) { navigate(matchPath(match.id)) }
 
   async function loadSelectedMatch(id: string) {
     const [match, participants] = await Promise.all([
@@ -166,7 +166,7 @@
     if (selectedCompetitionId) await loadSelectedCompetition(selectedCompetitionId)
   }
 
-  function openCompetition(competition: Competition) { navigate(`/competitions/${competition.id}`) }
+  function openCompetition(competition: Competition) { navigate(competitionPath(competition.id)) }
 
   async function loadCompetitionsList() {
     await fetchCompetitionsList(api)
@@ -191,7 +191,7 @@
   }
 
   function openParticipant(participantId: string) {
-    if (selectedMatchId) navigate(`/matches/${selectedMatchId}/participants/${participantId}`)
+    if (selectedMatchId) navigate(matchParticipantPath(selectedMatchId, participantId))
   }
 
   function returnToSelectedMatch() {
@@ -205,7 +205,7 @@
     loadMatchesList()
   }
 
-  function openTenant(childTenant: Tenant) { navigate(`/tenants/${childTenant.id}`) }
+  function openTenant(childTenant: Tenant) { navigate(tenantPath(childTenant.id)) }
 
   async function loadChildTenants() {
     await fetchChildTenantsList(api)
@@ -221,13 +221,13 @@
     loadChildTenants()
   }
 
-  function openAccount(account: Account) { navigate(`/accounts/${account.id}`) }
+  function openAccount(account: Account) { navigate(accountPath(account.id)) }
 
   async function loadAccounts() {
     await fetchAccountsList(api)
   }
 
-  function openCategory(category: Category) { navigate(`/categories/${category.id}`) }
+  function openCategory(category: Category) { navigate(categoryPath(category.id)) }
 
   async function refreshCategories() {
     await fetchCategoriesList(api)
@@ -238,7 +238,7 @@
     refreshCategories()
   }
 
-  function openList(list: ParticipantListSummary) { navigate(`/participants/${list.id}`) }
+  function openList(list: ParticipantListSummary) { navigate(participantListPath(list.id)) }
 
   async function loadSelectedList(id: string) {
     selectedList = await api.fetchParticipantList(id)
@@ -264,7 +264,7 @@
   }
 
   function openMember(memberId: string) {
-    if (selectedListId) navigate(`/participants/${selectedListId}/members/${memberId}`)
+    if (selectedListId) navigate(participantMemberPath(selectedListId, memberId))
   }
 
   function addMember() {
@@ -276,7 +276,7 @@
     refreshParticipantLists()
   }
 
-  function openTemplate(template: MatchTemplate) { navigate(`/templates/${template.id}`) }
+  function openTemplate(template: MatchTemplate) { navigate(templatePath(template.id)) }
 
   async function refreshTemplates() {
     await fetchTemplatesList(api)
@@ -359,7 +359,7 @@
         <MatchesView {api} matches={$matches} templates={$templates} {language} labels={t} onOpenMatch={openMatch} onChanged={loadMatchesList} />
       {:else if view === 'match' && selectedMatch}
         {@const currentMatch = selectedMatch}
-        <MatchDetailView {api} match={currentMatch} categories={$categories} sourceList={matchSourceList} {language} labels={t} onBack={() => navigate('/matches')} onToggleOpen={toggleSelectedMatch} onChanged={refreshSelectedMatch} onDeleted={onMatchDeleted} onEditMetadata={() => navigate(`/matches/${currentMatch.id}/edit`)} onManageDevices={() => navigate(`/matches/${currentMatch.id}/devices`)} onOpenParticipant={openParticipant} />
+        <MatchDetailView {api} match={currentMatch} categories={$categories} sourceList={matchSourceList} {language} labels={t} onBack={() => navigate('/matches')} onToggleOpen={toggleSelectedMatch} onChanged={refreshSelectedMatch} onDeleted={onMatchDeleted} onEditMetadata={() => navigate(matchEditPath(currentMatch.id))} onManageDevices={() => navigate(matchDevicesPath(currentMatch.id))} onOpenParticipant={openParticipant} />
       {:else if view === 'match-metadata' && selectedMatch}
         {@const currentMatch = selectedMatch}
         <MatchMetadataEditView {api} match={currentMatch} categories={$categories} participantLists={$participantLists} labels={t} onBack={() => navigate(`/matches/${currentMatch.id}`)} onSaved={() => navigate(`/matches/${currentMatch.id}`)} onDeleted={onMatchDeleted} />

@@ -1,5 +1,6 @@
 <script lang="ts">
   import DropdownMenu from './DropdownMenu.svelte'
+  import { navigateOnClick } from './router'
   import type { Language, View } from './types'
 
   export let username: string
@@ -14,18 +15,18 @@
 </script>
 
 <header>
-  <button class="brand" on:click={() => onNavigate('/')}>
+  <a class="brand" href="/" on:click={(event) => navigateOnClick(event, () => onNavigate('/'))}>
     {#if tenantLogoUrl}
       <img class="brand-mark small" src={tenantLogoUrl} alt="" />
     {:else}
       <span class="brand-mark small">{labels.brandInitials}</span>
     {/if}
     <span><strong>{tenantName ?? labels.defaultTenantName}</strong><small>{labels.rootTenantLabel}</small></span>
-  </button>
+  </a>
   <nav>
-    <button class:active={view === 'home'} on:click={() => onNavigate('/')}>{labels.home}</button>
-    <button class:active={view === 'matches' || view === 'match'} on:click={() => onNavigate('/matches')}>{labels.matches}</button>
-    <button class:active={view === 'competitions'} on:click={() => onNavigate('/competitions')}>{labels.competitions}</button>
+    <a class:active={view === 'home'} href="/" on:click={(event) => navigateOnClick(event, () => onNavigate('/'))}>{labels.home}</a>
+    <a class:active={view === 'matches' || view === 'match'} href="/matches" on:click={(event) => navigateOnClick(event, () => onNavigate('/matches'))}>{labels.matches}</a>
+    <a class:active={view === 'competitions'} href="/competitions" on:click={(event) => navigateOnClick(event, () => onNavigate('/competitions'))}>{labels.competitions}</a>
   </nav>
   <div class="user-menu">
     <DropdownMenu ariaLabel={labels.profile} buttonClass="menu-trigger profile-button" align="right">
@@ -50,7 +51,7 @@
         >🇳🇱</button>
       </div>
       <hr class="menu-separator" />
-      <button class="menu-item" class:active={view === 'profile'} on:click={() => onNavigate('/profile')}>{labels.editMyProfile}</button>
+      <a class="menu-item" class:active={view === 'profile'} href="/profile" on:click={(event) => navigateOnClick(event, () => onNavigate('/profile'))}>{labels.editMyProfile}</a>
       <button class="menu-item" on:click={onLogout}>{labels.logout}</button>
     </DropdownMenu>
   </div>

@@ -2,6 +2,7 @@
   import type { ApiClient } from '../api'
   import { labelForError } from '../errors'
   import { defaultMatchKeyboardJson, defaultMatchScoringRulesJson } from '../matchConfig'
+  import { matchPath, navigateOnClick } from '../router'
   import { parseTemplateConfiguration } from '../templateConfig'
   import type { Language, MatchListItem, MatchTemplate } from '../types'
 
@@ -132,31 +133,31 @@
 <section class="list-panel">
   {#if openMatches.length === 0 && upcomingMatches.length === 0 && pastMatches.length === 0}<p class="empty-state">{labels.emptyState}</p>{/if}
   {#each openMatches as match}
-    <button class="list-row" on:click={() => onOpenMatch(match)}>
+    <a class="list-row" href={matchPath(match.id)} on:click={(event) => navigateOnClick(event, () => onOpenMatch(match))}>
       <span class:live={match.isOpen} class="list-indicator"></span>
       <span><strong>{match.name}</strong><small>{formatDate(match.date)} · {match.participantCount} {labels.participantsCountLabel}{#if match.unlistedParticipantCount > 0}{' · '}<span class="error unlisted-warning">{match.unlistedParticipantCount} {labels.unlistedParticipantsWarning}</span>{/if}</small></span>
       <span class="tag">{labels.statusOpen}</span>
       <span class="arrow">→</span>
-    </button>
+    </a>
   {/each}
   {#if showUpcoming}
     {#each upcomingMatches as match}
-      <button class="list-row" on:click={() => onOpenMatch(match)}>
+      <a class="list-row" href={matchPath(match.id)} on:click={(event) => navigateOnClick(event, () => onOpenMatch(match))}>
         <span class="list-indicator"></span>
         <span><strong>{match.name}</strong><small>{formatDate(match.date)} · {match.participantCount} {labels.participantsCountLabel}{#if match.unlistedParticipantCount > 0}{' · '}<span class="error unlisted-warning">{match.unlistedParticipantCount} {labels.unlistedParticipantsWarning}</span>{/if}</small></span>
         <span class="tag">{labels.statusPlanned}</span>
         <span class="arrow">→</span>
-      </button>
+      </a>
     {/each}
   {/if}
   {#if showPast}
     {#each pastMatches as match}
-      <button class="list-row past" on:click={() => onOpenMatch(match)}>
+      <a class="list-row past" href={matchPath(match.id)} on:click={(event) => navigateOnClick(event, () => onOpenMatch(match))}>
         <span class="list-indicator"></span>
         <span><strong>{match.name}</strong><small>{formatDate(match.date)} · {match.participantCount} {labels.participantsCountLabel}{#if match.unlistedParticipantCount > 0}{' · '}<span class="error unlisted-warning">{match.unlistedParticipantCount} {labels.unlistedParticipantsWarning}</span>{/if}</small></span>
         <span class="tag">{labels.statusPast}</span>
         <span class="arrow">→</span>
-      </button>
+      </a>
     {/each}
   {/if}
 </section>

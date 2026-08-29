@@ -50,6 +50,11 @@ button {
   cursor: pointer;
 }
 
+a {
+  text-decoration: none;
+  color: inherit;
+}
+
 .login-shell {
   min-height: 100svh;
   display: grid;
@@ -270,6 +275,7 @@ nav::-webkit-scrollbar {
 }
 
 nav button,
+nav a,
 .text-button {
   border: 0;
   background: transparent;
@@ -278,18 +284,21 @@ nav button,
   padding: 4px 0;
 }
 
-nav button {
+nav button,
+nav a {
   position: relative;
   flex: 0 0 auto;
   white-space: nowrap;
 }
 
-nav button.active {
+nav button.active,
+nav a.active {
   color: var(--ink);
   font-weight: 700;
 }
 
-nav button.active:after {
+nav button.active:after,
+nav a.active:after {
   content: '';
   height: 3px;
   background: var(--accent);
@@ -498,6 +507,7 @@ nav button.active:after {
   text-align: left;
   padding: 15px 0;
   color: var(--ink);
+  cursor: pointer;
 }
 
 .match-row strong,
@@ -599,7 +609,10 @@ nav button.active:after {
   margin-top: 16px;
 }
 
-.quick-links button {
+.quick-links button,
+.quick-links a {
+  display: flex;
+  align-items: center;
   border: 1px solid var(--line);
   background: var(--paper);
   color: var(--ink);
@@ -609,7 +622,8 @@ nav button.active:after {
   box-shadow: 0 2px 6px rgba($color-text, .06);
 }
 
-.quick-links button:hover {
+.quick-links button:hover,
+.quick-links a:hover {
   background: #{$tint-accent};
   border-color: var(--green);
 }

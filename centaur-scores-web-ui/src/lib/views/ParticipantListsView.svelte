@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { ApiClient } from '../api'
   import { labelForError } from '../errors'
+  import { navigateOnClick, participantListPath } from '../router'
   import type { ParticipantListSummary } from '../types'
 
   export let api: ApiClient
@@ -45,11 +46,11 @@
 <section class="list-panel">
   {#if sortedLists.length === 0}<p class="empty-state">{labels.emptyState}</p>{/if}
   {#each sortedLists as list}
-    <button class="list-row" on:click={() => onOpenList(list)}>
+    <a class="list-row" href={participantListPath(list.id)} on:click={(event) => navigateOnClick(event, () => onOpenList(list))}>
       <span class:live={list.isActive} class="list-indicator"></span>
       <span><strong>{list.name}</strong><small>{list.memberCount} {labels.membersLabel.toLowerCase()}</small></span>
       {#if !list.isActive}<span class="tag">{labels.statusInactive}</span>{/if}
       <span class="arrow">→</span>
-    </button>
+    </a>
   {/each}
 </section>

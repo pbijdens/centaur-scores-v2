@@ -1,5 +1,6 @@
 <script lang="ts">
-  import type { Tenant } from '../types'
+  import { navigateOnClick, tenantPath } from '../router'
+import type { Tenant } from '../types'
 
   export let tenants: Tenant[]
   export let labels: Record<string, string>
@@ -32,10 +33,10 @@
 <section class="list-panel">
   {#if tenants.length === 0}<p class="empty-state">{labels.emptyState}</p>{/if}
   {#each tenants as tenant}
-    <button class="list-row" on:click={() => onOpenTenant(tenant)}>
+    <a class="list-row" href={tenantPath(tenant.id)} on:click={(event) => navigateOnClick(event, () => onOpenTenant(tenant))}>
       {#if tenant.logoUrl}<img class="tenant-logo-thumb" src={tenant.logoUrl} alt="" />{:else}<span class="management-icon">◇</span>{/if}
       <span><strong>{tenant.name}</strong></span>
       <span class="arrow">→</span>
-    </button>
+    </a>
   {/each}
 </section>
