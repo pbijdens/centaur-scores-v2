@@ -9,6 +9,7 @@
   export let api: ApiClient
   export let matches: MatchListItem[]
   export let templates: MatchTemplate[]
+  export let defaultNarrowcastScope: string
   export let language: Language
   export let labels: Record<string, string>
   export let onOpenMatch: (match: { id: string }) => void
@@ -84,7 +85,7 @@
         }
       } else {
         await api.addLiveScope(match.id, {
-          scope: 'all',
+          scope: defaultNarrowcastScope,
           groupByCategoryIds: [],
           includeAverage: true,
           includeGroupScores: false,

@@ -4,7 +4,10 @@ namespace CentaurScores.Api.Contracts;
 
 public sealed record ApiError(string Code, string Message);
 public sealed record LoginRequest(string Username, string Password, Guid TenantId);
-public sealed record CreateTenantRequest(string Name, string? LogoUrl, Guid? ParentTenantId);
+public sealed record CreateTenantRequest(string Name, string? LogoUrl, Guid? ParentTenantId, string? DefaultNarrowcastScope = null);
+public sealed record UpdateDefaultNarrowcastScopeRequest(string? DefaultNarrowcastScope);
+public sealed record DefaultScopeSettings(string? TenantValue, string EffectiveValue);
+public sealed record ScopeConflictSummary(Guid TenantId, string TenantName, string Scope, int MatchCount);
 public sealed record UpdateAccountRequest(string Username, string? Password, string? DisplayName, string? Email, string? Authorization);
 public sealed record UpdateProfileRequest(string? DisplayName, string? Email);
 public sealed record ChangePasswordRequest(string CurrentPassword, string NewPassword);

@@ -89,6 +89,61 @@ public sealed class MatchesController(ApplicationDbContext db, ITenantContext te
         return NoContent();
     }
 
+    // Narrowcast scopes are shared across tenants by design (see PublicScoresController), so a manager can
+    // find another tenant's open match silently colliding with theirs on the same scope (e.g. a shared venue
+    // where the previous day's match was never deactivated). This reports the collisions for the calling
+    // tenant's own match so the UI can offer to resolve them via ClaimScope.
+    [HttpGet("{id:guid}/scope-conflicts")]
+    public async Task<IActionResult> ScopeConflicts(Guid id, CancellationToken cancellationToken)
+    {
+        if (!CanManage) return Forbid();
+        var match = await db.Matches.AsNoTracking().Include(item => item.LiveScopes).SingleOrDefaultAsync(item => item.Id == id && item.TenantId == TenantId, cancellationToken);
+        if (match is null) return NotFound();
+        var scopes = match.LiveScopes.Select(item => item.Scope).Distinct().ToList();
+        if (scopes.Count == 0) return Ok(Array.Empty<ScopeConflictSummary>());
+
+        var matchingScopeRows = await db.Matches.AsNoTracking()
+            .Where(item => item.TenantId != TenantId && item.IsOpen)
+            .SelectMany(item => item.LiveScopes, (openMatch, liveScope) => new { MatchId = openMatch.Id, openMatch.TenantId, liveScope.Scope })
+            .Where(item => scopes.Contains(item.Scope))
+            .ToListAsync(cancellationToken);
+
+        var tenantIds = matchingScopeRows.Select(item => item.TenantId).Distinct().ToList();
+        var tenantNames = await db.Tenants.AsNoTracking().Where(item => tenantIds.Contains(item.Id)).ToDictionaryAsync(item => item.Id, item => item.Name, cancellationToken);
+
+        var conflicts = matchingScopeRows
+            .Distinct()
+            .GroupBy(item => new { item.TenantId, item.Scope })
+            .Select(group => new ScopeConflictSummary(group.Key.TenantId, tenantNames.GetValueOrDefault(group.Key.TenantId, ""), group.Key.Scope, group.Count()))
+            .OrderBy(item => item.TenantName).ThenBy(item => item.Scope)
+            .ToList();
+        return Ok(conflicts);
+    }
+
+    // Exclusively claims this match's scopes by deactivating every other tenant's open match sharing any of
+    // them. Deliberately cross-tenant (see the comment on ScopeConflicts above) but scoped tightly to the
+    // exact scopes configured on the caller's own match, and requires that match to be the caller's own and open.
+    [HttpPost("{id:guid}/claim-scope")]
+    public async Task<IActionResult> ClaimScope(Guid id, CancellationToken cancellationToken)
+    {
+        if (!CanManage) return Forbid();
+        var match = await db.Matches.AsNoTracking().Include(item => item.LiveScopes).SingleOrDefaultAsync(item => item.Id == id && item.TenantId == TenantId, cancellationToken);
+        if (match is null) return NotFound();
+        if (!match.IsOpen) return Conflict(new ApiError("MATCH_NOT_OPEN", "The match must be open to claim its scope."));
+        var scopes = match.LiveScopes.Select(item => item.Scope).Distinct().ToList();
+        if (scopes.Count == 0) return NoContent();
+
+        // Loaded and saved per-match (rather than one ExecuteUpdateAsync), same reasoning as DeactivateAll:
+        // RegisterOnDeactivationAsync needs change-tracked entities to run its per-match hook.
+        var conflictingMatches = await db.Matches
+            .Where(item => item.TenantId != TenantId && item.IsOpen && item.LiveScopes.Any(scope => scopes.Contains(scope.Scope)))
+            .ToListAsync(cancellationToken);
+        foreach (var conflict in conflictingMatches) conflict.IsOpen = false;
+        await db.SaveChangesAsync(cancellationToken);
+        foreach (var conflict in conflictingMatches) await personalBestRegistrationService.RegisterOnDeactivationAsync(conflict, cancellationToken);
+        return NoContent();
+    }
+
     [HttpGet("{id:guid}/participants")]
     public async Task<IActionResult> Participants(Guid id, CancellationToken cancellationToken) => Ok(await db.MatchParticipants.AsNoTracking().Include(item => item.Scores).Where(item => item.MatchId == id && item.TenantId == TenantId).OrderBy(item => item.DeviceId).ThenBy(item => item.DeviceOrder).ThenBy(item => item.LastName).ToListAsync(cancellationToken));
 

@@ -1,6 +1,8 @@
-export type View = 'home' | 'matches' | 'match' | 'match-metadata' | 'match-devices' | 'match-qr' | 'match-results-scope' | 'match-participant' | 'competitions' | 'competition' | 'competition-results' | 'participants' | 'participant-list' | 'participant' | 'categories' | 'category' | 'templates' | 'template' | 'accounts' | 'account' | 'profile' | 'tenants' | 'tenant' | 'narrowcast' | 'personal-best' | 'personal-best-classifiers' | 'personal-best-disciplines' | 'personal-best-export-config' | 'personal-best-import-config' | 'personal-best-log' | 'backup-restore'
+export type View = 'home' | 'matches' | 'match' | 'match-metadata' | 'match-devices' | 'match-qr' | 'match-results-scope' | 'match-participant' | 'competitions' | 'competition' | 'competition-results' | 'participants' | 'participant-list' | 'participant' | 'categories' | 'category' | 'templates' | 'template' | 'accounts' | 'account' | 'profile' | 'tenants' | 'tenant' | 'tenant-settings' | 'narrowcast' | 'personal-best' | 'personal-best-classifiers' | 'personal-best-disciplines' | 'personal-best-export-config' | 'personal-best-import-config' | 'personal-best-log' | 'backup-restore'
 export type Language = 'en' | 'nl'
-export type Tenant = { id: string; name: string; logoUrl?: string | null }
+export type Tenant = { id: string; name: string; logoUrl?: string | null; defaultNarrowcastScope?: string | null }
+export type DefaultScopeSettings = { tenantValue: string | null; effectiveValue: string }
+export type ScopeConflict = { tenantId: string; tenantName: string; scope: string; matchCount: number }
 export type Match = {
   id: string
   name: string

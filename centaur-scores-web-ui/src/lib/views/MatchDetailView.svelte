@@ -6,7 +6,7 @@
   import { parseMatchKeyboardConfig } from '../matchConfig'
   import { deriveLastName, memberDisplayLabel } from '../participantName'
   import { matchDevicesPath, matchEditPath, matchParticipantPath, matchQrPath, matchResultsPath, navigateOnClick } from '../router'
-  import type { Category, Language, Match, MatchParticipant, ParticipantList } from '../types'
+  import type { Category, Language, Match, MatchParticipant, ParticipantList, ScopeConflict } from '../types'
 
   export let api: ApiClient
   export let match: Match
@@ -41,6 +41,9 @@
   let manualFederationNumber = ''
   let manualCategoryValues: Record<string, string> = {}
   let addError = ''
+  let scopeConflicts: ScopeConflict[] = []
+  let claimingScope = false
+  let claimScopeError = ''
 
   $: participants = match.participants ?? []
   $: devices = match.devices ?? []
@@ -117,6 +120,36 @@
     } catch { results = [] }
   }
   $: if (match.id) loadResults()
+
+  async function loadScopeConflicts() {
+    if (!match.isOpen) { scopeConflicts = []; return }
+    try {
+      scopeConflicts = await api.fetchScopeConflicts(match.id)
+    } catch {
+      scopeConflicts = []
+    }
+  }
+  $: if (match.id) loadScopeConflicts()
+
+  async function claimScope() {
+    claimScopeError = ''
+    claimingScope = true
+    try {
+      await api.claimScope(match.id)
+      await loadScopeConflicts()
+    } catch (error) {
+      claimScopeError = labelForError(error, labels, 'claimScopeError')
+    } finally {
+      claimingScope = false
+    }
+  }
+
+  function scopeConflictRowText(conflict: ScopeConflict): string {
+    return labels.scopeConflictRow
+      .replace('{tenantName}', conflict.tenantName)
+      .replace('{count}', String(conflict.matchCount))
+      .replace('{scope}', conflict.scope)
+  }
 
   async function exportCsv() {
     exportError = ''
@@ -217,6 +250,16 @@
         <a class="menu-item" href={matchResultsPath(match.id, scope.scope)} target="_blank" rel="noopener">{scope.scope}</a>
       {/each}
     </DropdownMenu>
+  </div>
+{/if}
+{#if scopeConflicts.length > 0}
+  <div class="panel scope-conflict-warning">
+    <strong>{labels.scopeConflictWarningTitle}</strong>
+    <ul>
+      {#each scopeConflicts as conflict}<li>{scopeConflictRowText(conflict)}</li>{/each}
+    </ul>
+    {#if claimScopeError}<p class="error">{claimScopeError}</p>{/if}
+    <button class="primary" disabled={claimingScope} on:click={claimScope}>{labels.claimScopeAction}</button>
   </div>
 {/if}
 
@@ -340,6 +383,17 @@
     display: flex;
     justify-content: flex-end;
     margin-top: 16px;
+  }
+
+  .scope-conflict-warning {
+    margin-top: 16px;
+    background: #fdeeea;
+    border-color: #e8755b;
+  }
+
+  .scope-conflict-warning ul {
+    margin: 8px 0;
+    padding-left: 20px;
   }
 
   .add-unlisted-button {

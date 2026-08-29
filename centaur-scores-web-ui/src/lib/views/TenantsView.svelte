@@ -5,16 +5,18 @@ import type { Tenant } from '../types'
   export let tenants: Tenant[]
   export let labels: Record<string, string>
   export let onOpenTenant: (tenant: Tenant) => void
-  export let onCreateTenant: (name: string) => void
+  export let onCreateTenant: (name: string, defaultNarrowcastScope: string | null) => void
   export let onBack: () => void
 
   let showAddForm = false
   let newTenantName = ''
+  let newTenantDefaultScope = ''
 
   function submitAdd() {
     if (!newTenantName.trim()) return
-    onCreateTenant(newTenantName.trim())
+    onCreateTenant(newTenantName.trim(), newTenantDefaultScope.trim() || null)
     newTenantName = ''
+    newTenantDefaultScope = ''
     showAddForm = false
   }
 </script>
@@ -27,6 +29,7 @@ import type { Tenant } from '../types'
 {#if showAddForm}
   <form class="inline-form" on:submit|preventDefault={submitAdd}>
     <label>{labels.tenantName}<input bind:value={newTenantName} /></label>
+    <label>{labels.defaultScopeLabel}<input bind:value={newTenantDefaultScope} placeholder="all" /></label>
     <button class="primary" type="submit" disabled={!newTenantName.trim()}>{labels.save}</button>
   </form>
 {/if}

@@ -38,11 +38,13 @@ JWTs are returned by `POST /api/auth/login` and contain the account and active t
 | `POST` | `/api/auth/change-password` | user | Change the current account's password with `{ currentPassword, newPassword }`; `400` with a coded error body if the current password does not match or the new password is missing. |
 | `GET` | `/api/tenants/current` | user | Return the active tenant configuration. |
 | `PUT` | `/api/tenants/current` | admin | Update the active tenant name/logo. |
-| `POST` | `/api/tenants` | admin | Create a child tenant with `{ name, logoUrl, parentTenantId }`. |
+| `POST` | `/api/tenants` | admin | Create a child tenant with `{ name, logoUrl, parentTenantId, defaultNarrowcastScope }`. |
 | `GET` | `/api/tenants/children` | admin | List direct sub-tenants of the active tenant. |
 | `GET` | `/api/tenants/children/{id}` | admin | Get a sub-tenant's details for editing. |
-| `PUT` | `/api/tenants/children/{id}` | admin | Update a sub-tenant's `{ name, logoUrl }`. |
+| `PUT` | `/api/tenants/children/{id}` | admin | Update a sub-tenant's `{ name, logoUrl, defaultNarrowcastScope }`. |
 | `DELETE` | `/api/tenants/{id}` | admin | Delete a child tenant. The logged-in tenant cannot delete itself. |
+| `GET` | `/api/tenants/current/default-scope` | user | Return `{ tenantValue, effectiveValue }` for the active tenant's default narrowcast scope: `tenantValue` is this tenant's own override (`null` if unset), `effectiveValue` is resolved by walking `ParentTenantId` up to the nearest ancestor with one set, falling back to `"all"`. |
+| `PUT` | `/api/tenants/current/default-scope` | manager | Set or clear (`null`) the active tenant's own default narrowcast scope override. Unlike the other `tenants/current`/`children` endpoints, this only requires manager, not admin. |
 
 ## Accounts
 
@@ -94,6 +96,8 @@ JWTs are returned by `POST /api/auth/login` and contain the account and active t
 | `PUT` | `/api/matches/{id}` | manager | Update match configuration or open state. `409` with a coded error body (`PARTICIPANT_LIST_LOCKED`) if `participantListId` changes after the match already has participants. When this call transitions the match from open to closed and personal-best tracking is active with a `personalBestClassifier` set, eligible participants (on a source list, with a federation number, scoring higher than their prior best) are automatically registered into the personal-best log as a side effect. |
 | `DELETE` | `/api/matches/{id}` | admin | Delete a match and its dependent scoring data. |
 | `POST` | `/api/matches/deactivate-all` | manager | Close all open matches in the active tenant; each closed match triggers the same automatic personal-best registration as `PUT /api/matches/{id}`. |
+| `GET` | `/api/matches/{id}/scope-conflicts` | manager | For one of the active tenant's own matches, list other tenants' currently-open matches sharing any of its live scopes, grouped as `{ tenantId, tenantName, scope, matchCount }`. Narrowcast scopes are cross-tenant by design (see `live-scoring/match/{scope}` below), so this surfaces the collision described in the UI's "claim scope" warning. |
+| `POST` | `/api/matches/{id}/claim-scope` | manager | For one of the active tenant's own open matches, close every other tenant's open match sharing any of its live scopes (same personal-best registration side effect as `deactivate-all`, applied cross-tenant). `409` (`MATCH_NOT_OPEN`) if the target match itself isn't open. |
 | `GET` | `/api/matches/{id}/participants` | user | List match participants and entered scores. |
 | `POST` | `/api/matches/{id}/participants` | manager | Add a source-list or free participant. |
 | `PUT` | `/api/matches/{id}/participants/{participantId}` | manager | Update a participant's metadata: `{ participantListMemberId?, lastName, fullName, federationNumber?, categories }`. Used to edit details or "replace" the participant with another source-list member. `409` if `participantListMemberId` is already assigned to a different participant in the match. |

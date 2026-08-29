@@ -13,6 +13,7 @@
   let tenant: Tenant | null = null
   let name = ''
   let logoUrl: string | null | undefined = null
+  let defaultNarrowcastScope = ''
   let saveMessage = ''
   let saveError = ''
   let logoWarning = ''
@@ -22,6 +23,7 @@
     tenant = await api.fetchChildTenant(tenantId)
     name = tenant.name
     logoUrl = tenant.logoUrl
+    defaultNarrowcastScope = tenant.defaultNarrowcastScope ?? ''
   }
   loadTenant()
 
@@ -41,7 +43,7 @@
     saveMessage = ''
     saveError = ''
     try {
-      tenant = await api.updateChildTenant(tenantId, { name, logoUrl })
+      tenant = await api.updateChildTenant(tenantId, { name, logoUrl, defaultNarrowcastScope: defaultNarrowcastScope.trim() || null })
       saveMessage = labels.tenantSaved
     } catch {
       saveError = labels.tenantSaveError
@@ -83,6 +85,8 @@
       </label>
       <p class="muted">{labels.tenantLogoHint}</p>
       {#if logoWarning}<p class="error">{logoWarning}</p>{/if}
+      <label>{labels.defaultScopeLabel}<input bind:value={defaultNarrowcastScope} placeholder="all" /></label>
+      <p class="muted">{labels.defaultScopeHint}</p>
       {#if saveError}<p class="error">{saveError}</p>{/if}
       {#if saveMessage}<p class="success">{saveMessage}</p>{/if}
       <button class="primary" type="submit">{labels.save}</button>

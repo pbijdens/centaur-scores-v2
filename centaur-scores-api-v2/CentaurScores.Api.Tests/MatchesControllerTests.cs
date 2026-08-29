@@ -116,6 +116,200 @@ public sealed class MatchesControllerTests
         Assert.Equal(1, item.UnlistedParticipantCount);
     }
 
+    [Fact]
+    public async Task ScopeConflicts_counts_other_tenants_open_matches_on_matching_scopes_only()
+    {
+        await using var connection = new SqliteConnection("Filename=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>().UseSqlite(connection).Options;
+        await using var db = new ApplicationDbContext(options);
+        await db.Database.EnsureCreatedAsync();
+
+        var tenantA = Guid.NewGuid();
+        var tenantB = Guid.NewGuid();
+        var tenantC = Guid.NewGuid();
+        var myMatchId = Guid.NewGuid();
+
+        db.AddRange(
+            new Tenant { Id = tenantA, Name = "Mine" },
+            new Tenant { Id = tenantB, Name = "Other Club" },
+            new Tenant { Id = tenantC, Name = "Unrelated" },
+            new Match { Id = myMatchId, TenantId = tenantA, Name = "Mine", IsOpen = true, LiveScopes = [Scope(tenantA, myMatchId, "centaurhal")] },
+            MatchWithScopes(tenantA, "Mine other", isOpen: true, scopes: ["centaurhal"]),
+            MatchWithScopes(tenantB, "B1", isOpen: true, scopes: ["centaurhal", "all"]),
+            MatchWithScopes(tenantB, "B2", isOpen: true, scopes: ["centaurhal"]),
+            MatchWithScopes(tenantC, "C1 closed", isOpen: false, scopes: ["centaurhal"]));
+        await db.SaveChangesAsync();
+        var controller = NewController(db, tenantA);
+
+        var result = Assert.IsType<OkObjectResult>(await controller.ScopeConflicts(myMatchId, CancellationToken.None));
+        var conflicts = Assert.IsAssignableFrom<IReadOnlyList<ScopeConflictSummary>>(result.Value);
+
+        var conflict = Assert.Single(conflicts);
+        Assert.Equal(tenantB, conflict.TenantId);
+        Assert.Equal("Other Club", conflict.TenantName);
+        Assert.Equal("centaurhal", conflict.Scope);
+        Assert.Equal(2, conflict.MatchCount);
+    }
+
+    [Fact]
+    public async Task ClaimScope_deactivates_only_other_tenants_matches_sharing_a_scope()
+    {
+        await using var connection = new SqliteConnection("Filename=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>().UseSqlite(connection).Options;
+        await using var db = new ApplicationDbContext(options);
+        await db.Database.EnsureCreatedAsync();
+
+        var tenantA = Guid.NewGuid();
+        var tenantB = Guid.NewGuid();
+        var myMatchId = Guid.NewGuid();
+        var mySiblingMatchId = Guid.NewGuid();
+        var otherMatch1 = MatchWithScopes(tenantB, "B1", isOpen: true, scopes: ["centaurhal"]);
+        var otherMatch2 = MatchWithScopes(tenantB, "B2 different scope", isOpen: true, scopes: ["all"]);
+
+        db.AddRange(
+            new Tenant { Id = tenantA, Name = "Mine" },
+            new Tenant { Id = tenantB, Name = "Other Club" },
+            new Match { Id = myMatchId, TenantId = tenantA, Name = "Mine", IsOpen = true, LiveScopes = [Scope(tenantA, myMatchId, "centaurhal")] },
+            new Match { Id = mySiblingMatchId, TenantId = tenantA, Name = "Mine sibling", IsOpen = true, LiveScopes = [Scope(tenantA, mySiblingMatchId, "centaurhal")] },
+            otherMatch1,
+            otherMatch2);
+        await db.SaveChangesAsync();
+        var controller = NewController(db, tenantA);
+
+        Assert.IsType<NoContentResult>(await controller.ClaimScope(myMatchId, CancellationToken.None));
+
+        Assert.False((await db.Matches.SingleAsync(item => item.Id == otherMatch1.Id)).IsOpen);
+        Assert.True((await db.Matches.SingleAsync(item => item.Id == otherMatch2.Id)).IsOpen); // different scope, untouched
+        Assert.True((await db.Matches.SingleAsync(item => item.Id == mySiblingMatchId)).IsOpen); // same tenant, untouched
+    }
+
+    [Fact]
+    public async Task ClaimScope_registers_personal_best_for_the_other_tenants_match_it_closes()
+    {
+        await using var connection = new SqliteConnection("Filename=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>().UseSqlite(connection).Options;
+        await using var db = new ApplicationDbContext(options);
+        await db.Database.EnsureCreatedAsync();
+
+        var tenantA = Guid.NewGuid();
+        var tenantB = Guid.NewGuid();
+        var myMatchId = Guid.NewGuid();
+        var categoryId = Guid.NewGuid();
+        var disciplineId = Guid.NewGuid();
+        var otherMatchId = Guid.NewGuid();
+        var otherParticipantId = Guid.NewGuid();
+
+        db.AddRange(
+            new Tenant { Id = tenantA, Name = "Mine" },
+            new Tenant { Id = tenantB, Name = "Other Club", PersonalBestEnabled = true },
+            new Match { Id = myMatchId, TenantId = tenantA, Name = "Mine", IsOpen = true, LiveScopes = [Scope(tenantA, myMatchId, "centaurhal")] },
+            new PersonalBestClassifier { Id = Guid.NewGuid(), TenantId = tenantB, Name = "Outdoor" },
+            new PersonalBestDiscipline
+            {
+                Id = disciplineId,
+                TenantId = tenantB,
+                Name = "Recurve",
+                Mappings = [new PersonalBestDisciplineMapping { Id = Guid.NewGuid(), TenantId = tenantB, DisciplineId = disciplineId, SourceTenantId = tenantB, CategoryId = categoryId, ValueId = 1 }]
+            },
+            new Match
+            {
+                Id = otherMatchId,
+                TenantId = tenantB,
+                Name = "Other Club's forgotten match",
+                IsOpen = true,
+                Date = new DateOnly(2026, 8, 28),
+                Ends = 10,
+                ArrowsPerEnd = 3,
+                PersonalBestClassifier = "Outdoor",
+                LiveScopes = [Scope(tenantB, otherMatchId, "centaurhal")],
+                Participants =
+                [
+                    new MatchParticipant
+                    {
+                        Id = otherParticipantId,
+                        TenantId = tenantB,
+                        MatchId = otherMatchId,
+                        ParticipantListMemberId = Guid.NewGuid(),
+                        FullName = "Robin Archer",
+                        FederationNumber = "42",
+                        Categories = new Dictionary<Guid, int> { [categoryId] = 1 },
+                        Scores = [new ArrowScore { Id = Guid.NewGuid(), TenantId = tenantB, MatchParticipantId = otherParticipantId, End = 1, Arrow = 1, KeyId = "10", Value = 10 }]
+                    }
+                ]
+            });
+        await db.SaveChangesAsync();
+        var controller = NewController(db, tenantA);
+
+        Assert.IsType<NoContentResult>(await controller.ClaimScope(myMatchId, CancellationToken.None));
+
+        Assert.False((await db.Matches.SingleAsync(item => item.Id == otherMatchId)).IsOpen);
+        var entry = Assert.Single(db.PersonalBestLogEntries);
+        Assert.Equal("42", entry.FederationNumber);
+        Assert.Equal("Recurve", entry.Discipline);
+        Assert.Equal("Outdoor", entry.MatchClassifier);
+        Assert.Equal(10, entry.Score);
+    }
+
+    [Fact]
+    public async Task ClaimScope_rejects_when_the_callers_own_match_is_not_open()
+    {
+        await using var connection = new SqliteConnection("Filename=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>().UseSqlite(connection).Options;
+        await using var db = new ApplicationDbContext(options);
+        await db.Database.EnsureCreatedAsync();
+
+        var tenantA = Guid.NewGuid();
+        var myMatchId = Guid.NewGuid();
+        db.AddRange(
+            new Tenant { Id = tenantA, Name = "Mine" },
+            new Match { Id = myMatchId, TenantId = tenantA, Name = "Mine", IsOpen = false, LiveScopes = [Scope(tenantA, myMatchId, "centaurhal")] });
+        await db.SaveChangesAsync();
+        var controller = NewController(db, tenantA);
+
+        var result = Assert.IsType<ConflictObjectResult>(await controller.ClaimScope(myMatchId, CancellationToken.None));
+        var error = Assert.IsType<ApiError>(result.Value);
+        Assert.Equal("MATCH_NOT_OPEN", error.Code);
+    }
+
+    [Fact]
+    public async Task ScopeConflicts_and_ClaimScope_are_forbidden_without_manage_rights()
+    {
+        await using var connection = new SqliteConnection("Filename=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>().UseSqlite(connection).Options;
+        await using var db = new ApplicationDbContext(options);
+        await db.Database.EnsureCreatedAsync();
+
+        var tenantA = Guid.NewGuid();
+        var matchId = Guid.NewGuid();
+        db.AddRange(new Tenant { Id = tenantA, Name = "Mine" }, new Match { Id = matchId, TenantId = tenantA, Name = "Mine", IsOpen = true });
+        await db.SaveChangesAsync();
+        var controller = NewController(db, tenantA, canManage: false);
+
+        Assert.IsType<ForbidResult>(await controller.ScopeConflicts(matchId, CancellationToken.None));
+        Assert.IsType<ForbidResult>(await controller.ClaimScope(matchId, CancellationToken.None));
+    }
+
+    private static Match MatchWithScopes(Guid tenantId, string name, bool isOpen, IEnumerable<string> scopes)
+    {
+        var matchId = Guid.NewGuid();
+        return new Match { Id = matchId, TenantId = tenantId, Name = name, IsOpen = isOpen, LiveScopes = scopes.Select(scope => Scope(tenantId, matchId, scope)).ToList() };
+    }
+
+    private static LiveScoreScope Scope(Guid tenantId, Guid matchId, string scope) => new() { Id = Guid.NewGuid(), TenantId = tenantId, MatchId = matchId, Scope = scope };
+
+    private static MatchesController NewController(ApplicationDbContext db, Guid tenantId, bool canManage = true)
+    {
+        var scoring = new ScoringService();
+        var personalBestContext = new PersonalBestContext(db);
+        var personalBestEngine = new PersonalBestEngine(db);
+        return new MatchesController(db, new TestTenantContext(tenantId, canManage), scoring, new LiveScoringService(scoring), new PersonalBestRegistrationService(db, personalBestContext, personalBestEngine), new PersonalBestLiveLookup(db, personalBestContext, personalBestEngine, new MemoryCache(new MemoryCacheOptions())));
+    }
+
     private static ArrowScore Score(Guid tenantId, Guid participantId, int end, int arrow, string keyId, int value) => new()
     {
         Id = Guid.NewGuid(),
@@ -127,11 +321,11 @@ public sealed class MatchesControllerTests
         Value = value
     };
 
-    private sealed class TestTenantContext(Guid tenantId) : ITenantContext
+    private sealed class TestTenantContext(Guid tenantId, bool canManage = true) : ITenantContext
     {
         public Guid TenantId { get; } = tenantId;
         public Guid AccountId { get; } = Guid.NewGuid();
         public bool IsAdministrator => true;
-        public bool CanManage => true;
+        public bool CanManage => canManage;
     }
 }

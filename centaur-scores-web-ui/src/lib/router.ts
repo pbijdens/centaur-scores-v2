@@ -56,6 +56,7 @@ export function resolveRoute(path = location.pathname): Route {
     return { view: 'competition', competitionId: segments[1] }
   }
   if (section === 'profile') return { view: 'profile' }
+  if (section === 'tenant-settings') return { view: 'tenant-settings' }
   if (section === 'tenants') {
     return segments[1] ? { view: 'tenant', tenantId: segments[1] } : { view: 'tenants' }
   }

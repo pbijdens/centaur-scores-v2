@@ -1,12 +1,13 @@
 import { writable } from 'svelte/store'
 import { fetchTenants, type ApiClient } from './api'
-import type { Account, Category, Competition, MatchListItem, MatchTemplate, ParticipantListSummary, PersonalBestStatus, Profile, Tenant } from './types'
+import type { Account, Category, Competition, DefaultScopeSettings, MatchListItem, MatchTemplate, ParticipantListSummary, PersonalBestStatus, Profile, Tenant } from './types'
 
 export const tenants = writable<Tenant[]>([])
 export const matches = writable<MatchListItem[]>([])
 export const competitions = writable<Competition[]>([])
 export const profile = writable<Profile | null>(null)
 export const currentTenant = writable<Tenant | null>(null)
+export const defaultScopeSettings = writable<DefaultScopeSettings | null>(null)
 export const childTenants = writable<Tenant[]>([])
 export const accounts = writable<Account[]>([])
 export const categories = writable<Category[]>([])
@@ -25,6 +26,7 @@ export async function loadData(api: ApiClient) {
   competitions.set(await api.fetchCompetitions())
   profile.set(await api.fetchProfile())
   currentTenant.set(await api.fetchCurrentTenant())
+  defaultScopeSettings.set(await api.fetchDefaultScopeSettings())
   categories.set(await api.fetchCategories())
   participantLists.set(await api.fetchParticipantLists())
   templates.set(await api.fetchTemplates())
@@ -66,4 +68,8 @@ export async function refreshParticipantLists(api: ApiClient) {
 
 export async function refreshTemplates(api: ApiClient) {
   templates.set(await api.fetchTemplates())
+}
+
+export async function refreshDefaultScopeSettings(api: ApiClient) {
+  defaultScopeSettings.set(await api.fetchDefaultScopeSettings())
 }

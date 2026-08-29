@@ -10,7 +10,7 @@ namespace CentaurScores.Api.Controllers;
 
 [ApiController]
 [Route("api/tenants")]
-public sealed class TenantsController(ApplicationDbContext db, ITenantContext tenantContext) : ApiControllerBase(tenantContext)
+public sealed class TenantsController(ApplicationDbContext db, ITenantContext tenantContext, INarrowcastScopeContext narrowcastScopeContext) : ApiControllerBase(tenantContext)
 {
     [AllowAnonymous]
     [HttpGet]
@@ -23,10 +23,31 @@ public sealed class TenantsController(ApplicationDbContext db, ITenantContext te
     public async Task<IActionResult> Create(CreateTenantRequest request, CancellationToken cancellationToken)
     {
         if (!IsAdministrator) return Forbid();
-        var tenant = new Tenant { Id = Guid.NewGuid(), Name = request.Name, LogoUrl = request.LogoUrl, ParentTenantId = request.ParentTenantId };
+        var tenant = new Tenant { Id = Guid.NewGuid(), Name = request.Name, LogoUrl = request.LogoUrl, ParentTenantId = request.ParentTenantId, DefaultNarrowcastScope = request.DefaultNarrowcastScope };
         db.Tenants.Add(tenant);
         await db.SaveChangesAsync(cancellationToken);
         return CreatedAtAction(nameof(Current), new { id = tenant.Id }, tenant);
+    }
+
+    [HttpGet("current/default-scope")]
+    public async Task<IActionResult> CurrentDefaultScope(CancellationToken cancellationToken)
+    {
+        var tenant = await db.Tenants.AsNoTracking().SingleOrDefaultAsync(item => item.Id == TenantId, cancellationToken);
+        if (tenant is null) return NotFound();
+        var effective = await narrowcastScopeContext.ResolveEffectiveScopeAsync(TenantId, cancellationToken);
+        return Ok(new DefaultScopeSettings(tenant.DefaultNarrowcastScope, effective));
+    }
+
+    [HttpPut("current/default-scope")]
+    public async Task<IActionResult> UpdateCurrentDefaultScope(UpdateDefaultNarrowcastScopeRequest request, CancellationToken cancellationToken)
+    {
+        if (!CanManage) return Forbid();
+        var tenant = await db.Tenants.SingleOrDefaultAsync(item => item.Id == TenantId, cancellationToken);
+        if (tenant is null) return NotFound();
+        tenant.DefaultNarrowcastScope = request.DefaultNarrowcastScope;
+        await db.SaveChangesAsync(cancellationToken);
+        var effective = await narrowcastScopeContext.ResolveEffectiveScopeAsync(TenantId, cancellationToken);
+        return Ok(new DefaultScopeSettings(tenant.DefaultNarrowcastScope, effective));
     }
 
     [HttpPut("current")]
@@ -64,6 +85,7 @@ public sealed class TenantsController(ApplicationDbContext db, ITenantContext te
         if (tenant is null) return NotFound();
         tenant.Name = request.Name;
         tenant.LogoUrl = request.LogoUrl;
+        tenant.DefaultNarrowcastScope = request.DefaultNarrowcastScope;
         await db.SaveChangesAsync(cancellationToken);
         return Ok(tenant);
     }

@@ -2,13 +2,14 @@
   import type { ApiClient } from '../api'
   import { labelForError } from '../errors'
   import { navigateOnClick, templatePath } from '../router'
-  import { defaultTemplateConfigurationJson } from '../templateConfig'
+  import { buildEmptyTemplateConfiguration } from '../templateConfig'
   import type { MatchTemplate, ParticipantListSummary } from '../types'
 
   export let api: ApiClient
   export let templates: MatchTemplate[]
   export let participantLists: ParticipantListSummary[]
   export let labels: Record<string, string>
+  export let defaultNarrowcastScope: string
   export let onOpenTemplate: (template: MatchTemplate) => void
   export let onChanged: () => void
   export let onBack: () => void
@@ -33,7 +34,7 @@
     if (!newTemplateName.trim()) return
     createError = ''
     try {
-      const template = await api.createTemplate({ name: newTemplateName.trim(), allowFreeParticipants: true, deviceSelectionMode: 'list-and-free', configurationJson: defaultTemplateConfigurationJson })
+      const template = await api.createTemplate({ name: newTemplateName.trim(), allowFreeParticipants: true, deviceSelectionMode: 'list-and-free', configurationJson: JSON.stringify(buildEmptyTemplateConfiguration(defaultNarrowcastScope)) })
       newTemplateName = ''
       showAddForm = false
       onChanged()

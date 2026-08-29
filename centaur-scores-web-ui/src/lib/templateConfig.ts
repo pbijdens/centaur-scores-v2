@@ -10,17 +10,21 @@ const defaultKeyboard: KeyboardKey[] = [...Array.from({ length: 10 }, (_, index)
   return { keyId: String(value), label: String(value), color: defaultKeyboardColors[index], value }
 }), { keyId: 'M', label: 'M', color: 'White' as const, value: 0 }]
 
-export const emptyTemplateConfiguration: TemplateConfiguration = {
-  ends: 10,
-  arrowsPerEnd: 3,
-  groupEnds: null,
-  categoryOrder: [],
-  deviceNames: [],
-  keyboard: defaultKeyboard,
-  disabledKeyRules: [],
-  scoringRules: [{ type: 'total' }],
-  liveScopes: [{ scope: 'all', groupByCategoryIds: [], includeAverage: true, includeGroupScores: false, includeEqualizers: true, includePersonalBest: false }]
+export function buildEmptyTemplateConfiguration(defaultScope: string = 'all'): TemplateConfiguration {
+  return {
+    ends: 10,
+    arrowsPerEnd: 3,
+    groupEnds: null,
+    categoryOrder: [],
+    deviceNames: [],
+    keyboard: defaultKeyboard,
+    disabledKeyRules: [],
+    scoringRules: [{ type: 'total' }],
+    liveScopes: [{ scope: defaultScope, groupByCategoryIds: [], includeAverage: true, includeGroupScores: false, includeEqualizers: true, includePersonalBest: false }]
+  }
 }
+
+export const emptyTemplateConfiguration: TemplateConfiguration = buildEmptyTemplateConfiguration()
 
 export const defaultTemplateConfigurationJson = JSON.stringify(emptyTemplateConfiguration)
 

@@ -7,6 +7,7 @@
     childTenants,
     competitions,
     currentTenant,
+    defaultScopeSettings,
     matches,
     participantLists,
     personalBestStatus,
@@ -23,6 +24,7 @@
     refreshParticipantLists as fetchParticipantListsList,
     refreshPersonalBestStatus as fetchPersonalBestStatus,
     refreshTemplates as fetchTemplatesList,
+    refreshDefaultScopeSettings as fetchDefaultScopeSettings,
     resetMatchesAndCompetitions
   } from './lib/data'
   import { labelForError } from './lib/errors'
@@ -61,6 +63,7 @@
   import TemplateEditView from './lib/views/TemplateEditView.svelte'
   import TemplatesView from './lib/views/TemplatesView.svelte'
   import TenantEditView from './lib/views/TenantEditView.svelte'
+  import TenantSettingsView from './lib/views/TenantSettingsView.svelte'
   import TenantsView from './lib/views/TenantsView.svelte'
 
   const rootTenant = '00000000-0000-0000-0000-000000000001'
@@ -96,6 +99,7 @@
   $: canManage = isAdmin || $profile?.authorization === 'Manager'
   $: headerUsername = $profile?.displayName || $profile?.username || username
   $: showPersonalBestButton = $personalBestStatus !== null && (!$personalBestStatus.enabled || $personalBestStatus.ownedHere)
+  $: effectiveDefaultNarrowcastScope = $defaultScopeSettings?.effectiveValue ?? 'all'
   $: homeQuickLinks = (
     [
       { path: 'categories', icon: '🏷️', title: t.homeTileCategoriesTitle, description: t.homeTileCategoriesDescription },
@@ -103,6 +107,7 @@
       { path: 'templates', icon: '📋', title: t.homeTileTemplatesTitle, description: t.homeTileTemplatesDescription }
     ]
   ).concat(showPersonalBestButton ? [{ path: 'personal-best', icon: '🏆', title: t.personalBest, description: t.homeTilePersonalBestDescription }] : [])
+    .concat(canManage ? [{ path: 'tenant-settings', icon: '⚙️', title: t.tenantSettings, description: t.homeTileTenantSettingsDescription }] : [])
     .concat(isAdmin ? [
       { path: 'accounts', icon: '👤', title: t.accounts, description: t.homeTileAccountsDescription },
       { path: 'tenants', icon: '🏢', title: t.tenants, description: t.homeTileTenantsDescription },
@@ -226,8 +231,8 @@
     await fetchChildTenantsList(api)
   }
 
-  async function createChildTenant(name: string) {
-    await api.createChildTenant({ name, parentTenantId: tenant })
+  async function createChildTenant(name: string, defaultNarrowcastScope: string | null) {
+    await api.createChildTenant({ name, parentTenantId: tenant, defaultNarrowcastScope })
     await loadChildTenants()
   }
 
@@ -371,7 +376,7 @@
       {#if view === 'home'}
         <HomeView matches={$matches} competitions={$competitions} {language} labels={t} quickLinks={homeQuickLinks} onOpenMatch={openMatch} onNavigate={navigate} onDeactivateAll={deactivateAllMatches} />
       {:else if view === 'matches'}
-        <MatchesView {api} matches={$matches} templates={$templates} {language} labels={t} onOpenMatch={openMatch} onChanged={loadMatchesList} />
+        <MatchesView {api} matches={$matches} templates={$templates} defaultNarrowcastScope={effectiveDefaultNarrowcastScope} {language} labels={t} onOpenMatch={openMatch} onChanged={loadMatchesList} />
       {:else if view === 'match' && selectedMatch}
         {@const currentMatch = selectedMatch}
         <MatchDetailView {api} match={currentMatch} categories={$categories} sourceList={matchSourceList} {language} labels={t} onBack={() => navigate('/matches')} onToggleOpen={toggleSelectedMatch} onChanged={refreshSelectedMatch} onDeleted={onMatchDeleted} onEditMetadata={() => navigate(matchEditPath(currentMatch.id))} onManageDevices={() => navigate(matchDevicesPath(currentMatch.id))} onOpenParticipant={openParticipant} />
@@ -412,9 +417,11 @@
       {:else if view === 'participant' && selectedListId}
         <ParticipantMemberView {api} listId={selectedListId} member={selectedMember} categories={$categories} labels={t} onBack={() => navigate(`/participants/${selectedListId}`)} onSaved={onMemberSaved} onDeleted={onMemberSaved} />
       {:else if view === 'templates'}
-        <TemplatesView {api} templates={$templates} participantLists={$participantLists} labels={t} onOpenTemplate={openTemplate} onChanged={refreshTemplates} onBack={() => navigate('/')} />
+        <TemplatesView {api} templates={$templates} participantLists={$participantLists} defaultNarrowcastScope={effectiveDefaultNarrowcastScope} labels={t} onOpenTemplate={openTemplate} onChanged={refreshTemplates} onBack={() => navigate('/')} />
       {:else if view === 'template' && selectedTemplate}
         <TemplateEditView {api} template={selectedTemplate} categories={$categories} participantLists={$participantLists} labels={t} onBack={() => navigate('/templates')} onSaved={refreshTemplates} onDeleted={onTemplateDeleted} />
+      {:else if view === 'tenant-settings' && canManage}
+        <TenantSettingsView {api} labels={t} onBack={() => navigate('/')} onSaved={() => fetchDefaultScopeSettings(api)} />
       {:else if view === 'personal-best'}
         <PersonalBestView {api} status={$personalBestStatus} labels={t} onBack={() => navigate('/')} onNavigate={navigate} onChanged={refreshPersonalBestStatus} />
       {:else if view === 'personal-best-classifiers'}

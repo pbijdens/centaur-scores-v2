@@ -18,6 +18,7 @@ public sealed class Tenant
     public string? LogoUrl { get; set; }
     public Guid? ParentTenantId { get; set; }
     public bool PersonalBestEnabled { get; set; }
+    public string? DefaultNarrowcastScope { get; set; }
 }
 
 public sealed class Account : TenantOwnedEntity

@@ -1,4 +1,4 @@
-import type { Account, Category, Competition, CompetitionResultsDocument, CompetitionRound, CompetitionScoreRule, Language, LiveScoringMatch, LiveScoringPage, Match, MatchListItem, MatchParticipant, MatchTemplate, ParticipantList, ParticipantListSummary, PersonalBestAvailableValue, PersonalBestConflictResolution, PersonalBestDiscipline, PersonalBestDisciplineValueRef, PersonalBestExportConfig, PersonalBestExportField, PersonalBestExportMode, PersonalBestDateFormat, PersonalBestImportConfig, PersonalBestImportResult, PersonalBestLogRow, PersonalBestStatus, Profile, RestoreBackupResult, ScoreDevice, Tenant } from './types'
+import type { Account, Category, Competition, CompetitionResultsDocument, CompetitionRound, CompetitionScoreRule, DefaultScopeSettings, Language, LiveScoringMatch, LiveScoringPage, Match, MatchListItem, MatchParticipant, MatchTemplate, ParticipantList, ParticipantListSummary, PersonalBestAvailableValue, PersonalBestConflictResolution, PersonalBestDiscipline, PersonalBestDisciplineValueRef, PersonalBestExportConfig, PersonalBestExportField, PersonalBestExportMode, PersonalBestDateFormat, PersonalBestImportConfig, PersonalBestImportResult, PersonalBestLogRow, PersonalBestStatus, Profile, RestoreBackupResult, ScopeConflict, ScoreDevice, Tenant } from './types'
 
 export const apiBase = import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:5080'
 
@@ -200,6 +200,14 @@ export class ApiClient {
     return this.request(`/api/matches/${matchId}/live-scopes/${scopeId}`, { method: 'DELETE' })
   }
 
+  fetchScopeConflicts(matchId: string): Promise<ScopeConflict[]> {
+    return this.request(`/api/matches/${matchId}/scope-conflicts`)
+  }
+
+  claimScope(matchId: string) {
+    return this.request(`/api/matches/${matchId}/claim-scope`, { method: 'POST' })
+  }
+
   async downloadMatchExport(matchId: string): Promise<{ blob: Blob; filename: string }> {
     const response = await fetch(`${apiBase}/api/matches/${matchId}/export.csv`, { headers: this.headers() })
     if (!response.ok) throw await readApiError(response)
@@ -232,12 +240,20 @@ export class ApiClient {
     return this.request(`/api/tenants/children/${id}`)
   }
 
-  createChildTenant(body: { name: string; logoUrl?: string | null; parentTenantId: string }): Promise<Tenant> {
+  createChildTenant(body: { name: string; logoUrl?: string | null; parentTenantId: string; defaultNarrowcastScope?: string | null }): Promise<Tenant> {
     return this.request('/api/tenants', { method: 'POST', body: JSON.stringify(body) })
   }
 
-  updateChildTenant(id: string, body: { name: string; logoUrl?: string | null }): Promise<Tenant> {
+  updateChildTenant(id: string, body: { name: string; logoUrl?: string | null; defaultNarrowcastScope?: string | null }): Promise<Tenant> {
     return this.request(`/api/tenants/children/${id}`, { method: 'PUT', body: JSON.stringify(body) })
+  }
+
+  fetchDefaultScopeSettings(): Promise<DefaultScopeSettings> {
+    return this.request('/api/tenants/current/default-scope')
+  }
+
+  updateDefaultNarrowcastScope(defaultNarrowcastScope: string | null): Promise<DefaultScopeSettings> {
+    return this.request('/api/tenants/current/default-scope', { method: 'PUT', body: JSON.stringify({ defaultNarrowcastScope }) })
   }
 
   fetchAccounts(): Promise<Account[]> {

@@ -26,6 +26,7 @@ builder.Services.AddScoped<ICompetitionService, CompetitionService>();
 builder.Services.AddScoped<IScorekeeperService, ScorekeeperService>();
 builder.Services.AddScoped<IParticipantListExcelService, ParticipantListExcelService>();
 builder.Services.AddScoped<IPersonalBestContext, PersonalBestContext>();
+builder.Services.AddScoped<INarrowcastScopeContext, NarrowcastScopeContext>();
 builder.Services.AddScoped<IPersonalBestEngine, PersonalBestEngine>();
 builder.Services.AddScoped<IPersonalBestExcelService, PersonalBestExcelService>();
 builder.Services.AddScoped<IPersonalBestRegistrationService, PersonalBestRegistrationService>();
