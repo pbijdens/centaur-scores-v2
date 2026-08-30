@@ -27,6 +27,10 @@ for component in api web-ui scoring; do
     install -d -o "${CENTAUR_SERVICE_USER}" -g "${CENTAUR_SERVICE_GROUP}" -m 0750 "${RELEASES_DIR}/${component}/_builds"
 done
 
+# Pre-built Android APKs served statically at /android/ - a single flat
+# directory, not blue/green slots (see update/update-android-assets.sh).
+install -d -o "${CENTAUR_SERVICE_USER}" -g "${CENTAUR_SERVICE_GROUP}" -m 0750 "${CENTAUR_BASE_DIR}/android"
+
 install -d -o root -g root -m 0755 /etc/centaur-scores
 
 log "02-create-service-user-and-dirs.sh done."

@@ -7,8 +7,12 @@ running all three CentaurScores web components behind one nginx gateway:
 - `centaur-scores-web-ui` (Svelte, served at `/`)
 - `centaur-scores-mobile-web-scoring` (Svelte, served at `/scores/`)
 
-(`centaur-scores`, the Flutter app, is out of scope - it is not installed on
-this server.)
+It also serves pre-built APKs of `centaur-scores` (the Flutter app) as plain
+static downloads at `/android/app-debug.apk` and `/android/app-release.apk`,
+kept up to date with the monorepo's latest GitHub release by
+`update/update-android-assets.sh` - the app itself is not installed or built
+on this server, and this has its own update cycle, separate from the
+blue/green rollout below.
 
 This mirrors what `centaur-scores-docker-v2` does in a container, but builds
 and runs the three components directly on the host via systemd, and adds a

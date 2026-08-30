@@ -24,6 +24,7 @@ Every script below lives in `update/` and must be run as root from inside
 | `rollback.sh` | Emergency: swaps the active slot back to the other one immediately, weight to 0%. Use if something promoted (or mid-canary) turns out to be broken. |
 | `status.sh` | Shows current routing, each slot's deployed branch/commit, systemd status, and a health check. |
 | `stop-slot.sh <blue\|green>` | Stops and disables a slot's API service (e.g. to free resources once you're done with it). Refuses to stop the active slot without `--force`. |
+| `update-android-assets.sh` | Downloads the latest GitHub release's `app-debug.apk`/`app-release.apk` and publishes them at `/android/`. Unrelated to blue/green - see [Android APK downloads](#android-apk-downloads) below. |
 
 ## Typical rollout
 
@@ -127,6 +128,67 @@ changes with this in mind before deploying them as a candidate.
   operation.
 - `/etc/nginx/sites-available/centaur-scores.conf` (the TLS/server block
   certbot edited during install) is never touched by any update script.
+
+## Android APK downloads
+
+`https://<PUBLIC_HOSTNAME>/android/app-debug.apk` and `.../app-release.apk`
+serve the pre-built APKs from the monorepo's **latest GitHub release**
+(`centaur-scores`, the Flutter app - not otherwise installed on this server).
+
+This is completely separate from the blue/green web/API rollout above: there
+is no slot, no traffic split, no restart, just two static files nginx serves
+directly from `${CENTAUR_BASE_DIR}/android/`. Its update cycle is whatever
+cadence you release the Android app on, independent of web/API deploys.
+
+nginx can't itself run `curl`/query the GitHub API on every request, so the
+files are fetched ahead of time and served as plain static files rather than
+proxied live:
+
+```sh
+cd update
+sudo ./update-android-assets.sh
+```
+
+This looks up the latest release via the GitHub API, downloads whichever
+`app-debug.apk` / `app-release.apk` assets it finds, and atomically replaces
+the two files under `${CENTAUR_BASE_DIR}/android/`. Run it again any time you
+cut a new Android release to publish it. If you want it kept fresh
+automatically, add it to root's crontab, e.g. hourly:
+
+```sh
+0 * * * * cd /opt/centaur-scores-admin/centaur-scores-v2/centaur-scores-setup-and-maintenance/update && ./update-android-assets.sh >>/var/log/centaur-scores-android-assets.log 2>&1
+```
+
+### Updating an already-initialized server
+
+If your server was set up before this feature existed, two one-time steps
+are needed (both idempotent, safe to re-run):
+
+1. **Create the `android/` directory and pick up this script**: pull the
+   latest `centaur-scores-setup-and-maintenance` code, then re-run
+   `sudo ./setup/02-create-service-user-and-dirs.sh` - it only creates
+   missing directories, it won't touch anything else already on the box.
+2. **Add the nginx location block**: `setup/08-render-service-configs.sh`
+   deliberately never re-renders `/etc/nginx/sites-available/centaur-scores.conf`
+   once it exists, to avoid clobbering certbot's TLS edits (see the warning
+   at the top of that file). So on an already-initialized server you add
+   this block by hand, right before the existing `location / { ... }` block:
+
+   ```nginx
+   location ^~ /android/ {
+       alias /srv/centaur-scores/android/;
+   }
+   ```
+
+   (substitute your own `CENTAUR_BASE_DIR` if it isn't the default
+   `/srv/centaur-scores`), then:
+
+   ```sh
+   sudo nginx -t && sudo systemctl reload nginx
+   ```
+
+Then run `sudo ./update/update-android-assets.sh` once to populate the two
+files for the first time.
 
 ## Troubleshooting
 

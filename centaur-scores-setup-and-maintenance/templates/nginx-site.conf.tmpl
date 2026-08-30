@@ -58,6 +58,13 @@ server {
         try_files $uri $uri/ ${PUBLIC_APP_VDIR}index.html;
     }
 
+    # Pre-built Android APKs, refreshed from GitHub releases by
+    # update/update-android-assets.sh - not part of the blue/green slots,
+    # served as plain static files with their own, separate update cycle.
+    location ^~ /android/ {
+        alias ${CENTAUR_BASE_DIR}/android/;
+    }
+
     location / {
         try_files $uri $uri/ /index.html;
     }

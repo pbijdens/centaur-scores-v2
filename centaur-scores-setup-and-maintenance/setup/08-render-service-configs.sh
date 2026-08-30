@@ -84,7 +84,7 @@ if [[ -f "${site_conf}" ]]; then
 else
     render_template "${CS_TEMPLATES_DIR}/nginx-site.conf.tmpl" "${site_conf}" \
         PUBLIC_HOSTNAME PUBLIC_API_VDIR PUBLIC_APP_VDIR \
-        PUBLIC_API_VDIR_NOSLASH PUBLIC_APP_VDIR_NOSLASH CENTAUR_LOG_DIR
+        PUBLIC_API_VDIR_NOSLASH PUBLIC_APP_VDIR_NOSLASH CENTAUR_LOG_DIR CENTAUR_BASE_DIR
 fi
 ln -sf "${site_conf}" /etc/nginx/sites-enabled/centaur-scores.conf
 

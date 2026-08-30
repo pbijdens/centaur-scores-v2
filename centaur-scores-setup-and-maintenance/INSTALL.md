@@ -8,13 +8,17 @@ server, behind a single nginx gateway with Let's Encrypt TLS:
 | `/`               | `centaur-scores-web-ui`             |
 | `/api/`           | `centaur-scores-api-v2`             |
 | `/scores/`        | `centaur-scores-mobile-web-scoring` |
+| `/android/`       | Pre-built `centaur-scores` (Flutter) APKs, see below |
 
 It also stands up the blue/green infrastructure used later for updates (see
 [UPDATE.md](UPDATE.md)): two identical slots, `blue` and `green`, of which one
 is always "active" (serving 100% of traffic by default) and the other is the
 "candidate" for the next release.
 
-`centaur-scores` (the Flutter app) is **not** part of this install.
+`centaur-scores` (the Flutter app) itself is **not** installed on this
+server - it only serves the app's pre-built APKs as static downloads at
+`/android/` (see [UPDATE.md](UPDATE.md#android-apk-downloads)), populated by
+`update/update-android-assets.sh`, not by the setup scripts below.
 
 ## 1. System requirements
 
@@ -71,6 +75,7 @@ Internet
    |-- /            -> releases/web-ui/{blue,green}/  (static files)  |
    |-- /scores/     -> releases/scoring/{blue,green}/ (static files)  |
    |-- /api/        -> 127.0.0.1:5101 (blue) or :5102 (green)         |
+   |-- /android/    -> android/ (static files, no blue/green slot)   |
    ----------------------------------------------------------------- -
                               |
                      centaur-scores-api-{blue,green}.service (systemd)
@@ -90,6 +95,7 @@ means for how you ship schema changes.
     api/{blue,green}       -> symlinks into api/_builds/<slot>-<timestamp>/
     web-ui/{blue,green}    -> symlinks into web-ui/_builds/<slot>-<timestamp>/
     scoring/{blue,green}   -> symlinks into scoring/_builds/<slot>-<timestamp>/
+  android/                 app-debug.apk, app-release.apk (flat, no slots)
   build/                   scratch git-clone/build workspace (wiped per deploy)
   state/                   active-slot, candidate-weight, deployed-<slot>.txt
   logs/                    api-blue.log, api-green.log, nginx-access.log, nginx-error.log (+ rotated *.gz)
@@ -162,6 +168,10 @@ Notes:
 - **10** is just the first call to `update/deploy.sh blue <branch>` - see
   [UPDATE.md](UPDATE.md) for what it does. After it succeeds, `blue` is
   active at 100% and the site is fully live.
+- To also publish the Android app's pre-built APKs at `/android/`, run
+  `sudo ./update/update-android-assets.sh` (see
+  [UPDATE.md](UPDATE.md#android-apk-downloads)) - optional, and unrelated to
+  the blue/green steps above.
 
 ## 6. Verify
 
@@ -169,6 +179,7 @@ Notes:
 curl -I https://<your-hostname>/
 curl -s https://<your-hostname>/api/health
 curl -I https://<your-hostname>/scores/
+curl -I https://<your-hostname>/android/app-debug.apk   # only after update-android-assets.sh has run
 sudo /opt/centaur-scores-admin/centaur-scores-v2/centaur-scores-setup-and-maintenance/update/status.sh
 ```
 
