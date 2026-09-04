@@ -1,0 +1,25 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "centaur-scores/competition-result",
+	"title": "Centaur Scores Competition Result",
+	"category": "widgets",
+	"icon": "awards",
+	"description": "Embed the results of a Centaur Scores competition.",
+	"textdomain": "centaur-scores",
+	"attributes": {
+		"tenantId": { "type": "string", "default": "" },
+		"competitionId": { "type": "string", "default": "" },
+		"columns": { "type": "number", "default": 1 }
+	},
+	"supports": {
+		"html": false,
+		"className": true,
+		"spacing": {
+			"margin": true,
+			"padding": true
+		}
+	},
+	"editorScript": "centaur-scores-competition-result-editor",
+	"style": "centaur-scores-frontend"
+}

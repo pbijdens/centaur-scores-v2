@@ -1,0 +1,19 @@
+.centaur-scores-settings code {
+	display: inline-block;
+	margin: .25em 0 1em;
+	padding: .4em .6em;
+	background: #f0f0f1;
+}
+
+#centaur_scores_test_result {
+	margin-left: .75em;
+	font-weight: 600;
+}
+
+#centaur_scores_test_result.is-success {
+	color: #1e7e1e;
+}
+
+#centaur_scores_test_result.is-error {
+	color: #c9302c;
+}

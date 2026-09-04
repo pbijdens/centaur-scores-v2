@@ -1,0 +1,101 @@
+.centaur-scores-embed {
+	color: #14210f;
+}
+
+.centaur-scores {
+	column-gap: 1.5em;
+}
+
+.centaur-scores-columns-2 {
+	column-count: 2;
+}
+
+.centaur-scores-columns-3 {
+	column-count: 3;
+}
+
+.centaur-scores-group {
+	break-inside: avoid-column;
+	margin-bottom: 1em;
+}
+
+.centaur-scores-group h3 {
+	break-after: avoid-column;
+	margin: .5em 0 .3em;
+	padding: .35em .5em;
+	background: #eef2eb;
+	color: #164a13;
+	font-size: 1em;
+	line-height: 1.2;
+}
+
+.centaur-scores-row {
+	display: grid;
+	grid-template-columns: 3ch minmax(0, 1fr) 5ch 5ch;
+	align-items: center;
+	gap: .4em;
+	break-inside: avoid-column;
+	padding: .2em .5em;
+	border-bottom: 1px solid #edf0ea;
+	font-size: .95em;
+	line-height: 1.3;
+}
+
+.centaur-scores-position,
+.centaur-scores-average,
+.centaur-scores-score {
+	font-variant-numeric: tabular-nums;
+	text-align: right;
+}
+
+.centaur-scores-position {
+	text-align: left;
+}
+
+.centaur-scores-lines {
+	min-width: 0;
+	display: grid;
+	gap: .1em;
+}
+
+.centaur-scores-lines strong,
+.centaur-scores-lines small {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	display: block;
+}
+
+.centaur-scores-lines small {
+	color: #536050;
+	font-size: .82em;
+}
+
+.centaur-scores-average {
+	font-size: .9em;
+	color: #536050;
+}
+
+.centaur-scores-score {
+	font-weight: 700;
+}
+
+.centaur-scores-notice {
+	padding: .5em .75em;
+	margin-bottom: .75em;
+	background: #fff8e5;
+	border-left: 3px solid #dba617;
+	font-size: .85em;
+}
+
+.centaur-scores-error {
+	padding: .5em .75em;
+	background: #fbeaea;
+	border-left: 3px solid #c9302c;
+	font-size: .9em;
+}
+
+.centaur-scores-empty {
+	color: #536050;
+	font-style: italic;
+}

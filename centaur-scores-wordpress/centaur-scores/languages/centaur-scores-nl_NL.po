@@ -1,0 +1,200 @@
+# Dutch translation for Centaur Scores.
+# Copyright (C) 2026 Centaur Scores
+# This file is distributed under the GPL v2 or later.
+msgid ""
+msgstr ""
+"Project-Id-Version: Centaur Scores 1.0.0\n"
+"Report-Msgid-Bugs-To: https://net42.org/\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"PO-Revision-Date: 2026-09-04T00:00:00+00:00\n"
+"Last-Translator: Centaur Scores\n"
+"Language-Team: Dutch\n"
+"Language: nl_NL\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-Generator: manual\n"
+"X-Domain: centaur-scores\n"
+
+#: includes/class-cs-settings.php:170
+msgid ".centaur-scores-group h3 { color: #164a13; }"
+msgstr ".centaur-scores-group h3 { color: #164a13; }"
+
+#: includes/class-cs-settings.php:92
+msgid "API URL"
+msgstr "API-URL"
+
+#: includes/class-cs-settings.php:172
+msgid "Applied only inside each Centaur Scores embed, never to the rest of the page."
+msgstr "Wordt alleen toegepast binnen elke Centaur Scores-weergave, nooit op de rest van de pagina."
+
+#: includes/class-cs-api-client.php:103
+msgid "Authentication with the Centaur Scores API failed."
+msgstr "Authenticatie bij de Centaur Scores API is mislukt."
+
+#: includes/class-cs-settings.php:207
+msgid "Both shortcodes also accept tenant and class attributes, and are available as blocks named \"Centaur Scores Match Result\" and \"Centaur Scores Competition Result\" in the block editor."
+msgstr "Beide shortcodes accepteren ook tenant- en class-attributen, en zijn ook beschikbaar als blokken \"Centaur Scores wedstrijduitslag\" en \"Centaur Scores competitie-uitslag\" in de bloken-editor."
+
+#: includes/class-cs-settings.php:51
+#: includes/class-cs-settings.php:52
+#: includes/class-cs-settings.php:182
+msgid "Centaur Scores"
+msgstr "Centaur Scores"
+
+#: includes/class-cs-render.php:227
+#. translators: %s: error detail
+msgid "Centaur Scores: %s"
+msgstr "Centaur Scores: %s"
+
+#: blocks/competition-result/index.js:45
+#: blocks/match-result/index.js:52
+msgid "Columns"
+msgstr "Kolommen"
+
+#: blocks/competition-result/index.js:38
+msgid "Competition ID"
+msgstr "Competitie-ID"
+
+#: blocks/competition-result/index.js:28
+msgid "Competition settings"
+msgstr "Competitie-instellingen"
+
+#: includes/class-cs-settings.php:187
+#. translators: %s: link to net42.org
+msgid "Configure the connection to your Centaur Scores API. For more information, visit %s."
+msgstr "Configureer de verbinding met uw Centaur Scores API. Kijk voor meer informatie op %s."
+
+#: includes/class-cs-settings.php:96
+msgid "Connection"
+msgstr "Verbinding"
+
+#: includes/class-cs-settings.php:97
+msgid "Custom CSS"
+msgstr "Aangepaste CSS"
+
+#: includes/class-cs-render.php:151
+msgid "DQ"
+msgstr "GDK"
+
+#: includes/class-cs-settings.php:95
+msgid "Default tenant ID"
+msgstr "Standaard tenant-ID"
+
+#: includes/class-cs-settings.php:129
+msgid "The base URL to use in front of every API path (/api/auth/login, /api/matches/..., etc) exactly as it needs to appear in the request - if your Centaur Scores API is reverse-proxied under an /api path, include that here too."
+msgstr "De basis-URL die voor elk API-pad wordt geplaatst (/api/auth/login, /api/matches/..., enz.), precies zoals die in het verzoek moet voorkomen - als uw Centaur Scores API via een reverse proxy achter een /api-pad zit, neem dat hier dan ook op."
+
+#: includes/class-cs-settings.php:202
+msgid "Embed a single match result:"
+msgstr "Een enkele wedstrijduitslag insluiten:"
+
+#: includes/class-cs-settings.php:204
+msgid "Embed competition results:"
+msgstr "Competitie-uitslagen insluiten:"
+
+#: includes/class-cs-settings.php:144
+msgid "Leave blank to keep the currently saved password"
+msgstr "Laat leeg om het huidige opgeslagen wachtwoord te behouden"
+
+#: blocks/competition-result/index.js:31
+#: blocks/match-result/index.js:31
+msgid "Leave blank to use the default tenant from Centaur Scores settings."
+msgstr "Laat leeg om de standaardtenant uit de Centaur Scores-instellingen te gebruiken."
+
+#: includes/class-cs-settings.php:244
+#. translators: %s: account display name
+msgid "Login succeeded as %s. Add a default tenant ID to also verify tenant access."
+msgstr "Inloggen gelukt als %s. Voeg een standaard tenant-ID toe om ook de toegang tot de tenant te controleren."
+
+#: blocks/match-result/index.js:38
+msgid "Match ID"
+msgstr "Wedstrijd-ID"
+
+#: blocks/match-result/index.js:28
+msgid "Match settings"
+msgstr "Wedstrijdinstellingen"
+
+#: includes/class-cs-render.php:214
+msgid "No results are available yet."
+msgstr "Er zijn nog geen uitslagen beschikbaar."
+
+#: includes/class-cs-settings.php:94
+msgid "Password"
+msgstr "Wachtwoord"
+
+#: blocks/match-result/index.js:45
+msgid "Scope"
+msgstr "Scope"
+
+#: includes/class-cs-render.php:236
+msgid "Results are currently unavailable."
+msgstr "Uitslagen zijn op dit moment niet beschikbaar."
+
+#: includes/class-cs-render.php:211
+msgid "Showing the last successfully retrieved results; the Centaur Scores API could not be reached just now."
+msgstr "De laatst succesvol opgehaalde uitslagen worden getoond; de Centaur Scores API was zojuist niet bereikbaar."
+
+#: includes/class-cs-settings.php:145
+msgid "Stored in the WordPress database and only ever used server-side."
+msgstr "Wordt opgeslagen in de WordPress-database en alleen server-side gebruikt."
+
+#: includes/class-cs-settings.php:255
+#. translators: %s: account display name
+msgid "Success: authenticated as %s and confirmed access to the tenant."
+msgstr "Succes: geauthenticeerd als %s en toegang tot de tenant bevestigd."
+
+#: blocks/competition-result/index.js:30
+#: blocks/match-result/index.js:30
+msgid "Tenant ID"
+msgstr "Tenant-ID"
+
+#: includes/class-cs-settings.php:73
+#: includes/class-cs-settings.php:160
+msgid "Test authentication"
+msgstr "Authenticatie testen"
+
+#: includes/class-cs-settings.php:72
+msgid "Testing…"
+msgstr "Bezig met testen…"
+
+#: includes/class-cs-settings.php:162
+msgid "Tests the fields above without needing to save first."
+msgstr "Test de bovenstaande velden zonder eerst te hoeven opslaan."
+
+#: includes/class-cs-api-client.php:39
+msgid "The Centaur Scores API is not fully configured yet."
+msgstr "De Centaur Scores API is nog niet volledig geconfigureerd."
+
+#: includes/class-cs-api-client.php:211
+msgid "The Centaur Scores API returned a response that could not be understood."
+msgstr "De Centaur Scores API gaf een antwoord dat niet kon worden verwerkt."
+
+#: includes/class-cs-api-client.php:206
+#. translators: %d: HTTP status code returned by the API.
+msgid "The Centaur Scores API returned an unexpected response (HTTP %d)."
+msgstr "De Centaur Scores API gaf een onverwacht antwoord (HTTP %d)."
+
+#: includes/class-cs-render.php:72
+msgid "This Centaur Scores competition result block is missing a tenant or competition."
+msgstr "Bij dit Centaur Scores competitie-uitslagblok ontbreekt een tenant of competitie."
+
+#: includes/class-cs-render.php:32
+msgid "This Centaur Scores match result block is missing a tenant, match, or scope."
+msgstr "Bij dit Centaur Scores wedstrijduitslagblok ontbreekt een tenant, wedstrijd of scope."
+
+#: includes/class-cs-settings.php:201
+msgid "Usage"
+msgstr "Gebruik"
+
+#: includes/class-cs-settings.php:155
+msgid "Used whenever a shortcode or block does not specify its own tenant ID."
+msgstr "Wordt gebruikt wanneer een shortcode of blok geen eigen tenant-ID opgeeft."
+
+#: includes/class-cs-settings.php:93
+msgid "Username"
+msgstr "Gebruikersnaam"
+
+#: includes/class-cs-settings.php:217
+msgid "You are not allowed to do this."
+msgstr "U heeft hier geen toestemming voor."
