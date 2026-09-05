@@ -1,0 +1,64 @@
+# Managed by centaur-scores-setup-and-maintenance (update/add-alias-hostname.sh).
+#
+# IMPORTANT: after add-alias-hostname.sh's certbot step has run, certbot has
+# added a "listen 443 ssl;" server block (and an http->https redirect) to
+# this file. Do not blindly re-render this file after that point - it will
+# wipe out certbot's changes.
+#
+# This is a secondary hostname for the same site rendered by
+# templates/nginx-site.conf.tmpl - same webroot, same blue/green upstream
+# selection, same sticky-slot cookie, just a different server_name. The
+# web-ui served here still calls the API at the original PUBLIC_HOSTNAME
+# (that absolute URL is baked into the build at compile time - see
+# lib/common.sh's PUBLIC_API_URL), which is reachable cross-origin because
+# the API enables CORS for any origin. The /api/ proxy below is kept anyway
+# so this alias behaves identically to the primary hostname if ever needed.
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name ${ALIAS_HOSTNAME};
+    absolute_redirect off;
+
+    access_log ${CENTAUR_LOG_DIR}/nginx-access-${ALIAS_HOSTNAME}.log;
+    error_log  ${CENTAUR_LOG_DIR}/nginx-error-${ALIAS_HOSTNAME}.log;
+
+    # Same sticky blue/green pinning as the primary hostname (see
+    # templates/nginx-site.conf.tmpl) so a visitor gets a consistent
+    # frontend/API pairing regardless of which hostname they arrived on.
+    add_header Set-Cookie "csv_slot=$centaur_scores_variant; Path=/; Max-Age=2592000; SameSite=Lax" always;
+
+    root $centaur_scores_webroot;
+    index index.html;
+
+    location = ${PUBLIC_API_VDIR_NOSLASH} {
+        return 301 ${PUBLIC_API_VDIR}$is_args$args;
+    }
+    location = ${PUBLIC_APP_VDIR_NOSLASH} {
+        return 301 ${PUBLIC_APP_VDIR}$is_args$args;
+    }
+
+    location ^~ ${PUBLIC_API_VDIR} {
+        rewrite ^${PUBLIC_API_VDIR}(.*)$ /$1 break;
+        proxy_pass $centaur_scores_api_upstream;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location ^~ ${PUBLIC_APP_VDIR} {
+        alias $centaur_scores_scoringroot/;
+        try_files $uri $uri/ ${PUBLIC_APP_VDIR}index.html;
+    }
+
+    location ^~ /android/ {
+        alias ${CENTAUR_BASE_DIR}/android/;
+    }
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}
