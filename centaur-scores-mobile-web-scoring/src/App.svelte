@@ -9,7 +9,7 @@
   import ScoreCardView from './views/ScoreCardView.svelte';
   import { apiBase, goToParent, screen } from './lib/stores';
   import { initializeFromStartupParams } from './lib/matchService';
-  import { startBackgroundSync, stopBackgroundSync } from './lib/syncService';
+  import { fetchMatchInfo, flushPendingScores, startBackgroundSync, stopBackgroundSync } from './lib/syncService';
   import { t } from './lib/i18n';
 
   onMount(() => {
@@ -18,6 +18,24 @@
 
     const onPopState = () => goToParent();
     window.addEventListener('popstate', onPopState);
+
+    // iOS WebKit (Safari and, since it's WebKit-based too, "Chrome" on iOS)
+    // freezes our setInterval polling while the tab is backgrounded or the
+    // page is served from the back/forward cache after a real browser-back
+    // navigation. Without this, a returning user sees stale scores until the
+    // next scheduled poll happens to fire.
+    const resync = () => {
+      void fetchMatchInfo();
+      void flushPendingScores();
+    };
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') resync();
+    };
+    const onPageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) resync();
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    window.addEventListener('pageshow', onPageShow);
 
     // iOS Safari shrinks the visual viewport (not the layout viewport) when the
     // on-screen keyboard opens, so a 100%-height layout ends up partly hidden
@@ -32,6 +50,8 @@
 
     return () => {
       window.removeEventListener('popstate', onPopState);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      window.removeEventListener('pageshow', onPageShow);
       window.visualViewport?.removeEventListener('resize', updateAppHeight);
       window.removeEventListener('resize', updateAppHeight);
       stopBackgroundSync();
