@@ -59,21 +59,23 @@
       <span class="match-name">{$matchData?.match ?? ''}</span>
     </button>
 
-    <div class="lang-wrap">
-      <button class="icon-button lang-button" onclick={() => (langMenuOpen = !langMenuOpen)} aria-label="Language">
-        <Icon name={$language === 'NL' ? 'flag-nl' : 'flag-en'} size={28} />
-      </button>
-      {#if langMenuOpen}
-        <div class="lang-menu">
-          <button class:active={$language === 'NL'} onclick={() => selectLanguage('NL')}>
-            <Icon name="flag-nl" size={22} /> Nederlands
-          </button>
-          <button class:active={$language === 'EN'} onclick={() => selectLanguage('EN')}>
-            <Icon name="flag-en" size={22} /> English
-          </button>
-        </div>
-      {/if}
-    </div>
+    {#if $screen.name === 'home'}
+      <div class="lang-wrap">
+        <button class="icon-button lang-button" onclick={() => (langMenuOpen = !langMenuOpen)} aria-label="Language">
+          <Icon name={$language === 'NL' ? 'flag-nl' : 'flag-en'} size={28} />
+        </button>
+        {#if langMenuOpen}
+          <div class="lang-menu">
+            <button class:active={$language === 'NL'} onclick={() => selectLanguage('NL')}>
+              <Icon name="flag-nl" size={22} /> Nederlands
+            </button>
+            <button class:active={$language === 'EN'} onclick={() => selectLanguage('EN')}>
+              <Icon name="flag-en" size={22} /> English
+            </button>
+          </div>
+        {/if}
+      </div>
+    {/if}
 
     <button class="sync-icon {syncVisual.className}" onclick={onSyncTap} aria-label="Sync status">
       <Icon name={syncVisual.icon} size={22} />
