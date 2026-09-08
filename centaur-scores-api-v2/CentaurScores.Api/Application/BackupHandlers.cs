@@ -1,5 +1,6 @@
 using System.IO.Compression;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using CentaurScores.Api.Infrastructure;
 
 namespace CentaurScores.Api.Application;
@@ -81,5 +82,50 @@ public static class BackupRemapHelpers
         catch (JsonException) { ids = null; }
         var remapped = (ids ?? []).Where(id => context.TryRemap(id, out _)).Select(id => context.IdMap[id]).ToList();
         return JsonSerializer.Serialize(remapped);
+    }
+
+    /// <summary>
+    /// Rewrites the category-id references embedded in a frontend-owned keyboard/config JSON blob
+    /// (<c>Match.KeyboardJson</c> / <c>MatchTemplate.ConfigurationJson</c>, shape
+    /// <c>{ categoryOrder: string[], keyboard: [...], disabledKeyRules: [{ categoryId, valueId, disabledKeyIds }] }</c>)
+    /// - <c>categoryOrder</c> entries and <c>disabledKeyRules[].categoryId</c> are category ids that need the
+    /// same old-id-to-new-id remap as every other reference. Every other property (notably <c>keyboard</c>,
+    /// which contains no entity references) is left byte-for-byte as parsed. A category id that can't be
+    /// remapped (outside the backup's scope) is dropped from <c>categoryOrder</c>/<c>disabledKeyRules</c>
+    /// entirely, same as <see cref="RemapGuidJsonArray"/>. Malformed/empty JSON is returned unchanged.
+    /// </summary>
+    public static string RemapKeyboardConfigJson(string json, BackupImportContext context)
+    {
+        JsonNode? root;
+        try { root = JsonNode.Parse(json); }
+        catch (JsonException) { return json; }
+        if (root is not JsonObject obj) return json;
+
+        if (obj["categoryOrder"] is JsonArray categoryOrder)
+        {
+            var remapped = new JsonArray();
+            foreach (var node in categoryOrder)
+            {
+                if (node?.GetValue<string>() is { } idText && Guid.TryParse(idText, out var id) && context.TryRemap(id, out var newId))
+                    remapped.Add(JsonValue.Create(newId.ToString()));
+            }
+            obj["categoryOrder"] = remapped;
+        }
+
+        if (obj["disabledKeyRules"] is JsonArray disabledKeyRules)
+        {
+            var remapped = new JsonArray();
+            foreach (var node in disabledKeyRules)
+            {
+                if (node is not JsonObject rule) continue;
+                if (rule["categoryId"]?.GetValue<string>() is not { } idText || !Guid.TryParse(idText, out var id) || !context.TryRemap(id, out var newId)) continue;
+                var clone = rule.DeepClone().AsObject();
+                clone["categoryId"] = JsonValue.Create(newId.ToString());
+                remapped.Add(clone);
+            }
+            obj["disabledKeyRules"] = remapped;
+        }
+
+        return obj.ToJsonString();
     }
 }

@@ -100,7 +100,7 @@ public sealed class MatchBackupHandler : IBackupHandler
                 ArrowsPerEnd = entry.ArrowsPerEnd,
                 GroupEnds = entry.GroupEnds,
                 AllowFreeParticipants = entry.AllowFreeParticipants,
-                KeyboardJson = entry.KeyboardJson,
+                KeyboardJson = BackupRemapHelpers.RemapKeyboardConfigJson(entry.KeyboardJson, context),
                 ScoringRulesJson = entry.ScoringRulesJson,
                 PersonalBestClassifier = entry.PersonalBestClassifier,
                 Participants = participants,

@@ -37,7 +37,7 @@ public sealed class MatchTemplateBackupHandler : IBackupHandler
                 ParticipantListId = participantListId,
                 AllowFreeParticipants = entry.AllowFreeParticipants,
                 DeviceSelectionMode = entry.DeviceSelectionMode,
-                ConfigurationJson = entry.ConfigurationJson,
+                ConfigurationJson = BackupRemapHelpers.RemapKeyboardConfigJson(entry.ConfigurationJson, context),
                 PersonalBestClassifier = entry.PersonalBestClassifier
             });
         }

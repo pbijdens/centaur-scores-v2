@@ -149,6 +149,76 @@ public sealed class BackupRestoreServiceTests
     }
 
     [Fact]
+    public async Task Restore_remaps_category_ids_embedded_in_match_keyboard_json_and_template_configuration_json()
+    {
+        await using var connection = new SqliteConnection("Filename=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>().UseSqlite(connection).Options;
+        await using var db = new ApplicationDbContext(options);
+        await db.Database.EnsureCreatedAsync();
+
+        var sourceTenantId = Guid.NewGuid();
+        var adminTenantId = Guid.NewGuid();
+        var categoryId = Guid.NewGuid();
+        var matchId = Guid.NewGuid();
+        var templateId = Guid.NewGuid();
+
+        db.Tenants.AddRange(
+            new Tenant { Id = sourceTenantId, Name = "Archery Club" },
+            new Tenant { Id = adminTenantId, Name = "HQ" });
+
+        db.Categories.Add(new Category
+        {
+            Id = categoryId,
+            TenantId = sourceTenantId,
+            Name = "Bow type",
+            Values = [new CategoryValue { Id = Guid.NewGuid(), TenantId = sourceTenantId, CategoryId = categoryId, ValueId = 1, Name = "Recurve" }]
+        });
+
+        // "keyboard" carries no entity references and must survive untouched; "categoryOrder" and
+        // "disabledKeyRules[].categoryId" are category ids and must come back pointing at the restored category.
+        string KeyboardJson(Guid category) => $$"""{"categoryOrder":["{{category}}"],"keyboard":[{"keyId":"10","label":"10","value":10,"color":"Yellow"}],"disabledKeyRules":[{"categoryId":"{{category}}","valueId":1,"disabledKeyIds":["10"]}]}""";
+
+        db.Matches.Add(new Match { Id = matchId, TenantId = sourceTenantId, Name = "Open", KeyboardJson = KeyboardJson(categoryId) });
+        db.MatchTemplates.Add(new MatchTemplate { Id = templateId, TenantId = sourceTenantId, Name = "Standard", ConfigurationJson = KeyboardJson(categoryId) });
+
+        await db.SaveChangesAsync();
+
+        var backupService = new BackupService(db);
+        var (zipBytes, _) = await backupService.CreateBackupAsync(sourceTenantId, includeSubTenants: false, CancellationToken.None);
+
+        var restoreService = new RestoreService(db);
+        using var zipStream = new MemoryStream(zipBytes);
+        var result = await restoreService.RestoreAsync(adminTenantId, zipStream, CancellationToken.None);
+
+        Assert.Empty(result.Warnings);
+        var newCategory = await db.Categories.SingleAsync(item => item.TenantId == result.NewTenantId);
+        Assert.NotEqual(categoryId, newCategory.Id);
+
+        var newMatch = await db.Matches.SingleAsync(item => item.TenantId == result.NewTenantId);
+        using (var keyboard = JsonDocument.Parse(newMatch.KeyboardJson))
+        {
+            var root = keyboard.RootElement;
+            Assert.Equal(newCategory.Id.ToString(), Assert.Single(root.GetProperty("categoryOrder").EnumerateArray()).GetString());
+            var rule = Assert.Single(root.GetProperty("disabledKeyRules").EnumerateArray());
+            Assert.Equal(newCategory.Id.ToString(), rule.GetProperty("categoryId").GetString());
+            Assert.Equal(1, rule.GetProperty("valueId").GetInt32());
+            Assert.Equal("10", Assert.Single(rule.GetProperty("disabledKeyIds").EnumerateArray()).GetString());
+            // "keyboard" itself references no entity - it must be preserved verbatim, not dropped.
+            var key = Assert.Single(root.GetProperty("keyboard").EnumerateArray());
+            Assert.Equal("10", key.GetProperty("keyId").GetString());
+        }
+
+        var newTemplate = await db.MatchTemplates.SingleAsync(item => item.TenantId == result.NewTenantId);
+        using (var config = JsonDocument.Parse(newTemplate.ConfigurationJson))
+        {
+            var root = config.RootElement;
+            Assert.Equal(newCategory.Id.ToString(), Assert.Single(root.GetProperty("categoryOrder").EnumerateArray()).GetString());
+            Assert.Equal(newCategory.Id.ToString(), Assert.Single(root.GetProperty("disabledKeyRules").EnumerateArray()).GetProperty("categoryId").GetString());
+        }
+    }
+
+    [Fact]
     public async Task Discipline_mapping_pointing_outside_the_exported_tenant_set_is_dropped_with_a_warning()
     {
         await using var connection = new SqliteConnection("Filename=:memory:");
