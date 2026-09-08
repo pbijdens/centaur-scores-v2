@@ -33,11 +33,12 @@ public sealed class ScorekeeperService(ApplicationDbContext db, IPersonalBestLiv
     public async Task<ScorekeeperMatch> GetMatchAsync(ScorekeeperContext context, CancellationToken cancellationToken)
     {
         var categories = await CategoriesAsync(context.Match, cancellationToken);
-        var keyboard = ParseKeyboard(context.Match.KeyboardJson).Keys;
+        var parsedKeyboard = ParseKeyboard(context.Match.KeyboardJson);
+        var keyboard = parsedKeyboard.Keys;
         var participants = context.Match.Participants
             .Where(item => item.DeviceId == context.Device.Id)
             .OrderBy(item => item.DeviceOrder).ThenBy(item => item.LastName)
-            .Select(item => ToMatchParticipant(item, context.Match, categories))
+            .Select(item => ToMatchParticipant(item, context.Match, categories, keyboard, parsedKeyboard.DisabledKeyRules))
             .ToList();
         return new(context.Device.Name, context.Match.Name, context.Match.Ends, context.Match.ArrowsPerEnd, context.Match.GroupEnds,
             categories, context.Match.DeviceSelectionMode != "restricted", context.Match.AllowFreeParticipants, keyboard, participants);
@@ -201,13 +202,25 @@ public sealed class ScorekeeperService(ApplicationDbContext db, IPersonalBestLiv
         }
     }
 
-    private static ScorekeeperMatchParticipant ToMatchParticipant(MatchParticipant item, Match match, IReadOnlyList<ScorekeeperCategory> categories) => new(item.FederationNumber, item.FullName, Info(item.Categories, categories), CategoryValues(item.Categories, categories), item.Id, item.ParticipantListMemberId, null, Enumerable.Range(0, match.Ends * match.ArrowsPerEnd).Select(index => item.Scores.SingleOrDefault(score => (score.End - 1) * match.ArrowsPerEnd + score.Arrow - 1 == index)?.KeyId).ToList());
+    private static ScorekeeperMatchParticipant ToMatchParticipant(MatchParticipant item, Match match, IReadOnlyList<ScorekeeperCategory> categories, IReadOnlyList<ScorekeeperKey> keyboard, IReadOnlyList<DisabledKeyRule> disabledKeyRules) => new(item.FederationNumber, item.FullName, Info(item.Categories, categories), CategoryValues(item.Categories, categories), item.Id, item.ParticipantListMemberId, AvailableKeyIds(item.Categories, keyboard, disabledKeyRules), Enumerable.Range(0, match.Ends * match.ArrowsPerEnd).Select(index => item.Scores.SingleOrDefault(score => (score.End - 1) * match.ArrowsPerEnd + score.Arrow - 1 == index)?.KeyId).ToList());
+
+    // Keys disabled by any rule whose category/value matches this participant are removed from the
+    // available set; null (all keys available) is returned only when no rule matches at all, per the
+    // documented AvailableKeyIDs contract.
+    private static IReadOnlyList<string>? AvailableKeyIds(Dictionary<Guid, int> participantCategories, IReadOnlyList<ScorekeeperKey> keyboard, IReadOnlyList<DisabledKeyRule> disabledKeyRules)
+    {
+        var matchingRules = disabledKeyRules.Where(rule => participantCategories.TryGetValue(rule.CategoryId, out var value) && value == rule.ValueId).ToList();
+        if (matchingRules.Count == 0)
+            return null;
+        var disabledKeyIds = matchingRules.SelectMany(rule => rule.DisabledKeyIds).ToHashSet();
+        return keyboard.Select(key => key.Id).Where(id => !disabledKeyIds.Contains(id)).ToList();
+    }
     private static ScorekeeperParticipantInfo ToInfo(MatchParticipant item, IReadOnlyList<ScorekeeperCategory> categories) => new(item.Id, item.ParticipantListMemberId, item.FederationNumber, item.FullName, Info(item.Categories, categories), CategoryValues(item.Categories, categories));
     private static IReadOnlyList<ScorekeeperParticipantCategory> CategoryValues(Dictionary<Guid, int> values, IReadOnlyList<ScorekeeperCategory> categories) => categories.Select(category => new ScorekeeperParticipantCategory(category.Id, category.Name, category.Values.FirstOrDefault(value => values.GetValueOrDefault(category.Id) == value.Id)?.Name)).ToList();
     private static string? Info(Dictionary<Guid, int> values, IReadOnlyList<ScorekeeperCategory> categories) { var text = string.Join(" / ", CategoryValues(values, categories).Where(item => item.Value is not null).Select(item => item.Value)); return text.Length == 0 ? null : text; }
     private static void ApplyValues(MatchParticipant participant, ScorekeeperParticipantRequest item, IReadOnlyList<ScorekeeperCategory> categories) { participant.OwnFederationNumber = item.FederationNumber; participant.OwnFullName = item.Name ?? ""; participant.OwnLastName = item.Name?.Split(' ', StringSplitOptions.RemoveEmptyEntries).LastOrDefault() ?? ""; participant.OwnCategories = item.Categories?.Where(category => category.Value is not null).ToDictionary(category => category.Id, category => categories.SingleOrDefault(value => value.Id == category.Id)?.Values.FirstOrDefault(value => value.Name == category.Value)?.Id ?? 0) ?? []; }
     private static bool SameValues(MatchParticipant participant, ScorekeeperParticipantRequest item, IReadOnlyList<ScorekeeperCategory> categories) => participant.FederationNumber == item.FederationNumber && participant.FullName == item.Name && participant.Categories.SequenceEqual(item.Categories?.Where(category => category.Value is not null).ToDictionary(category => category.Id, category => categories.SingleOrDefault(value => value.Id == category.Id)?.Values.FirstOrDefault(value => value.Name == category.Value)?.Id ?? 0) ?? []);
-    private static (List<Guid> CategoryOrder, List<ScorekeeperKey> Keys) ParseKeyboard(string json)
+    private static (List<Guid> CategoryOrder, List<ScorekeeperKey> Keys, List<DisabledKeyRule> DisabledKeyRules) ParseKeyboard(string json)
     {
         try
         {
@@ -215,8 +228,16 @@ public sealed class ScorekeeperService(ApplicationDbContext db, IPersonalBestLiv
             var root = document.RootElement;
             var order = root.TryGetProperty("categoryOrder", out var categories) ? categories.EnumerateArray().Where(item => Guid.TryParse(item.GetString(), out _)).Select(item => item.GetGuid()).ToList() : [];
             var keys = root.TryGetProperty("keyboard", out var keyboard) ? keyboard.EnumerateArray().Select(item => new ScorekeeperKey(item.GetProperty("keyId").GetString() ?? "", item.GetProperty("label").GetString() ?? "", item.TryGetProperty("value", out var value) ? value.GetInt32() : 0, item.TryGetProperty("color", out var color) ? color.GetString() ?? "White" : "White")).ToList() : [];
-            return (order, keys);
+            var disabledKeyRules = root.TryGetProperty("disabledKeyRules", out var rules)
+                ? rules.EnumerateArray().Where(item => Guid.TryParse(item.GetProperty("categoryId").GetString(), out _)).Select(item => new DisabledKeyRule(
+                    item.GetProperty("categoryId").GetGuid(),
+                    item.GetProperty("valueId").GetInt32(),
+                    item.TryGetProperty("disabledKeyIds", out var disabledKeyIds) ? disabledKeyIds.EnumerateArray().Select(disabledKeyId => disabledKeyId.GetString() ?? "").ToList() : [])).ToList()
+                : [];
+            return (order, keys, disabledKeyRules);
         }
-        catch (JsonException) { return ([], []); }
+        catch (JsonException) { return ([], [], []); }
     }
+
+    private sealed record DisabledKeyRule(Guid CategoryId, int ValueId, IReadOnlyList<string> DisabledKeyIds);
 }

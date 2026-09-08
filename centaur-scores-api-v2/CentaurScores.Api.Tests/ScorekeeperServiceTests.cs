@@ -161,4 +161,70 @@ public sealed class ScorekeeperServiceTests
         var member = await db.ParticipantListMembers.AsNoTracking().SingleAsync(item => item.Id == memberId);
         Assert.False(member.Categories.ContainsKey(classId));
     }
+
+    [Fact]
+    public async Task GetMatchAsync_restricts_available_keys_to_matching_disabled_key_rules_and_allows_all_when_no_rule_matches()
+    {
+        await using var connection = new SqliteConnection("Filename=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>().UseSqlite(connection).Options;
+        await using var db = new ApplicationDbContext(options);
+        await db.Database.EnsureCreatedAsync();
+
+        var tenantId = Guid.NewGuid();
+        var classId = Guid.NewGuid();
+        var matchId = Guid.NewGuid();
+        var deviceId = Guid.NewGuid();
+        var restrictedParticipantId = Guid.NewGuid();
+        var unrestrictedParticipantId = Guid.NewGuid();
+        db.AddRange(
+            new Tenant { Id = tenantId, Name = "Tenant" },
+            new Category
+            {
+                Id = classId,
+                TenantId = tenantId,
+                Name = "Class",
+                Values =
+                [
+                    new CategoryValue { Id = Guid.NewGuid(), TenantId = tenantId, CategoryId = classId, ValueId = 1, Name = "Cadet" },
+                    new CategoryValue { Id = Guid.NewGuid(), TenantId = tenantId, CategoryId = classId, ValueId = 2, Name = "Senior" }
+                ]
+            },
+            new Match
+            {
+                Id = matchId,
+                TenantId = tenantId,
+                KeyboardJson = $$"""
+                    {
+                      "categoryOrder": ["{{classId}}"],
+                      "keyboard": [
+                        {"keyId": "X", "label": "X", "value": 10},
+                        {"keyId": "10", "label": "10", "value": 10},
+                        {"keyId": "M", "label": "M", "value": 0}
+                      ],
+                      "disabledKeyRules": [
+                        {"categoryId": "{{classId}}", "valueId": 1, "disabledKeyIds": ["X"]}
+                      ]
+                    }
+                    """,
+                Devices = [new ScoreDevice { Id = deviceId, TenantId = tenantId, MatchId = matchId, Name = "Device" }],
+                Participants =
+                [
+                    new MatchParticipant { Id = restrictedParticipantId, TenantId = tenantId, MatchId = matchId, DeviceId = deviceId, OwnFullName = "Restricted", OwnLastName = "Restricted", OwnCategories = new Dictionary<Guid, int> { [classId] = 1 } },
+                    new MatchParticipant { Id = unrestrictedParticipantId, TenantId = tenantId, MatchId = matchId, DeviceId = deviceId, OwnFullName = "Unrestricted", OwnLastName = "Unrestricted", OwnCategories = new Dictionary<Guid, int> { [classId] = 2 } }
+                ]
+            });
+        await db.SaveChangesAsync();
+
+        var service = new ScorekeeperService(db, new PersonalBestLiveLookup(db, new PersonalBestContext(db), new PersonalBestEngine(db), new MemoryCache(new MemoryCacheOptions())));
+        var context = await service.FindAsync(tenantId, matchId, deviceId, CancellationToken.None);
+        Assert.NotNull(context);
+
+        var result = await service.GetMatchAsync(context!, CancellationToken.None);
+
+        var restricted = result.Participants.Single(item => item.MatchParticipantId == restrictedParticipantId);
+        var unrestricted = result.Participants.Single(item => item.MatchParticipantId == unrestrictedParticipantId);
+        Assert.Equal(["10", "M"], restricted.AvailableKeyIDs);
+        Assert.Null(unrestricted.AvailableKeyIDs);
+    }
 }
