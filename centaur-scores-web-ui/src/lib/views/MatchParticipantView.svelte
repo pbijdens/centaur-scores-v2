@@ -4,7 +4,7 @@
   import { labelForError } from '../errors'
   import { parseMatchKeyboardConfig } from '../matchConfig'
   import { deriveLastName, memberCategoryLabel, memberDisplayLabel } from '../participantName'
-  import { participantMemberPath } from '../router'
+  import { navigateOnClick, participantMemberPath } from '../router'
   import type { ArrowScore, Category, KeyboardKey, Match, MatchParticipant, ParticipantList } from '../types'
 
   export let api: ApiClient
@@ -17,6 +17,7 @@
   export let onBack: () => void
   export let onChanged: () => void | Promise<void>
   export let onRemoved: () => void
+  export let onAddToList: () => void
 
   let removeError = ''
   let quickTotal = 0
@@ -259,7 +260,7 @@
     <p class="muted">{participant.federationNumber} / {participant.fullName || participant.lastName}{#if categoryLabel()}<span class="muted">/ {categoryLabel()}</span>{/if}</p>
     <button class="primary" on:click={() => (showMetadataEditor ? (showMetadataEditor = false) : openMetadataEditor())}>{labels.editParticipantDetails}</button>
     {#if !participant.participantListMemberId && sourceList && canManage}
-      <a class="primary" href={participantMemberPath(sourceList.id, 'new')} target="_blank" rel="noopener">{labels.addToParticipantList.replace('{name}', sourceList.name)}</a>
+      <a class="primary" href={participantMemberPath(sourceList.id, 'new')} on:click={(event) => navigateOnClick(event, onAddToList)}>{labels.addToParticipantList.replace('{name}', sourceList.name)}</a>
     {/if}
   </div>
   {#if showMetadataEditor}

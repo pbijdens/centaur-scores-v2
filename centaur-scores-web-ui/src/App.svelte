@@ -28,7 +28,7 @@
   import { labelForError } from './lib/errors'
   import { translationsFor } from './lib/i18n'
   import { accountPath, categoryPath, competitionPath, matchDevicesPath, matchEditPath, matchParticipantPath, matchPath, navigateTo, participantListPath, participantMemberPath, resolveRoute, templatePath, tenantPath } from './lib/router'
-  import type { Account, Category, Competition, Language, Match, MatchTemplate, ParticipantList, ParticipantListSummary, TenantAccess, Tenant, View } from './lib/types'
+  import type { Account, Category, Competition, Language, Match, MatchTemplate, ParticipantList, ParticipantListMember, ParticipantListSummary, TenantAccess, Tenant, View } from './lib/types'
   import AccountEditView from './lib/views/AccountEditView.svelte'
   import AccountsView from './lib/views/AccountsView.svelte'
   import BackupRestoreView from './lib/views/BackupRestoreView.svelte'
@@ -92,6 +92,13 @@
   let selectedCompetition: Competition | null = null
   let narrowcastScope: string | null = null
   let selectedResultsScope: string | null = null
+  // Set by beginAddParticipantToList() when a free match participant's "Add to {list}" button
+  // detours into the add-member screen; consumed by onMemberSaved()/onMemberBack() to prefill
+  // the form and return to (and link) the originating match participant. Cleared on every other
+  // entry into the add-member screen (addMember(), openMember()) so it never leaks into an
+  // unrelated add/edit.
+  let pendingParticipantLink: { matchId: string; participantId: string } | null = null
+  let memberPrefill: { fullName: string; federationNumber: string | null; categories: Record<string, number> } | null = null
 
   $: t = translationsFor(language)
   $: isAdmin = $profile?.authorization === 'Administrator'
@@ -309,14 +316,51 @@
   }
 
   function openMember(memberId: string) {
+    pendingParticipantLink = null
+    memberPrefill = null
     if (selectedListId) navigate(participantMemberPath(selectedListId, memberId))
   }
 
   function addMember() {
+    pendingParticipantLink = null
+    memberPrefill = null
     if (selectedListId) navigate(`/participants/${selectedListId}/members/new`)
   }
 
-  function onMemberSaved() {
+  // Entry point for MatchParticipantView's "Add to {list}" button: detours a free participant
+  // into the add-member screen, prefilled with their current details, and remembers where to
+  // link the result back to.
+  function beginAddParticipantToList(matchId: string, participant: { id: string; fullName: string; federationNumber?: string | null; categories: Record<string, number> }, listId: string) {
+    pendingParticipantLink = { matchId, participantId: participant.id }
+    memberPrefill = { fullName: participant.fullName, federationNumber: participant.federationNumber ?? null, categories: participant.categories }
+    navigate(participantMemberPath(listId, 'new'))
+  }
+
+  function onMemberBack() {
+    const pending = pendingParticipantLink
+    pendingParticipantLink = null
+    memberPrefill = null
+    if (pending) navigate(matchParticipantPath(pending.matchId, pending.participantId))
+    else if (selectedListId) navigate(`/participants/${selectedListId}`)
+  }
+
+  async function onMemberSaved(member: ParticipantListMember) {
+    const pending = pendingParticipantLink
+    pendingParticipantLink = null
+    memberPrefill = null
+    if (pending) {
+      await api.updateMatchParticipant(pending.matchId, pending.participantId, { participantListMemberId: member.id, lastName: member.lastName, fullName: member.fullName, federationNumber: member.federationNumber, categories: member.categories })
+      navigate(matchParticipantPath(pending.matchId, pending.participantId))
+      refreshParticipantLists()
+      return
+    }
+    if (selectedListId) navigate(`/participants/${selectedListId}`)
+    refreshParticipantLists()
+  }
+
+  function onMemberDeleted() {
+    pendingParticipantLink = null
+    memberPrefill = null
     if (selectedListId) navigate(`/participants/${selectedListId}`)
     refreshParticipantLists()
   }
@@ -416,7 +460,8 @@
         <MatchDevicesView {api} match={currentMatch} categories={$categories} labels={t} onBack={() => navigate(`/matches/${currentMatch.id}`)} onChanged={refreshSelectedMatch} />
       {:else if view === 'match-participant' && selectedMatch && selectedParticipant}
         {@const currentMatch = selectedMatch}
-        <MatchParticipantView {api} match={currentMatch} participant={selectedParticipant} categories={$categories} sourceList={matchSourceList} {canManage} labels={t} onBack={returnToSelectedMatch} onChanged={refreshSelectedMatch} onRemoved={() => navigate(`/matches/${currentMatch.id}`)} />
+        {@const currentParticipant = selectedParticipant}
+        <MatchParticipantView {api} match={currentMatch} participant={currentParticipant} categories={$categories} sourceList={matchSourceList} {canManage} labels={t} onBack={returnToSelectedMatch} onChanged={refreshSelectedMatch} onRemoved={() => navigate(`/matches/${currentMatch.id}`)} onAddToList={() => matchSourceList && beginAddParticipantToList(currentMatch.id, currentParticipant, matchSourceList.id)} />
       {:else if view === 'competitions'}
         <CompetitionsView {api} competitions={$competitions} {language} labels={t} onOpenCompetition={openCompetition} onChanged={loadCompetitionsList} />
       {:else if view === 'competition' && selectedCompetition}
@@ -445,7 +490,7 @@
       {:else if view === 'participant-list' && selectedList}
         <ParticipantListDetailView {api} list={selectedList} categories={$categories} {language} {canManage} labels={t} onOpenMember={openMember} onAddMember={addMember} onChanged={onParticipantListChanged} onDeleted={onParticipantListDeleted} onBack={() => navigate('/participants')} />
       {:else if view === 'participant' && selectedListId}
-        <ParticipantMemberView {api} listId={selectedListId} member={selectedMember} categories={$categories} labels={t} onBack={() => navigate(`/participants/${selectedListId}`)} onSaved={onMemberSaved} onDeleted={onMemberSaved} />
+        <ParticipantMemberView {api} listId={selectedListId} member={selectedMember} prefill={memberPrefill} categories={$categories} labels={t} onBack={onMemberBack} onSaved={onMemberSaved} onDeleted={onMemberDeleted} />
       {:else if view === 'templates'}
         <TemplatesView {api} templates={$templates} participantLists={$participantLists} defaultNarrowcastScope={effectiveDefaultNarrowcastScope} labels={t} onOpenTemplate={openTemplate} onChanged={refreshTemplates} onBack={() => navigate('/')} />
       {:else if view === 'template' && selectedTemplate}

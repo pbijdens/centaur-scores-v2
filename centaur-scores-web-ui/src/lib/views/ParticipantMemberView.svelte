@@ -8,18 +8,19 @@
   export let api: ApiClient
   export let listId: string
   export let member: ParticipantListMember | null
+  export let prefill: { fullName: string; federationNumber: string | null; categories: Record<string, number> } | null = null
   export let categories: Category[]
   export let labels: Record<string, string>
   export let onBack: () => void
-  export let onSaved: () => void
+  export let onSaved: (member: ParticipantListMember) => void
   export let onDeleted: () => void
 
-  let fullName = member?.fullName ?? ''
-  let federationNumber = member?.federationNumber ?? ''
+  let fullName = member?.fullName ?? prefill?.fullName ?? ''
+  let federationNumber = member?.federationNumber ?? prefill?.federationNumber ?? ''
   let isActive = member?.isActive ?? true
   let categoryValues: Record<string, string> = {}
   for (const category of categories) {
-    const existing = member?.categories?.[category.id]
+    const existing = member?.categories?.[category.id] ?? prefill?.categories?.[category.id]
     categoryValues[category.id] = existing !== undefined ? String(existing) : ''
   }
   let saveError = ''
@@ -40,9 +41,8 @@
     }
     const body = { lastName: deriveLastName(fullName.trim()), fullName, federationNumber: federationNumber || null, categories: categoriesPayload, isActive }
     try {
-      if (member) await api.updateParticipantMember(listId, member.id, body)
-      else await api.addParticipantMember(listId, body)
-      onSaved()
+      const saved: ParticipantListMember = member ? await api.updateParticipantMember(listId, member.id, body) : await api.addParticipantMember(listId, body)
+      onSaved(saved)
     } catch (error) {
       saveError = labelForError(error, labels, 'memberSaveError')
     }
