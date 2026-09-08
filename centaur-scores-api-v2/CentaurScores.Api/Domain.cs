@@ -1,3 +1,6 @@
+using System.ComponentModel.DataAnnotations.Schema;
+using System.Text.Json.Serialization;
+
 namespace CentaurScores.Api.Domain;
 
 public static class MatchDefaults
@@ -97,10 +100,40 @@ public sealed class MatchParticipant : TenantOwnedEntity
 {
     public Guid MatchId { get; init; }
     public Guid? ParticipantListMemberId { get; set; }
-    public string LastName { get; set; } = "";
-    public string FullName { get; set; } = "";
-    public string? FederationNumber { get; set; }
-    public Dictionary<Guid, int> Categories { get; set; } = [];
+
+    // The linked roster entry, when this participant is not a "free" participant. When set, this
+    // is the sole source of the participant's display data (see the computed properties below) -
+    // a match must never hold its own stale copy of a roster member's name/number/categories.
+    [JsonIgnore]
+    public ParticipantListMember? ParticipantListMember { get; set; }
+
+    // Own* name/number fields are only meaningful for a "free" participant (ParticipantListMemberId
+    // is null); for a list-linked participant they stay empty and are ignored in favor of the live
+    // roster data. OwnCategories is different: even a list-linked participant can need a per-match
+    // category filled in (e.g. defaulting a category the roster entry never set to "Unknown" for
+    // scoring/display) without writing that back into the shared roster entry - OwnCategories holds
+    // exactly those per-match additions, layered on top of (never overwriting) the roster's own values.
+    public string OwnLastName { get; set; } = "";
+    public string OwnFullName { get; set; } = "";
+    public string? OwnFederationNumber { get; set; }
+    public Dictionary<Guid, int> OwnCategories { get; set; } = [];
+
+    [NotMapped] public string LastName => ParticipantListMember?.LastName ?? OwnLastName;
+    [NotMapped] public string FullName => ParticipantListMember?.FullName ?? OwnFullName;
+    [NotMapped] public string? FederationNumber => ParticipantListMember?.FederationNumber ?? OwnFederationNumber;
+
+    [NotMapped]
+    public Dictionary<Guid, int> Categories
+    {
+        get
+        {
+            if (ParticipantListMember is null) return OwnCategories;
+            var merged = new Dictionary<Guid, int>(ParticipantListMember.Categories);
+            foreach (var (categoryId, valueId) in OwnCategories) merged[categoryId] = valueId;
+            return merged;
+        }
+    }
+
     public Guid? DeviceId { get; set; }
     public int? DeviceOrder { get; set; }
     public List<ArrowScore> Scores { get; set; } = [];

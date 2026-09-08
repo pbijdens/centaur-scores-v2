@@ -44,10 +44,10 @@ public sealed class MatchesControllerTests
                     Id = participantId,
                     TenantId = tenantId,
                     MatchId = matchId,
-                    FederationNumber = "123",
-                    FullName = "Robin Archer",
-                    LastName = "Archer",
-                    Categories = new Dictionary<Guid, int> { [disciplineId] = 7, [classId] = 2 },
+                    OwnFederationNumber = "123",
+                    OwnFullName = "Robin Archer",
+                    OwnLastName = "Archer",
+                    OwnCategories = new Dictionary<Guid, int> { [disciplineId] = 7, [classId] = 2 },
                     Scores =
                     [
                         Score(tenantId, participantId, 1, 1, "X", 10),
@@ -88,6 +88,7 @@ public sealed class MatchesControllerTests
 
         var tenantId = Guid.NewGuid();
         var matchId = Guid.NewGuid();
+        var listId = Guid.NewGuid();
         var listedParticipantId = Guid.NewGuid();
         var listMemberId = Guid.NewGuid();
         var match = new Match
@@ -97,11 +98,11 @@ public sealed class MatchesControllerTests
             Name = "Open",
             Participants =
             [
-                new MatchParticipant { Id = listedParticipantId, TenantId = tenantId, MatchId = matchId, ParticipantListMemberId = listMemberId, LastName = "Listed", FullName = "Listed Archer" },
-                new MatchParticipant { Id = Guid.NewGuid(), TenantId = tenantId, MatchId = matchId, ParticipantListMemberId = null, LastName = "Walkin", FullName = "Walk In" }
+                new MatchParticipant { Id = listedParticipantId, TenantId = tenantId, MatchId = matchId, ParticipantListMemberId = listMemberId, ParticipantListMember = new ParticipantListMember { Id = listMemberId, TenantId = tenantId, ParticipantListId = listId, LastName = "Listed", FullName = "Listed Archer" } },
+                new MatchParticipant { Id = Guid.NewGuid(), TenantId = tenantId, MatchId = matchId, ParticipantListMemberId = null, OwnLastName = "Walkin", OwnFullName = "Walk In" }
             ]
         };
-        db.AddRange(new Tenant { Id = tenantId, Name = "Tenant" }, match);
+        db.AddRange(new Tenant { Id = tenantId, Name = "Tenant" }, new ParticipantList { Id = listId, TenantId = tenantId, Name = "List" }, match);
         await db.SaveChangesAsync();
         var scoring = new ScoringService();
         var personalBestContext = new PersonalBestContext(db);
@@ -201,10 +202,13 @@ public sealed class MatchesControllerTests
         var disciplineId = Guid.NewGuid();
         var otherMatchId = Guid.NewGuid();
         var otherParticipantId = Guid.NewGuid();
+        var otherListId = Guid.NewGuid();
+        var otherMemberId = Guid.NewGuid();
 
         db.AddRange(
             new Tenant { Id = tenantA, Name = "Mine" },
             new Tenant { Id = tenantB, Name = "Other Club", PersonalBestEnabled = true },
+            new ParticipantList { Id = otherListId, TenantId = tenantB, Name = "List" },
             new Match { Id = myMatchId, TenantId = tenantA, Name = "Mine", IsOpen = true, LiveScopes = [Scope(tenantA, myMatchId, "centaurhal")] },
             new PersonalBestClassifier { Id = Guid.NewGuid(), TenantId = tenantB, Name = "Outdoor" },
             new PersonalBestDiscipline
@@ -232,10 +236,8 @@ public sealed class MatchesControllerTests
                         Id = otherParticipantId,
                         TenantId = tenantB,
                         MatchId = otherMatchId,
-                        ParticipantListMemberId = Guid.NewGuid(),
-                        FullName = "Robin Archer",
-                        FederationNumber = "42",
-                        Categories = new Dictionary<Guid, int> { [categoryId] = 1 },
+                        ParticipantListMemberId = otherMemberId,
+                        ParticipantListMember = new ParticipantListMember { Id = otherMemberId, TenantId = tenantB, ParticipantListId = otherListId, LastName = "Archer", FullName = "Robin Archer", FederationNumber = "42", Categories = new Dictionary<Guid, int> { [categoryId] = 1 } },
                         Scores = [new ArrowScore { Id = Guid.NewGuid(), TenantId = tenantB, MatchParticipantId = otherParticipantId, End = 1, Arrow = 1, KeyId = "10", Value = 10 }]
                     }
                 ]
@@ -292,6 +294,57 @@ public sealed class MatchesControllerTests
 
         Assert.IsType<ForbidResult>(await controller.ScopeConflicts(matchId, CancellationToken.None));
         Assert.IsType<ForbidResult>(await controller.ClaimScope(matchId, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task Editing_a_participant_list_member_propagates_immediately_into_an_existing_match_without_re_adding_them()
+    {
+        await using var connection = new SqliteConnection("Filename=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>().UseSqlite(connection).Options;
+        await using (var setupDb = new ApplicationDbContext(options))
+            await setupDb.Database.EnsureCreatedAsync();
+
+        var tenantId = Guid.NewGuid();
+        var listId = Guid.NewGuid();
+        var memberId = Guid.NewGuid();
+        var matchId = Guid.NewGuid();
+        var participantId = Guid.NewGuid();
+
+        await using (var seedDb = new ApplicationDbContext(options))
+        {
+            seedDb.AddRange(
+                new Tenant { Id = tenantId, Name = "Tenant" },
+                new ParticipantList { Id = listId, TenantId = tenantId, Name = "Club members", Members = [new ParticipantListMember { Id = memberId, TenantId = tenantId, LastName = "Archer", FullName = "Old Name" }] },
+                new Match { Id = matchId, TenantId = tenantId, Name = "Open", ParticipantListId = listId, ArrowsPerEnd = 3, Participants = [new MatchParticipant { Id = participantId, TenantId = tenantId, MatchId = matchId, ParticipantListMemberId = memberId }] });
+            await seedDb.SaveChangesAsync();
+        }
+
+        // Before the edit, the match already shows the roster member's current name.
+        await using (var readDb = new ApplicationDbContext(options))
+        {
+            var before = Assert.Single(Assert.IsAssignableFrom<IReadOnlyList<MatchParticipant>>(Assert.IsType<OkObjectResult>(await NewController(readDb, tenantId).Participants(matchId, CancellationToken.None)).Value));
+            Assert.Equal("Old Name", before.FullName);
+        }
+
+        // Edit the roster entry via a separate DbContext/request, as ParticipantListsController.UpdateMember would.
+        await using (var editDb = new ApplicationDbContext(options))
+        {
+            var editController = new ParticipantListsController(editDb, new TestTenantContext(tenantId), new ParticipantListExcelService());
+            var request = new CreateParticipantRequest("Archer", "New Name", null, [], true);
+            Assert.IsType<OkObjectResult>(await editController.UpdateMember(listId, memberId, request, CancellationToken.None));
+        }
+
+        // A fresh request against the match reflects the edit immediately - no re-adding the participant.
+        await using (var verifyDb = new ApplicationDbContext(options))
+        {
+            var controller = NewController(verifyDb, tenantId);
+            var participant = Assert.Single(Assert.IsAssignableFrom<IReadOnlyList<MatchParticipant>>(Assert.IsType<OkObjectResult>(await controller.Participants(matchId, CancellationToken.None)).Value));
+            Assert.Equal("New Name", participant.FullName);
+
+            var results = Assert.IsAssignableFrom<IReadOnlyList<ParticipantResult>>(Assert.IsType<OkObjectResult>(await controller.Results(matchId, CancellationToken.None)).Value);
+            Assert.Equal("New Name", Assert.Single(results).Name);
+        }
     }
 
     private static Match MatchWithScopes(Guid tenantId, string name, bool isOpen, IEnumerable<string> scopes)

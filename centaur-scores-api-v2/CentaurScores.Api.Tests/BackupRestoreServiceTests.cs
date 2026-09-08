@@ -66,9 +66,6 @@ public sealed class BackupRestoreServiceTests
                     TenantId = sourceTenantId,
                     MatchId = matchId,
                     ParticipantListMemberId = memberId,
-                    FullName = "Robin Archer",
-                    LastName = "Archer",
-                    Categories = new Dictionary<Guid, int> { [categoryId] = 1 },
                     DeviceId = deviceId,
                     Scores = [new ArrowScore { Id = Guid.NewGuid(), TenantId = sourceTenantId, MatchParticipantId = participantId, End = 1, Arrow = 1, KeyId = "X", Value = 10 }]
                 }
@@ -122,7 +119,7 @@ public sealed class BackupRestoreServiceTests
         Assert.NotEqual(memberId, newMember.Id);
         Assert.Equal(newCategory.Id, Assert.Single(newMember.Categories).Key);
 
-        var newMatch = await db.Matches.Include(item => item.Participants).Include(item => item.Devices).SingleAsync(item => item.TenantId == result.NewTenantId);
+        var newMatch = await db.Matches.Include(item => item.Participants).ThenInclude(item => item.ParticipantListMember).Include(item => item.Devices).SingleAsync(item => item.TenantId == result.NewTenantId);
         Assert.NotEqual(matchId, newMatch.Id);
         Assert.Equal(newMember.ParticipantListId, newMatch.ParticipantListId);
         var newDevice = Assert.Single(newMatch.Devices);

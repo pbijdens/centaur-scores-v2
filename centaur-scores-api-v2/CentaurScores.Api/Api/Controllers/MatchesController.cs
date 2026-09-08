@@ -36,7 +36,7 @@ public sealed class MatchesController(ApplicationDbContext db, ITenantContext te
     }
 
     [HttpGet("{id:guid}")]
-    public async Task<IActionResult> Get(Guid id, CancellationToken cancellationToken) => await db.Matches.AsNoTracking().Include(item => item.Participants).Include(item => item.Devices).Include(item => item.LiveScopes).SingleOrDefaultAsync(item => item.Id == id && item.TenantId == TenantId, cancellationToken) is { } match ? Ok(match) : NotFound();
+    public async Task<IActionResult> Get(Guid id, CancellationToken cancellationToken) => await db.Matches.AsNoTracking().Include(item => item.Participants).ThenInclude(item => item.ParticipantListMember).Include(item => item.Devices).Include(item => item.LiveScopes).SingleOrDefaultAsync(item => item.Id == id && item.TenantId == TenantId, cancellationToken) is { } match ? Ok(match) : NotFound();
 
     [HttpPut("{id:guid}")]
     public async Task<IActionResult> Update(Guid id, CreateMatchRequest request, CancellationToken cancellationToken)
@@ -145,7 +145,7 @@ public sealed class MatchesController(ApplicationDbContext db, ITenantContext te
     }
 
     [HttpGet("{id:guid}/participants")]
-    public async Task<IActionResult> Participants(Guid id, CancellationToken cancellationToken) => Ok(await db.MatchParticipants.AsNoTracking().Include(item => item.Scores).Where(item => item.MatchId == id && item.TenantId == TenantId).OrderBy(item => item.DeviceId).ThenBy(item => item.DeviceOrder).ThenBy(item => item.LastName).ToListAsync(cancellationToken));
+    public async Task<IActionResult> Participants(Guid id, CancellationToken cancellationToken) => Ok(await db.MatchParticipants.AsNoTracking().Include(item => item.Scores).Include(item => item.ParticipantListMember).Where(item => item.MatchId == id && item.TenantId == TenantId).OrderBy(item => item.DeviceId).ThenBy(item => item.DeviceOrder).ThenBy(item => item.ParticipantListMember != null ? item.ParticipantListMember.LastName : item.OwnLastName).ToListAsync(cancellationToken));
 
     [HttpPost("{id:guid}/participants")]
     public async Task<IActionResult> AddParticipant(Guid id, CreateMatchParticipantRequest request, CancellationToken cancellationToken)
@@ -155,7 +155,21 @@ public sealed class MatchesController(ApplicationDbContext db, ITenantContext te
         if (match is null) return NotFound();
         if (request.ParticipantListMemberId is null && !match.AllowFreeParticipants) return BadRequest(new { message = "This match does not allow free participants." });
         if (request.ParticipantListMemberId is { } memberId && await db.MatchParticipants.AnyAsync(item => item.MatchId == id && item.ParticipantListMemberId == memberId, cancellationToken)) return Conflict(new { message = "Participant is already assigned." });
-        var participant = new MatchParticipant { Id = Guid.NewGuid(), TenantId = TenantId, MatchId = id, ParticipantListMemberId = request.ParticipantListMemberId, LastName = request.LastName, FullName = request.FullName, FederationNumber = request.FederationNumber, Categories = request.Categories };
+        var participant = new MatchParticipant { Id = Guid.NewGuid(), TenantId = TenantId, MatchId = id };
+        if (request.ParticipantListMemberId is { } newMemberId)
+        {
+            var member = await db.ParticipantListMembers.SingleOrDefaultAsync(item => item.Id == newMemberId && item.ParticipantListId == match.ParticipantListId && item.TenantId == TenantId, cancellationToken);
+            if (member is null) return NotFound();
+            participant.ParticipantListMemberId = member.Id;
+            participant.ParticipantListMember = member;
+        }
+        else
+        {
+            participant.OwnLastName = request.LastName;
+            participant.OwnFullName = request.FullName;
+            participant.OwnFederationNumber = request.FederationNumber;
+            participant.OwnCategories = request.Categories;
+        }
         db.MatchParticipants.Add(participant);
         await db.SaveChangesAsync(cancellationToken);
         personalBestLiveLookup.Invalidate(id);
@@ -169,11 +183,27 @@ public sealed class MatchesController(ApplicationDbContext db, ITenantContext te
         var participant = await db.MatchParticipants.SingleOrDefaultAsync(item => item.Id == participantId && item.MatchId == id && item.TenantId == TenantId, cancellationToken);
         if (participant is null) return NotFound();
         if (request.ParticipantListMemberId is { } memberId && await db.MatchParticipants.AnyAsync(item => item.MatchId == id && item.Id != participantId && item.ParticipantListMemberId == memberId, cancellationToken)) return Conflict(new { message = "Participant is already assigned." });
-        participant.ParticipantListMemberId = request.ParticipantListMemberId;
-        participant.LastName = request.LastName;
-        participant.FullName = request.FullName;
-        participant.FederationNumber = request.FederationNumber;
-        participant.Categories = request.Categories;
+        if (request.ParticipantListMemberId is { } newMemberId)
+        {
+            var match = await db.Matches.AsNoTracking().SingleAsync(item => item.Id == id && item.TenantId == TenantId, cancellationToken);
+            var member = await db.ParticipantListMembers.SingleOrDefaultAsync(item => item.Id == newMemberId && item.ParticipantListId == match.ParticipantListId && item.TenantId == TenantId, cancellationToken);
+            if (member is null) return NotFound();
+            participant.ParticipantListMemberId = member.Id;
+            participant.ParticipantListMember = member;
+            participant.OwnLastName = "";
+            participant.OwnFullName = "";
+            participant.OwnFederationNumber = null;
+            participant.OwnCategories = [];
+        }
+        else
+        {
+            participant.ParticipantListMemberId = null;
+            participant.ParticipantListMember = null;
+            participant.OwnLastName = request.LastName;
+            participant.OwnFullName = request.FullName;
+            participant.OwnFederationNumber = request.FederationNumber;
+            participant.OwnCategories = request.Categories;
+        }
         await db.SaveChangesAsync(cancellationToken);
         personalBestLiveLookup.Invalidate(id);
         return Ok(participant);
@@ -218,13 +248,16 @@ public sealed class MatchesController(ApplicationDbContext db, ITenantContext te
         }
 
         await db.Entry(participant).Collection(item => item.Scores).LoadAsync(cancellationToken);
+        await db.Entry(participant).Reference(item => item.ParticipantListMember).LoadAsync(cancellationToken);
         return Ok(scoring.Calculate(participant, (await db.Matches.FindAsync([id], cancellationToken))?.ArrowsPerEnd ?? 1, null));
     }
 
     [HttpGet("{id:guid}/results")]
     public async Task<IActionResult> Results(Guid id, CancellationToken cancellationToken)
     {
-        var match = await db.Matches.Include(item => item.Participants).ThenInclude(item => item.Scores).SingleOrDefaultAsync(item => item.Id == id && item.TenantId == TenantId, cancellationToken);
+        var match = await db.Matches.Include(item => item.Participants).ThenInclude(item => item.Scores)
+            .Include(item => item.Participants).ThenInclude(item => item.ParticipantListMember)
+            .SingleOrDefaultAsync(item => item.Id == id && item.TenantId == TenantId, cancellationToken);
         return match is null ? NotFound() : Ok(scoring.Rank(match.Participants, match));
     }
 
@@ -234,6 +267,7 @@ public sealed class MatchesController(ApplicationDbContext db, ITenantContext te
     {
         var match = await db.Matches.AsNoTracking()
             .Include(item => item.Participants).ThenInclude(item => item.Scores)
+            .Include(item => item.Participants).ThenInclude(item => item.ParticipantListMember)
             .Include(item => item.LiveScopes)
             .SingleOrDefaultAsync(item => item.Id == id && item.TenantId == TenantId, cancellationToken);
         var liveScope = match?.LiveScopes.SingleOrDefault(item => item.Scope == scope);
@@ -290,7 +324,7 @@ public sealed class MatchesController(ApplicationDbContext db, ITenantContext te
     public async Task<IActionResult> AssignParticipantDevice(Guid id, Guid participantId, AssignParticipantDeviceRequest request, CancellationToken cancellationToken)
     {
         if (!CanManage) return Forbid();
-        var participant = await db.MatchParticipants.SingleOrDefaultAsync(item => item.Id == participantId && item.MatchId == id && item.TenantId == TenantId, cancellationToken);
+        var participant = await db.MatchParticipants.Include(item => item.ParticipantListMember).SingleOrDefaultAsync(item => item.Id == participantId && item.MatchId == id && item.TenantId == TenantId, cancellationToken);
         if (participant is null) return NotFound();
         if (request.DeviceId is { } deviceId && !await db.ScoreDevices.AnyAsync(item => item.Id == deviceId && item.MatchId == id && item.TenantId == TenantId, cancellationToken)) return NotFound();
         if (request.DeviceId is null)
@@ -325,9 +359,10 @@ public sealed class MatchesController(ApplicationDbContext db, ITenantContext te
         if (!await db.ScoreDevices.AnyAsync(item => item.Id == deviceId && item.MatchId == id && item.TenantId == TenantId, cancellationToken)) return NotFound();
 
         var assignedParticipants = await db.MatchParticipants
+            .Include(item => item.ParticipantListMember)
             .Where(item => item.MatchId == id && item.TenantId == TenantId && item.DeviceId == deviceId)
             .OrderBy(item => item.DeviceOrder)
-            .ThenBy(item => item.LastName)
+            .ThenBy(item => item.ParticipantListMember != null ? item.ParticipantListMember.LastName : item.OwnLastName)
             .ToListAsync(cancellationToken);
 
         if (request.ParticipantIds.Count != assignedParticipants.Count) return BadRequest(new { message = "All assigned participants must be included." });
@@ -369,7 +404,9 @@ public sealed class MatchesController(ApplicationDbContext db, ITenantContext te
     [HttpGet("{id:guid}/export.csv")]
     public async Task<IActionResult> Export(Guid id, CancellationToken cancellationToken)
     {
-        var match = await db.Matches.AsNoTracking().Include(item => item.Participants).ThenInclude(item => item.Scores).SingleOrDefaultAsync(item => item.Id == id && item.TenantId == TenantId, cancellationToken);
+        var match = await db.Matches.AsNoTracking().Include(item => item.Participants).ThenInclude(item => item.Scores)
+            .Include(item => item.Participants).ThenInclude(item => item.ParticipantListMember)
+            .SingleOrDefaultAsync(item => item.Id == id && item.TenantId == TenantId, cancellationToken);
         if (match is null) return NotFound();
 
         var keyboard = ParseKeyboardConfiguration(match.KeyboardJson);

@@ -66,6 +66,11 @@ public sealed class ParticipantListsController(ApplicationDbContext db, ITenantC
         if (!CanManage) return Forbid();
         var list = await db.ParticipantLists.SingleOrDefaultAsync(item => item.Id == listId && item.TenantId == TenantId, cancellationToken);
         if (list is null) return NotFound();
+        // A linked match participant resolves its name/categories live from these members - deleting a
+        // member that's in use would silently change historical match/competition results, so that must
+        // be a deliberate choice (deactivate instead) rather than a side effect of deleting the list.
+        if (await db.MatchParticipants.AnyAsync(item => item.TenantId == TenantId && item.ParticipantListMember!.ParticipantListId == listId, cancellationToken))
+            return Conflict(new ApiError("PARTICIPANT_LIST_IN_USE", "This list has members that are used in a match and cannot be deleted."));
         db.ParticipantLists.Remove(list);
         await db.SaveChangesAsync(cancellationToken);
         return NoContent();
@@ -92,6 +97,10 @@ public sealed class ParticipantListsController(ApplicationDbContext db, ITenantC
         if (!CanManage) return Forbid();
         var member = await db.ParticipantListMembers.SingleOrDefaultAsync(item => item.Id == memberId && item.ParticipantListId == listId && item.TenantId == TenantId, cancellationToken);
         if (member is null) return NotFound();
+        // See Delete(listId) above: a match participant linked to this member resolves its data live from
+        // it, so deleting an in-use member would silently change historical results. Deactivate instead.
+        if (await db.MatchParticipants.AnyAsync(item => item.ParticipantListMemberId == memberId && item.TenantId == TenantId, cancellationToken))
+            return Conflict(new ApiError("PARTICIPANT_LIST_MEMBER_IN_USE", "This member is used in a match and cannot be deleted. Deactivate it instead."));
         db.ParticipantListMembers.Remove(member);
         await db.SaveChangesAsync(cancellationToken);
         return NoContent();

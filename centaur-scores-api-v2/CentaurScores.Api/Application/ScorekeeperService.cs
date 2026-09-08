@@ -23,6 +23,7 @@ public sealed class ScorekeeperService(ApplicationDbContext db, IPersonalBestLiv
     {
         var match = await db.Matches
             .Include(item => item.Participants).ThenInclude(item => item.Scores)
+            .Include(item => item.Participants).ThenInclude(item => item.ParticipantListMember)
             .Include(item => item.Devices)
             .SingleOrDefaultAsync(item => item.TenantId == tenantId && item.Id == matchId, cancellationToken);
         var device = match?.Devices.SingleOrDefault(item => item.Id == deviceId);
@@ -63,16 +64,14 @@ public sealed class ScorekeeperService(ApplicationDbContext db, IPersonalBestLiv
                 if (!members.TryGetValue(tenantParticipantId, out var member))
                     return new("CUSTOM_PARTICIPANT_NOT_ALLOWED", "The participant is not in the match participant list.");
                 participant = byId.Values.FirstOrDefault(value => value.ParticipantListMemberId == member.Id)
-                    ?? new MatchParticipant { Id = Guid.NewGuid(), TenantId = context.Match.TenantId, MatchId = context.Match.Id, ParticipantListMemberId = member.Id };
+                    ?? new MatchParticipant { Id = Guid.NewGuid(), TenantId = context.Match.TenantId, MatchId = context.Match.Id, ParticipantListMemberId = member.Id, ParticipantListMember = member };
                 if (!byId.ContainsKey(participant.Id))
                 {
                     db.MatchParticipants.Add(participant);
                     byId[participant.Id] = participant;
                 }
-                participant.LastName = member.LastName;
-                participant.FullName = member.FullName;
-                participant.FederationNumber = member.FederationNumber;
-                participant.Categories = new Dictionary<Guid, int>(member.Categories);
+                // No copy needed: participant.FullName/LastName/FederationNumber/Categories resolve live
+                // from the linked ParticipantListMember via the navigation set above.
             }
             else if (item.MatchParticipantId is { } matchParticipantId && byId.TryGetValue(matchParticipantId, out participant!))
             {
@@ -190,13 +189,15 @@ public sealed class ScorekeeperService(ApplicationDbContext db, IPersonalBestLiv
 
     private static void FillMissingCategories(MatchParticipant participant, IReadOnlyList<ScorekeeperCategory> categories)
     {
+        // participant.Categories merges OwnCategories over the roster member's (see Domain.cs), so
+        // writing gaps into OwnCategories fills them for this match without ever touching the roster.
         foreach (var category in categories)
         {
             if (participant.Categories.ContainsKey(category.Id))
                 continue;
             var unknown = category.Values.FirstOrDefault(value => value.Name.Equals("Onbekend", StringComparison.OrdinalIgnoreCase) || value.Name.Equals("Unknown", StringComparison.OrdinalIgnoreCase));
             if (unknown is not null)
-                participant.Categories[category.Id] = unknown.Id;
+                participant.OwnCategories[category.Id] = unknown.Id;
         }
     }
 
@@ -204,7 +205,7 @@ public sealed class ScorekeeperService(ApplicationDbContext db, IPersonalBestLiv
     private static ScorekeeperParticipantInfo ToInfo(MatchParticipant item, IReadOnlyList<ScorekeeperCategory> categories) => new(item.Id, item.ParticipantListMemberId, item.FederationNumber, item.FullName, Info(item.Categories, categories), CategoryValues(item.Categories, categories));
     private static IReadOnlyList<ScorekeeperParticipantCategory> CategoryValues(Dictionary<Guid, int> values, IReadOnlyList<ScorekeeperCategory> categories) => categories.Select(category => new ScorekeeperParticipantCategory(category.Id, category.Name, category.Values.FirstOrDefault(value => values.GetValueOrDefault(category.Id) == value.Id)?.Name)).ToList();
     private static string? Info(Dictionary<Guid, int> values, IReadOnlyList<ScorekeeperCategory> categories) { var text = string.Join(" / ", CategoryValues(values, categories).Where(item => item.Value is not null).Select(item => item.Value)); return text.Length == 0 ? null : text; }
-    private static void ApplyValues(MatchParticipant participant, ScorekeeperParticipantRequest item, IReadOnlyList<ScorekeeperCategory> categories) { participant.FederationNumber = item.FederationNumber; participant.FullName = item.Name ?? ""; participant.LastName = item.Name?.Split(' ', StringSplitOptions.RemoveEmptyEntries).LastOrDefault() ?? ""; participant.Categories = item.Categories?.Where(category => category.Value is not null).ToDictionary(category => category.Id, category => categories.SingleOrDefault(value => value.Id == category.Id)?.Values.FirstOrDefault(value => value.Name == category.Value)?.Id ?? 0) ?? []; }
+    private static void ApplyValues(MatchParticipant participant, ScorekeeperParticipantRequest item, IReadOnlyList<ScorekeeperCategory> categories) { participant.OwnFederationNumber = item.FederationNumber; participant.OwnFullName = item.Name ?? ""; participant.OwnLastName = item.Name?.Split(' ', StringSplitOptions.RemoveEmptyEntries).LastOrDefault() ?? ""; participant.OwnCategories = item.Categories?.Where(category => category.Value is not null).ToDictionary(category => category.Id, category => categories.SingleOrDefault(value => value.Id == category.Id)?.Values.FirstOrDefault(value => value.Name == category.Value)?.Id ?? 0) ?? []; }
     private static bool SameValues(MatchParticipant participant, ScorekeeperParticipantRequest item, IReadOnlyList<ScorekeeperCategory> categories) => participant.FederationNumber == item.FederationNumber && participant.FullName == item.Name && participant.Categories.SequenceEqual(item.Categories?.Where(category => category.Value is not null).ToDictionary(category => category.Id, category => categories.SingleOrDefault(value => value.Id == category.Id)?.Values.FirstOrDefault(value => value.Name == category.Value)?.Id ?? 0) ?? []);
     private static (List<Guid> CategoryOrder, List<ScorekeeperKey> Keys) ParseKeyboard(string json)
     {

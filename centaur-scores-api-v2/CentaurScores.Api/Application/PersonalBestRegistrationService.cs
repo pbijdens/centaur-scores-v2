@@ -32,6 +32,7 @@ public sealed class PersonalBestRegistrationService(ApplicationDbContext db, IPe
 
         var participants = await db.MatchParticipants.AsNoTracking()
             .Include(item => item.Scores)
+            .Include(item => item.ParticipantListMember)
             .Where(item => item.MatchId == match.Id && item.TenantId == match.TenantId)
             .ToListAsync(cancellationToken);
 

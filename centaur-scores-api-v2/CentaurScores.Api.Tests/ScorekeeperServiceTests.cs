@@ -155,7 +155,7 @@ public sealed class ScorekeeperServiceTests
         var error = await service.SetParticipantsAsync(context!, [request], CancellationToken.None);
 
         Assert.Null(error);
-        var participant = Assert.Single(await db.MatchParticipants.AsNoTracking().Where(item => item.MatchId == matchId).ToListAsync());
+        var participant = Assert.Single(await db.MatchParticipants.AsNoTracking().Include(item => item.ParticipantListMember).Where(item => item.MatchId == matchId).ToListAsync());
         Assert.Equal(1, participant.Categories[disciplineId]);
         Assert.Equal(99, participant.Categories[classId]);
         var member = await db.ParticipantListMembers.AsNoTracking().SingleAsync(item => item.Id == memberId);

@@ -12,7 +12,7 @@ public sealed class ScoringServiceTests
         var participant = new MatchParticipant
         {
             Id = participantId,
-            FullName = "A. Archer",
+            OwnFullName = "A. Archer",
             Scores = [
             new ArrowScore { Id = Guid.NewGuid(), End = 1, Arrow = 1, Value = 10 },
             new ArrowScore { Id = Guid.NewGuid(), End = 1, Arrow = 2, Value = 9 },
@@ -29,8 +29,8 @@ public sealed class ScoringServiceTests
     public void Rank_orders_by_total_then_name()
     {
         var match = new Match { Id = Guid.NewGuid(), ArrowsPerEnd = 3 };
-        var first = new MatchParticipant { Id = Guid.NewGuid(), FullName = "B Archer", Scores = [new ArrowScore { Id = Guid.NewGuid(), Value = 10 }] };
-        var second = new MatchParticipant { Id = Guid.NewGuid(), FullName = "A Archer", Scores = [new ArrowScore { Id = Guid.NewGuid(), Value = 10 }] };
+        var first = new MatchParticipant { Id = Guid.NewGuid(), OwnFullName = "B Archer", Scores = [new ArrowScore { Id = Guid.NewGuid(), Value = 10 }] };
+        var second = new MatchParticipant { Id = Guid.NewGuid(), OwnFullName = "A Archer", Scores = [new ArrowScore { Id = Guid.NewGuid(), Value = 10 }] };
         var result = new ScoringService().Rank([first, second], match);
         Assert.Equal("A Archer", result[0].Name);
     }

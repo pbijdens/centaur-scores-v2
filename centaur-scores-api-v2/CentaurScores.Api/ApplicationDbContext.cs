@@ -93,7 +93,17 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
         // composite index without this one fails with "needed in a foreign key constraint".
         modelBuilder.Entity<Account>().HasIndex(item => item.TenantId);
         modelBuilder.Entity<ParticipantListMember>().Property(item => item.Categories).HasJsonConversion();
-        modelBuilder.Entity<MatchParticipant>().Property(item => item.Categories).HasJsonConversion();
+        // Column names are kept identical to the pre-rename properties (last_name, full_name,
+        // federation_number, categories) so existing free-participant data needs no migration.
+        modelBuilder.Entity<MatchParticipant>().Property(item => item.OwnLastName).HasColumnName("last_name");
+        modelBuilder.Entity<MatchParticipant>().Property(item => item.OwnFullName).HasColumnName("full_name");
+        modelBuilder.Entity<MatchParticipant>().Property(item => item.OwnFederationNumber).HasColumnName("federation_number");
+        modelBuilder.Entity<MatchParticipant>().Property(item => item.OwnCategories).HasColumnName("categories").HasJsonConversion();
+        // Restrict (rather than SetNull/Cascade): a linked participant no longer holds its own copy of the
+        // roster member's data, so deleting a member that's in use would silently blank out historical match
+        // and competition results. ParticipantListsController blocks the delete before this constraint would
+        // ever be hit, giving a clean API error instead of a raw DB exception.
+        modelBuilder.Entity<MatchParticipant>().HasOne(item => item.ParticipantListMember).WithMany().HasForeignKey(item => item.ParticipantListMemberId).OnDelete(DeleteBehavior.Restrict);
         modelBuilder.Entity<Match>().HasMany(item => item.Participants).WithOne().HasForeignKey(item => item.MatchId).OnDelete(DeleteBehavior.Cascade);
         modelBuilder.Entity<Match>().HasMany(item => item.Devices).WithOne().HasForeignKey(item => item.MatchId).OnDelete(DeleteBehavior.Cascade);
         modelBuilder.Entity<Match>().HasMany(item => item.LiveScopes).WithOne().HasForeignKey(item => item.MatchId).OnDelete(DeleteBehavior.Cascade);

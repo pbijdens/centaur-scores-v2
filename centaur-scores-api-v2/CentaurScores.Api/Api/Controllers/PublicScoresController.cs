@@ -30,6 +30,7 @@ public sealed class PublicScoresController(ApplicationDbContext db, ILiveScoring
     {
         var match = await db.Matches.AsNoTracking()
             .Include(item => item.Participants).ThenInclude(item => item.Scores)
+            .Include(item => item.Participants).ThenInclude(item => item.ParticipantListMember)
             .Include(item => item.LiveScopes)
             .SingleOrDefaultAsync(item => item.Id == matchId && item.IsOpen, cancellationToken);
         var liveScope = match?.LiveScopes.SingleOrDefault(item => item.Scope == scope);

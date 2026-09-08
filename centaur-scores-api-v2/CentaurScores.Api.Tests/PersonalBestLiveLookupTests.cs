@@ -32,7 +32,7 @@ public sealed class PersonalBestLiveLookupTests
             Ends = 5,
             ArrowsPerEnd = 6,
             PersonalBestClassifier = "Outdoor",
-            Participants = [new MatchParticipant { Id = participantId, TenantId = tenantId, MatchId = matchId, FederationNumber = "123", FullName = "Robin Archer", LastName = "Archer", Categories = new Dictionary<Guid, int> { [categoryId] = 7 } }]
+            Participants = [new MatchParticipant { Id = participantId, TenantId = tenantId, MatchId = matchId, OwnFederationNumber = "123", OwnFullName = "Robin Archer", OwnLastName = "Archer", OwnCategories = new Dictionary<Guid, int> { [categoryId] = 7 } }]
         };
         db.AddRange(
             new Tenant { Id = tenantId, Name = "Tenant", PersonalBestEnabled = true },
@@ -87,7 +87,7 @@ public sealed class PersonalBestLiveLookupTests
 
         // A new participant joins the match after the cache was already populated.
         var newParticipantId = Guid.NewGuid();
-        match.Participants.Add(new MatchParticipant { Id = newParticipantId, TenantId = tenantId, MatchId = matchId, FederationNumber = "123", FullName = "Robin Archer", LastName = "Archer", Categories = new Dictionary<Guid, int> { [categoryId] = 7 } });
+        match.Participants.Add(new MatchParticipant { Id = newParticipantId, TenantId = tenantId, MatchId = matchId, OwnFederationNumber = "123", OwnFullName = "Robin Archer", OwnLastName = "Archer", OwnCategories = new Dictionary<Guid, int> { [categoryId] = 7 } });
 
         var stillCached = await lookup.BuildAsync(match, scope, CancellationToken.None);
         Assert.Empty(stillCached);

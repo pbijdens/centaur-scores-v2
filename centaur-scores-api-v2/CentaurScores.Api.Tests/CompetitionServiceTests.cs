@@ -37,8 +37,8 @@ public sealed class CompetitionServiceTests
             ArrowsPerEnd = 3,
             Participants =
             [
-                new MatchParticipant { Id = Guid.NewGuid(), ParticipantListMemberId = idA, FullName = "A Archer", Categories = [], Scores = [new ArrowScore { Id = Guid.NewGuid(), KeyId = "9", Value = 9 }, new ArrowScore { Id = Guid.NewGuid(), KeyId = "9", Value = 9 }, new ArrowScore { Id = Guid.NewGuid(), KeyId = "9", Value = 9 }] },
-                new MatchParticipant { Id = Guid.NewGuid(), ParticipantListMemberId = idB, FullName = "B Archer", Categories = [], Scores = [new ArrowScore { Id = Guid.NewGuid(), KeyId = "6", Value = 6 }, new ArrowScore { Id = Guid.NewGuid(), KeyId = "6", Value = 6 }, new ArrowScore { Id = Guid.NewGuid(), KeyId = "6", Value = 6 }] }
+                new MatchParticipant { Id = Guid.NewGuid(), ParticipantListMemberId = idA, ParticipantListMember = new ParticipantListMember { Id = idA, FullName = "A Archer" }, Scores = [new ArrowScore { Id = Guid.NewGuid(), KeyId = "9", Value = 9 }, new ArrowScore { Id = Guid.NewGuid(), KeyId = "9", Value = 9 }, new ArrowScore { Id = Guid.NewGuid(), KeyId = "9", Value = 9 }] },
+                new MatchParticipant { Id = Guid.NewGuid(), ParticipantListMemberId = idB, ParticipantListMember = new ParticipantListMember { Id = idB, FullName = "B Archer" }, Scores = [new ArrowScore { Id = Guid.NewGuid(), KeyId = "6", Value = 6 }, new ArrowScore { Id = Guid.NewGuid(), KeyId = "6", Value = 6 }, new ArrowScore { Id = Guid.NewGuid(), KeyId = "6", Value = 6 }] }
             ]
         };
         var round = new CompetitionRound { Id = roundId, Order = 0, ShortName = "R1", LongName = "Round 1" };
@@ -75,8 +75,8 @@ public sealed class CompetitionServiceTests
             ScoringRulesJson = "[]",
             Participants =
             [
-                new MatchParticipant { Id = Guid.NewGuid(), ParticipantListMemberId = idA, FullName = "A Archer", Categories = [], Scores = [new ArrowScore { Id = Guid.NewGuid(), KeyId = "10", Value = 10 }] },
-                new MatchParticipant { Id = Guid.NewGuid(), ParticipantListMemberId = idB, FullName = "B Archer", Categories = [], Scores = [new ArrowScore { Id = Guid.NewGuid(), KeyId = "9", Value = 9 }] }
+                new MatchParticipant { Id = Guid.NewGuid(), ParticipantListMemberId = idA, ParticipantListMember = new ParticipantListMember { Id = idA, FullName = "A Archer" }, Scores = [new ArrowScore { Id = Guid.NewGuid(), KeyId = "10", Value = 10 }] },
+                new MatchParticipant { Id = Guid.NewGuid(), ParticipantListMemberId = idB, ParticipantListMember = new ParticipantListMember { Id = idB, FullName = "B Archer" }, Scores = [new ArrowScore { Id = Guid.NewGuid(), KeyId = "9", Value = 9 }] }
             ]
         };
         var round = new CompetitionRound { Id = roundId, Order = 0, ShortName = "R1", LongName = "Round 1" };
@@ -106,8 +106,7 @@ public sealed class CompetitionServiceTests
         {
             Id = Guid.NewGuid(),
             ParticipantListMemberId = participantId,
-            FullName = name,
-            Categories = [],
+            ParticipantListMember = new ParticipantListMember { Id = participantId, FullName = name },
             Scores = [new ArrowScore { Id = Guid.NewGuid(), KeyId = value.ToString(), Value = value }]
         };
 

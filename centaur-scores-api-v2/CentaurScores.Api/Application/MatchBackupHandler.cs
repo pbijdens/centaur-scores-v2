@@ -13,6 +13,7 @@ public sealed class MatchBackupHandler : IBackupHandler
     {
         var matches = await db.Matches.AsNoTracking()
             .Include(item => item.Participants).ThenInclude(item => item.Scores)
+            .Include(item => item.Participants).ThenInclude(item => item.ParticipantListMember)
             .Include(item => item.Devices)
             .Include(item => item.LiveScopes)
             .Where(item => tenantIds.Contains(item.TenantId))
@@ -58,11 +59,14 @@ public sealed class MatchBackupHandler : IBackupHandler
                     Id = newParticipantId,
                     TenantId = newTenantId,
                     MatchId = newMatchId,
+                    // Own* is populated from the backup snapshot regardless of link status, as a fallback:
+                    // if the remap above fails (the roster member wasn't part of this backup), the
+                    // restored participant still shows the name/number/categories it had when backed up.
                     ParticipantListMemberId = participant.ParticipantListMemberId is { } memberId && context.TryRemap(memberId, out var newMemberId) ? newMemberId : null,
-                    LastName = participant.LastName,
-                    FullName = participant.FullName,
-                    FederationNumber = participant.FederationNumber,
-                    Categories = BackupRemapHelpers.RemapCategoryDictionary(participant.Categories, context),
+                    OwnLastName = participant.LastName,
+                    OwnFullName = participant.FullName,
+                    OwnFederationNumber = participant.FederationNumber,
+                    OwnCategories = BackupRemapHelpers.RemapCategoryDictionary(participant.Categories, context),
                     DeviceId = participant.DeviceId is { } deviceId && context.TryRemap(deviceId, out var newDeviceId) ? newDeviceId : null,
                     DeviceOrder = participant.DeviceOrder,
                     Scores = participant.Scores.Select(score => new ArrowScore { Id = Guid.NewGuid(), TenantId = newTenantId, MatchParticipantId = newParticipantId, End = score.End, Arrow = score.Arrow, KeyId = score.KeyId, Value = score.Value }).ToList()

@@ -31,8 +31,11 @@ public sealed class PersonalBestRegistrationServiceTests
         var disciplineId = Guid.NewGuid();
         var matchId = Guid.NewGuid();
         var participantId = Guid.NewGuid();
+        var listId = Guid.NewGuid();
+        var memberId = Guid.NewGuid();
 
         db.Tenants.Add(tenant);
+        db.ParticipantLists.Add(new ParticipantList { Id = listId, TenantId = tenant.Id, Name = "List" });
         db.PersonalBestClassifiers.Add(new PersonalBestClassifier { Id = Guid.NewGuid(), TenantId = tenant.Id, Name = "Outdoor" });
         db.PersonalBestDisciplines.Add(new PersonalBestDiscipline
         {
@@ -48,10 +51,8 @@ public sealed class PersonalBestRegistrationServiceTests
             Id = participantId,
             TenantId = tenant.Id,
             MatchId = matchId,
-            ParticipantListMemberId = Guid.NewGuid(),
-            FullName = "Robin Archer",
-            FederationNumber = "42",
-            Categories = new Dictionary<Guid, int> { [categoryId] = 1 },
+            ParticipantListMemberId = memberId,
+            ParticipantListMember = new ParticipantListMember { Id = memberId, TenantId = tenant.Id, ParticipantListId = listId, LastName = "Archer", FullName = "Robin Archer", FederationNumber = "42", Categories = new Dictionary<Guid, int> { [categoryId] = 1 } },
             Scores = [new ArrowScore { Id = Guid.NewGuid(), TenantId = tenant.Id, MatchParticipantId = participantId, End = 1, Arrow = 1, KeyId = "10", Value = 10 }]
         });
         await db.SaveChangesAsync();
@@ -95,9 +96,9 @@ public sealed class PersonalBestRegistrationServiceTests
             TenantId = tenant.Id,
             MatchId = matchId,
             ParticipantListMemberId = null, // walk-in / unlisted
-            FullName = "Walk In",
-            FederationNumber = "99",
-            Categories = new Dictionary<Guid, int> { [categoryId] = 1 }
+            OwnFullName = "Walk In",
+            OwnFederationNumber = "99",
+            OwnCategories = new Dictionary<Guid, int> { [categoryId] = 1 }
         });
         await db.SaveChangesAsync();
 

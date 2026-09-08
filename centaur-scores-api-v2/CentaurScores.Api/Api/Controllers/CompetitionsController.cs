@@ -187,7 +187,10 @@ public sealed class CompetitionsController(ApplicationDbContext db, ITenantConte
         if (competition is null) return NotFound();
         var categories = await db.Categories.AsNoTracking().Include(item => item.Values).Where(item => item.TenantId == TenantId).ToListAsync(cancellationToken);
         var matchIds = competition.Rounds.SelectMany(item => item.Matches).Select(item => item.MatchId).Distinct().ToList();
-        var matches = await db.Matches.AsNoTracking().Include(item => item.Participants).ThenInclude(item => item.Scores).Where(item => matchIds.Contains(item.Id) && item.TenantId == TenantId).ToListAsync(cancellationToken);
+        var matches = await db.Matches.AsNoTracking()
+            .Include(item => item.Participants).ThenInclude(item => item.Scores)
+            .Include(item => item.Participants).ThenInclude(item => item.ParticipantListMember)
+            .Where(item => matchIds.Contains(item.Id) && item.TenantId == TenantId).ToListAsync(cancellationToken);
         var matchesById = matches.ToDictionary(item => item.Id);
         var matchesByRound = competition.Rounds.ToDictionary(
             round => round.Id,

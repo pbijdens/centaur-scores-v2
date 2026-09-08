@@ -66,8 +66,8 @@ public sealed class LiveScoringServiceTests
     private static MatchParticipant Participant(string name, Guid disciplineId, Guid classId, params (string Key, int Value)[] scores) => new()
     {
         Id = Guid.NewGuid(),
-        FullName = name,
-        Categories = new Dictionary<Guid, int> { [disciplineId] = 1, [classId] = 2 },
+        OwnFullName = name,
+        OwnCategories = new Dictionary<Guid, int> { [disciplineId] = 1, [classId] = 2 },
         Scores = scores.Select((score, index) => new ArrowScore { Id = Guid.NewGuid(), End = 1, Arrow = index + 1, KeyId = score.Key, Value = score.Value }).ToList()
     };
 }
