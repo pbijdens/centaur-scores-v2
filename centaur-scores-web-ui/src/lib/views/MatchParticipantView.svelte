@@ -4,6 +4,7 @@
   import { labelForError } from '../errors'
   import { parseMatchKeyboardConfig } from '../matchConfig'
   import { deriveLastName, memberCategoryLabel, memberDisplayLabel } from '../participantName'
+  import { participantMemberPath } from '../router'
   import type { ArrowScore, Category, KeyboardKey, Match, MatchParticipant, ParticipantList } from '../types'
 
   export let api: ApiClient
@@ -11,6 +12,7 @@
   export let participant: MatchParticipant
   export let categories: Category[]
   export let sourceList: ParticipantList | null
+  export let canManage: boolean
   export let labels: Record<string, string>
   export let onBack: () => void
   export let onChanged: () => void | Promise<void>
@@ -256,6 +258,9 @@
     <h2>{labels.participantDetailsLabel}</h2>
     <p class="muted">{participant.federationNumber} / {participant.fullName || participant.lastName}{#if categoryLabel()}<span class="muted">/ {categoryLabel()}</span>{/if}</p>
     <button class="primary" on:click={() => (showMetadataEditor ? (showMetadataEditor = false) : openMetadataEditor())}>{labels.editParticipantDetails}</button>
+    {#if !participant.participantListMemberId && sourceList && canManage}
+      <a class="primary" href={participantMemberPath(sourceList.id, 'new')} target="_blank" rel="noopener">{labels.addToParticipantList.replace('{name}', sourceList.name)}</a>
+    {/if}
   </div>
   {#if showMetadataEditor}
     {#if sourceList}
