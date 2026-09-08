@@ -189,7 +189,8 @@
   >
     {#each Array(match.ends) as _, endIndex (endIndex)}
       {@const arrows = endArrows(match, participant, endIndex)}
-      <div class="end-block" class:active={openEndIndex === endIndex}>
+      {@const isGroupDivider = !!match.groupEnds && match.groupEnds > 0 && (endIndex + 1) % match.groupEnds === 0 && endIndex + 1 < match.ends}
+      <div class="end-block" class:active={openEndIndex === endIndex} class:group-divider={isGroupDivider}>
         <div class="end-row">
           <span class="end-number">{endIndex + 1}</span>
           <div class="arrows">
@@ -207,9 +208,11 @@
           </div>
           <span class="end-total">{endTotal(match, participant, endIndex)}</span>
           <div class="totals-cell">
-            <span class="running-total">{runningTotalThroughEnd(match, participant, endIndex)}</span>
             {#if match.groupEnds}
-              <span class="group-total">{groupRunningTotal(match, participant, endIndex)}</span>
+              <span class="running-total">{groupRunningTotal(match, participant, endIndex)}</span>
+              <span class="group-total">{runningTotalThroughEnd(match, participant, endIndex)}</span>
+            {:else}
+              <span class="running-total">{runningTotalThroughEnd(match, participant, endIndex)}</span>
             {/if}
           </div>
         </div>
@@ -238,6 +241,10 @@
     &.active {
       background: rgba(28, 59, 87, 0.04);
       border-radius: v.$radius;
+    }
+
+    &.group-divider {
+      border-bottom: 3px solid v.$color-primary;
     }
   }
 
