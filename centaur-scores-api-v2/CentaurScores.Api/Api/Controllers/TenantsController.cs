@@ -10,7 +10,7 @@ namespace CentaurScores.Api.Controllers;
 
 [ApiController]
 [Route("api/tenants")]
-public sealed class TenantsController(ApplicationDbContext db, ITenantContext tenantContext, INarrowcastScopeContext narrowcastScopeContext) : ApiControllerBase(tenantContext)
+public sealed class TenantsController(ApplicationDbContext db, ITenantContext tenantContext, INarrowcastScopeContext narrowcastScopeContext, ITenantDeletionService tenantDeletionService) : ApiControllerBase(tenantContext)
 {
     [AllowAnonymous]
     [HttpGet]
@@ -94,10 +94,9 @@ public sealed class TenantsController(ApplicationDbContext db, ITenantContext te
     public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
     {
         if (!IsAdministrator || id == TenantId) return Forbid();
-        var tenant = await db.Tenants.SingleOrDefaultAsync(item => item.Id == id && item.ParentTenantId == TenantId, cancellationToken);
+        var tenant = await db.Tenants.AsNoTracking().SingleOrDefaultAsync(item => item.Id == id && item.ParentTenantId == TenantId, cancellationToken);
         if (tenant is null) return NotFound();
-        db.Tenants.Remove(tenant);
-        await db.SaveChangesAsync(cancellationToken);
+        await tenantDeletionService.DeleteTenantAsync(id, cancellationToken);
         return NoContent();
     }
 }

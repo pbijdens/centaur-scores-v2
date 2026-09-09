@@ -43,7 +43,7 @@ JWTs are returned by `POST /api/auth/login` and contain the account and active t
 | `GET` | `/api/tenants/children` | admin | List direct sub-tenants of the active tenant. |
 | `GET` | `/api/tenants/children/{id}` | admin | Get a sub-tenant's details for editing. |
 | `PUT` | `/api/tenants/children/{id}` | admin | Update a sub-tenant's `{ name, logoUrl, defaultNarrowcastScope }`. |
-| `DELETE` | `/api/tenants/{id}` | admin | Delete a child tenant. The logged-in tenant cannot delete itself. |
+| `DELETE` | `/api/tenants/{id}` | admin | Delete a child tenant. The logged-in tenant cannot delete itself. Cascades: every descendant tenant (recursively) and all data owned by the tenant/its descendants (accounts, categories, participant lists, matches, templates, competitions, personal-best config) is deleted too, in one transaction. |
 | `GET` | `/api/tenants/current/default-scope` | user | Return `{ tenantValue, effectiveValue }` for the active tenant's default narrowcast scope: `tenantValue` is this tenant's own override (`null` if unset), `effectiveValue` is resolved by walking `ParentTenantId` up to the nearest ancestor with one set, falling back to `"all"`. |
 | `PUT` | `/api/tenants/current/default-scope` | manager | Set or clear (`null`) the active tenant's own default narrowcast scope override. Unlike the other `tenants/current`/`children` endpoints, this only requires manager, not admin. |
 

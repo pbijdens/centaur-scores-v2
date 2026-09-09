@@ -33,6 +33,7 @@ builder.Services.AddScoped<IPersonalBestRegistrationService, PersonalBestRegistr
 builder.Services.AddScoped<IPersonalBestLiveLookup, PersonalBestLiveLookup>();
 builder.Services.AddScoped<IBackupService, BackupService>();
 builder.Services.AddScoped<IRestoreService, RestoreService>();
+builder.Services.AddScoped<ITenantDeletionService, TenantDeletionService>();
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
