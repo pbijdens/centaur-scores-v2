@@ -27,7 +27,7 @@
   } from './lib/data'
   import { labelForError } from './lib/errors'
   import { translationsFor } from './lib/i18n'
-  import { accountPath, categoryPath, competitionPath, matchDevicesPath, matchEditPath, matchParticipantPath, matchPath, navigateTo, participantListPath, participantMemberPath, resolveRoute, templatePath, tenantPath } from './lib/router'
+  import { accountPath, categoryPath, competitionPath, matchAddParticipantsPath, matchDevicesPath, matchEditPath, matchParticipantPath, matchPath, navigateTo, participantListPath, participantMemberPath, resolveRoute, templatePath, tenantPath } from './lib/router'
   import { isSessionWatchActive } from './lib/sessionWatch'
   import type { Account, Category, Competition, Language, Match, MatchTemplate, ParticipantList, ParticipantListMember, ParticipantListSummary, TenantAccess, Tenant, View } from './lib/types'
   import AccountEditView from './lib/views/AccountEditView.svelte'
@@ -42,6 +42,7 @@
   import HomeView from './lib/views/HomeView.svelte'
   import LoginView from './lib/views/LoginView.svelte'
   import LiveScoringView from './lib/views/LiveScoringView.svelte'
+  import MatchAddParticipantsView from './lib/views/MatchAddParticipantsView.svelte'
   import MatchDetailView from './lib/views/MatchDetailView.svelte'
   import MatchDevicesView from './lib/views/MatchDevicesView.svelte'
   import MatchesView from './lib/views/MatchesView.svelte'
@@ -397,7 +398,7 @@
     view = route.view
     narrowcastScope = route.view === 'narrowcast' ? route.scope ?? null : null
     selectedResultsScope = route.view === 'match-results-scope' ? route.scope ?? null : null
-    const matchScopedViews: View[] = ['match', 'match-metadata', 'match-devices', 'match-qr', 'match-results-scope', 'match-participant']
+    const matchScopedViews: View[] = ['match', 'match-metadata', 'match-devices', 'match-qr', 'match-results-scope', 'match-participant', 'match-add-participants']
     selectedMatchId = matchScopedViews.includes(route.view) ? route.matchId ?? null : null
     if (selectedMatchId) loadSelectedMatch(selectedMatchId)
     else { selectedMatch = null; matchSourceList = null }
@@ -458,7 +459,10 @@
         <MatchesView {api} matches={$matches} templates={$templates} defaultNarrowcastScope={effectiveDefaultNarrowcastScope} {language} labels={t} onOpenMatch={openMatch} onChanged={loadMatchesList} />
       {:else if view === 'match' && selectedMatch}
         {@const currentMatch = selectedMatch}
-        <MatchDetailView {api} match={currentMatch} categories={$categories} sourceList={matchSourceList} {language} labels={t} onBack={() => navigate('/matches')} onToggleOpen={toggleSelectedMatch} onChanged={refreshSelectedMatch} onDeleted={onMatchDeleted} onEditMetadata={() => navigate(matchEditPath(currentMatch.id))} onManageDevices={() => navigate(matchDevicesPath(currentMatch.id))} onOpenParticipant={openParticipant} onCopied={(copy) => { loadMatchesList(); openMatch(copy) }} />
+        <MatchDetailView {api} match={currentMatch} categories={$categories} {language} labels={t} onBack={() => navigate('/matches')} onToggleOpen={toggleSelectedMatch} onDeleted={onMatchDeleted} onEditMetadata={() => navigate(matchEditPath(currentMatch.id))} onManageDevices={() => navigate(matchDevicesPath(currentMatch.id))} onAddParticipants={() => navigate(matchAddParticipantsPath(currentMatch.id))} onOpenParticipant={openParticipant} onCopied={(copy) => { loadMatchesList(); openMatch(copy) }} />
+      {:else if view === 'match-add-participants' && selectedMatch}
+        {@const currentMatch = selectedMatch}
+        <MatchAddParticipantsView {api} match={currentMatch} categories={$categories} sourceList={matchSourceList} labels={t} onBack={() => navigate(`/matches/${currentMatch.id}`)} onChanged={refreshSelectedMatch} />
       {:else if view === 'match-metadata' && selectedMatch}
         {@const currentMatch = selectedMatch}
         <MatchMetadataEditView {api} match={currentMatch} categories={$categories} participantLists={$participantLists} labels={t} onBack={() => navigate(`/matches/${currentMatch.id}`)} onSaved={refreshSelectedMatch} onDeleted={onMatchDeleted} />

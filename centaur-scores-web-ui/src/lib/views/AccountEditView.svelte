@@ -56,7 +56,7 @@
     <div><p class="eyebrow">{labels.eyebrowAccounts}</p><h1>{account.username}</h1></div>
   </div>
   <section class="panel">
-    <form on:submit|preventDefault={save}>
+    <form id="account-edit-form" on:submit|preventDefault={save}>
       <label>{labels.usernameLabel}<input bind:value={username} /></label>
       <label>{labels.accountRealName}<input bind:value={displayName} /></label>
       <label>{labels.email}<input type="email" bind:value={email} /></label>
@@ -72,7 +72,9 @@
       <p class="muted">{labels.newPasswordOptionalHint}</p>
       {#if saveError}<p class="error">{saveError}</p>{/if}
       {#if saveMessage}<p class="success">{saveMessage}</p>{/if}
-      <button class="primary" type="submit">{labels.save}</button>
     </form>
   </section>
+  <div class="sticky-actions">
+    <button class="primary" type="submit" form="account-edit-form">{labels.save}</button>
+  </div>
 {/if}

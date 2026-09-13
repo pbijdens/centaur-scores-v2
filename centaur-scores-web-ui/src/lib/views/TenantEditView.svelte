@@ -77,7 +77,7 @@
   </div>
   {#if deleteError}<p class="error">{deleteError}</p>{/if}
   <section class="panel">
-    <form on:submit|preventDefault={save}>
+    <form id="tenant-edit-form" on:submit|preventDefault={save}>
       <label>{labels.tenantName}<input bind:value={name} /></label>
       <label>{labels.tenantLogo}
         {#if logoUrl}<img class="tenant-logo-preview" src={logoUrl} alt="" />{/if}
@@ -89,7 +89,9 @@
       <p class="muted">{labels.defaultScopeHint}</p>
       {#if saveError}<p class="error">{saveError}</p>{/if}
       {#if saveMessage}<p class="success">{saveMessage}</p>{/if}
-      <button class="primary" type="submit">{labels.save}</button>
     </form>
   </section>
+  <div class="sticky-actions">
+    <button class="primary" type="submit" form="tenant-edit-form">{labels.save}</button>
+  </div>
 {/if}

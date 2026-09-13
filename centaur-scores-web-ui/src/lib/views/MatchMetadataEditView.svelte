@@ -421,11 +421,11 @@
   <button class="primary" on:click={addLiveScope}>+ {labels.addLiveScope}</button>
 </section>
 
-<section class="panel section-gap">
-  {#if saveError}<p class="error">{saveError}</p>{/if}
-  {#if saveMessage}<p class="success">{saveMessage}</p>{/if}
+{#if saveError}<p class="error">{saveError}</p>{/if}
+{#if saveMessage}<p class="success">{saveMessage}</p>{/if}
+<div class="sticky-actions">
   <button class="primary" on:click={save}>{labels.save}</button>
-</section>
+</div>
 
 <style>
   .section-gap {

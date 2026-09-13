@@ -13,6 +13,10 @@ describe('resolveRoute', () => {
     expect(resolveRoute('/narrowcast')).toEqual({ view: 'home', invalid: true })
   })
 
+  it('resolves the match add-participants route', () => {
+    expect(resolveRoute('/matches/match-1/add-participants')).toEqual({ view: 'match-add-participants', matchId: 'match-1' })
+  })
+
   it('resolves the select-tenant route', () => {
     expect(resolveRoute('/select-tenant')).toEqual({ view: 'select-tenant' })
   })

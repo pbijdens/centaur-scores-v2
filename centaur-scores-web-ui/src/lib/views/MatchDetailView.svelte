@@ -4,23 +4,20 @@
   import DropdownMenu from '../DropdownMenu.svelte'
   import { labelForError } from '../errors'
   import { parseMatchKeyboardConfig } from '../matchConfig'
-  import { deriveLastName } from '../participantName'
-  import ParticipantSelectionTable from '../ParticipantSelectionTable.svelte'
-  import { matchDevicesPath, matchEditPath, matchParticipantPath, matchQrPath, matchResultsPath, navigateOnClick } from '../router'
-  import type { Category, Language, Match, MatchParticipant, ParticipantList, ScopeConflict } from '../types'
+  import { matchAddParticipantsPath, matchDevicesPath, matchEditPath, matchParticipantPath, matchQrPath, matchResultsPath, navigateOnClick } from '../router'
+  import type { Category, Language, Match, MatchParticipant, ScopeConflict } from '../types'
 
   export let api: ApiClient
   export let match: Match
   export let categories: Category[]
-  export let sourceList: ParticipantList | null
   export let language: Language
   export let labels: Record<string, string>
   export let onBack: () => void
   export let onToggleOpen: () => void
-  export let onChanged: () => void
   export let onDeleted: () => void
   export let onEditMetadata: () => void
   export let onManageDevices: () => void
+  export let onAddParticipants: () => void
   export let onOpenParticipant: (participantId: string) => void
   export let onCopied: (match: Match) => void
 
@@ -36,12 +33,6 @@
   let results: ResultRow[] = []
   let deleteError = ''
   let exportError = ''
-  let showAddForm = false
-  let showManualCard = false
-  let manualFullName = ''
-  let manualFederationNumber = ''
-  let manualCategoryValues: Record<string, string> = {}
-  let addError = ''
   let scopeConflicts: ScopeConflict[] = []
   let claimingScope = false
   let claimScopeError = ''
@@ -57,9 +48,6 @@
 
   $: keyboardConfig = parseMatchKeyboardConfig(match.keyboardJson)
   $: matchCategories = keyboardConfig.categoryOrder.map((id) => categories.find((category) => category.id === id)).filter((category): category is Category => !!category)
-  $: assignedMemberIds = new Set(participants.map((participant) => participant.participantListMemberId).filter((id): id is string => !!id))
-  $: manualAllCategoriesFilled = matchCategories.every((category) => manualCategoryValues[category.id])
-  $: canAddManually = manualFullName.trim() !== '' && manualAllCategoriesFilled
 
   function categoryLabel(participantCategories: Record<string, number>): string {
     return matchCategories
@@ -226,30 +214,6 @@
     }
   }
 
-  function resetAddForm() {
-    manualFullName = ''
-    manualFederationNumber = ''
-    manualCategoryValues = {}
-    showManualCard = false
-  }
-
-  async function submitAddManually() {
-    if (!canAddManually) return
-    addError = ''
-    const categoryValues: Record<string, number> = {}
-    for (const category of matchCategories) {
-      const value = manualCategoryValues[category.id]
-      if (value) categoryValues[category.id] = Number(value)
-    }
-    try {
-      await api.addMatchParticipant(match.id, { participantListMemberId: null, lastName: deriveLastName(manualFullName.trim()), fullName: manualFullName.trim(), federationNumber: manualFederationNumber || null, categories: categoryValues })
-      resetAddForm()
-      showAddForm = false
-      onChanged()
-    } catch (error) {
-      addError = labelForError(error, labels, 'addParticipantError')
-    }
-  }
 </script>
 
 <button class="back-link" on:click={onBack}>← {labels.matches}</button>
@@ -328,39 +292,8 @@
         {labels.filterUnlistedLabel} ({unlistedParticipantCount})
       </label>
     {/if}
-    <button class="primary" on:click={() => (showAddForm = !showAddForm)}>+ {labels.addParticipant}</button>
+    <a class="primary" href={matchAddParticipantsPath(match.id)} on:click={(event) => navigateOnClick(event, onAddParticipants)}>+ {labels.addParticipant}</a>
   </div>
-
-  {#if showAddForm}
-    <div class="entry-card">
-      {#if sourceList}
-        <ParticipantSelectionTable {api} matchId={match.id} members={sourceList.members} categories={matchCategories} {assignedMemberIds} {labels} onApplied={onChanged} />
-        {#if match.allowFreeParticipants}
-          <button type="button" class="text-button add-unlisted-button" on:click={() => (showManualCard = !showManualCard)}>+ {labels.addUnlistedParticipant}</button>
-        {/if}
-      {/if}
-      {#if !sourceList || showManualCard}
-        {#if match.allowFreeParticipants}
-          <form class="manual-card" on:submit|preventDefault={submitAddManually}>
-            <label>{labels.fullNameLabel}<input bind:value={manualFullName} autocomplete="off" /></label>
-            <label>{labels.federationNumberLabel}<input bind:value={manualFederationNumber} /></label>
-            {#each matchCategories as category}
-              <label>{category.name}
-                <select bind:value={manualCategoryValues[category.id]}>
-                  <option value="">{labels.selectValue}</option>
-                  {#each [...category.values].sort((a, b) => a.valueId - b.valueId) as value}<option value={String(value.valueId)}>{value.name}</option>{/each}
-                </select>
-              </label>
-            {/each}
-            <button class="primary large-submit" type="submit" disabled={!canAddManually}>+ {labels.addThisParticipant}</button>
-          </form>
-        {:else}
-          <p class="muted">{labels.participantListLockedHint}</p>
-        {/if}
-      {/if}
-      {#if addError}<p class="error">{addError}</p>{/if}
-    </div>
-  {/if}
 
   {#if participants.length === 0}<p class="empty-state">{labels.emptyState}</p>{:else if sortedParticipants.length === 0}<p class="empty-state">{labels.noUnlistedParticipants}</p>{/if}
   {#each groupedParticipants as group}
@@ -430,23 +363,6 @@
   .scope-conflict-warning ul {
     margin: 8px 0;
     padding-left: 20px;
-  }
-
-  .add-unlisted-button {
-    margin-top: 12px;
-  }
-
-  .manual-card {
-    margin-top: 16px;
-  }
-
-  .entry-card form {
-    margin-top: 0;
-  }
-
-  .manual-card:not(:first-child) {
-    border-top: 1px solid var(--line);
-    padding-top: 16px;
   }
 
   .group-heading {

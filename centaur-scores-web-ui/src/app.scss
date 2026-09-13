@@ -198,6 +198,22 @@ select:focus {
   margin-left: 16px;
 }
 
+// Pins a page's bottom action row (typically a Save button, sometimes paired with Cancel) to the
+// bottom of the viewport while scrolling, so it never requires scrolling past a long form/list to
+// reach - reuse this on any settings/configuration page instead of a plain trailing button.
+.sticky-actions {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+  margin-top: 24px;
+  padding: 14px 0;
+  background: var(--neutral);
+  border-top: 1px solid var(--line);
+}
+
 .language {
   margin-top: 28px;
   border: 0;
