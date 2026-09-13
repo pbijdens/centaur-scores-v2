@@ -94,7 +94,7 @@
   {#if sourceList}
     {#if match.allowFreeParticipants}
       <div class="toolbar">
-        <button type="button" class="text-button" on:click={() => (showManualCard = !showManualCard)}>+ {labels.addUnlistedParticipant}</button>
+        <button type="button" class="text-button toolbar-button" on:click={() => (showManualCard = !showManualCard)}>+ {labels.addUnlistedParticipant}</button>
       </div>
     {/if}
     <ParticipantSelectionTable members={sourceList.members} categories={matchCategories} {assignedMemberIds} {selectedIds} {labels} onToggle={toggleSelected} />
@@ -134,6 +134,10 @@
     display: flex;
     justify-content: flex-end;
     margin-bottom: 12px;
+  }
+
+  .toolbar-button {
+    font-size: 16px;
   }
 
   .manual-card {
