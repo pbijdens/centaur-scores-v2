@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { ApiClient } from '../api'
+  import type { ApiClient, MatchInput } from '../api'
   import { formatLocalDate } from '../date'
   import DropdownMenu from '../DropdownMenu.svelte'
   import { labelForError } from '../errors'
@@ -22,6 +22,7 @@
   export let onEditMetadata: () => void
   export let onManageDevices: () => void
   export let onOpenParticipant: (participantId: string) => void
+  export let onCopied: (match: Match) => void
 
   type ResultRow = { participantId: string; total: number }
   type SortBy = 'name' | 'score'
@@ -44,6 +45,10 @@
   let scopeConflicts: ScopeConflict[] = []
   let claimingScope = false
   let claimScopeError = ''
+  let showCopyForm = false
+  let copyIncludeParticipants = false
+  let copying = false
+  let copyError = ''
 
   $: participants = match.participants ?? []
   $: devices = match.devices ?? []
@@ -173,6 +178,54 @@
     }
   }
 
+  async function copyMatch() {
+    copyError = ''
+    copying = true
+    try {
+      const copyInput: MatchInput = {
+        name: labels.copyOfMatchName.replace('{name}', match.name),
+        date: match.date,
+        shortCode: match.shortCode,
+        isOpen: false,
+        participantListId: match.participantListId,
+        deviceSelectionMode: match.deviceSelectionMode,
+        ends: match.ends,
+        arrowsPerEnd: match.arrowsPerEnd,
+        groupEnds: match.groupEnds,
+        allowFreeParticipants: match.allowFreeParticipants,
+        keyboardJson: match.keyboardJson,
+        scoringRulesJson: match.scoringRulesJson,
+        personalBestClassifier: match.personalBestClassifier
+      }
+      const copy = await api.createMatch(copyInput)
+
+      const deviceIdMap = new Map<string, string>()
+      for (const device of [...devices].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))) {
+        const newDevice = await api.addDevice(copy.id, { name: device.name })
+        deviceIdMap.set(device.id, newDevice.id)
+      }
+
+      for (const scope of liveScopes) {
+        await api.addLiveScope(copy.id, { scope: scope.scope, groupByCategoryIds: JSON.parse(scope.groupByCategoryIdsJson || '[]'), includeAverage: scope.includeAverage, includeGroupScores: scope.includeGroupScores, includeEqualizers: scope.includeEqualizers, includePersonalBest: scope.includePersonalBest })
+      }
+
+      if (copyIncludeParticipants) {
+        for (const participant of participants) {
+          const newParticipant = await api.addMatchParticipant(copy.id, { participantListMemberId: participant.participantListMemberId, lastName: participant.lastName, fullName: participant.fullName, federationNumber: participant.federationNumber, categories: participant.categories })
+          const newDeviceId = participant.deviceId ? deviceIdMap.get(participant.deviceId) : null
+          if (newDeviceId) await api.assignParticipantDevice(copy.id, newParticipant.id, newDeviceId)
+        }
+      }
+
+      showCopyForm = false
+      onCopied(copy)
+    } catch (error) {
+      copyError = labelForError(error, labels, 'matchCopyError')
+    } finally {
+      copying = false
+    }
+  }
+
   function resetAddForm() {
     manualFullName = ''
     manualFederationNumber = ''
@@ -211,6 +264,7 @@
       <a class="menu-item" href={matchDevicesPath(match.id)} on:click={(event) => navigateOnClick(event, onManageDevices)}>{labels.manageDevices}</a>
       <a class="menu-item" href={matchQrPath(match.id)} target="_blank" rel="noopener">{labels.viewQrCodes}</a>
       <button class="menu-item" on:click={exportCsv}>{labels.exportCsv}</button>
+      <button class="menu-item" on:click={() => (showCopyForm = !showCopyForm)}>{labels.copyMatch}</button>
       <hr class="menu-separator" />
       <button class="menu-item menu-item-danger" on:click={remove}>{labels.deleteMatch}</button>
     </DropdownMenu>
@@ -218,6 +272,16 @@
 </div>
 {#if exportError}<p class="error">{exportError}</p>{/if}
 {#if deleteError}<p class="error">{deleteError}</p>{/if}
+{#if showCopyForm}
+  <div class="panel entry-card">
+    <label class="checkbox-label"><input type="checkbox" bind:checked={copyIncludeParticipants} /> {labels.copyIncludeParticipantsLabel}</label>
+    <div class="editor-row">
+      <button class="primary" type="button" disabled={copying} on:click={copyMatch}>{labels.copyMatch}</button>
+      <button type="button" class="text-button" on:click={() => (showCopyForm = false)}>{labels.cancel}</button>
+    </div>
+    {#if copyError}<p class="error">{copyError}</p>{/if}
+  </div>
+{/if}
 {#if sortedLiveScopes.length === 1}
   <div class="results-row">
     <a class="actions-trigger results-trigger" href={matchResultsPath(match.id, sortedLiveScopes[0].scope)} target="_blank" rel="noopener">{labels.resultsLabel}</a>
