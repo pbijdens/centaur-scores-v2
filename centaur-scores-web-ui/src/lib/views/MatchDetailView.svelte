@@ -4,7 +4,8 @@
   import DropdownMenu from '../DropdownMenu.svelte'
   import { labelForError } from '../errors'
   import { parseMatchKeyboardConfig } from '../matchConfig'
-  import { deriveLastName, memberDisplayLabel } from '../participantName'
+  import { deriveLastName } from '../participantName'
+  import ParticipantSelectionTable from '../ParticipantSelectionTable.svelte'
   import { matchDevicesPath, matchEditPath, matchParticipantPath, matchQrPath, matchResultsPath, navigateOnClick } from '../router'
   import type { Category, Language, Match, MatchParticipant, ParticipantList, ScopeConflict } from '../types'
 
@@ -36,7 +37,6 @@
   let exportError = ''
   let showAddForm = false
   let showManualCard = false
-  let sourceMemberId = ''
   let manualFullName = ''
   let manualFederationNumber = ''
   let manualCategoryValues: Record<string, string> = {}
@@ -53,11 +53,6 @@
   $: keyboardConfig = parseMatchKeyboardConfig(match.keyboardJson)
   $: matchCategories = keyboardConfig.categoryOrder.map((id) => categories.find((category) => category.id === id)).filter((category): category is Category => !!category)
   $: assignedMemberIds = new Set(participants.map((participant) => participant.participantListMemberId).filter((id): id is string => !!id))
-  $: availableMembers = sourceList
-    ? sourceList.members
-        .filter((member) => member.isActive && !assignedMemberIds.has(member.id))
-        .sort((a, b) => (a.fullName || a.lastName).localeCompare(b.fullName || b.lastName))
-    : []
   $: manualAllCategoriesFilled = matchCategories.every((category) => manualCategoryValues[category.id])
   $: canAddManually = manualFullName.trim() !== '' && manualAllCategoriesFilled
 
@@ -179,25 +174,10 @@
   }
 
   function resetAddForm() {
-    sourceMemberId = ''
     manualFullName = ''
     manualFederationNumber = ''
     manualCategoryValues = {}
     showManualCard = false
-  }
-
-  async function submitAddFromList() {
-    const member = sourceList?.members.find((item) => item.id === sourceMemberId)
-    if (!member) return
-    addError = ''
-    try {
-      await api.addMatchParticipant(match.id, { participantListMemberId: member.id, lastName: member.lastName, fullName: member.fullName, federationNumber: member.federationNumber, categories: member.categories })
-      resetAddForm()
-      showAddForm = false
-      onChanged()
-    } catch (error) {
-      addError = labelForError(error, labels, 'addParticipantError')
-    }
   }
 
   async function submitAddManually() {
@@ -290,15 +270,7 @@
   {#if showAddForm}
     <div class="entry-card">
       {#if sourceList}
-        <form on:submit|preventDefault={submitAddFromList}>
-          <label>{labels.selectParticipantLabel}
-            <select bind:value={sourceMemberId}>
-              <option value="">{labels.selectValue}</option>
-              {#each availableMembers as member}<option value={member.id}>{memberDisplayLabel(categories, member)}</option>{/each}
-            </select>
-          </label>
-          <button class="primary" type="submit" disabled={!sourceMemberId}>{labels.save}</button>
-        </form>
+        <ParticipantSelectionTable {api} matchId={match.id} members={sourceList.members} categories={matchCategories} {assignedMemberIds} {labels} onApplied={onChanged} />
         {#if match.allowFreeParticipants}
           <button type="button" class="text-button add-unlisted-button" on:click={() => (showManualCard = !showManualCard)}>+ {labels.addUnlistedParticipant}</button>
         {/if}
