@@ -21,7 +21,6 @@
   let addError = ''
   let selectedIds = new Set<string>()
   let applying = false
-  let applyError = ''
 
   $: participants = match.participants ?? []
   $: keyboardConfig = parseMatchKeyboardConfig(match.keyboardJson)
@@ -39,7 +38,6 @@
 
   async function apply() {
     if (selectedIds.size === 0) return
-    applyError = ''
     applying = true
     try {
       for (const memberId of selectedIds) {
@@ -48,9 +46,10 @@
         await api.addMatchParticipant(match.id, { participantListMemberId: member.id, lastName: member.lastName, fullName: member.fullName, federationNumber: member.federationNumber, categories: member.categories })
       }
       selectedIds = new Set()
+      alert(labels.participantsAddedMessage)
       onChanged()
     } catch (error) {
-      applyError = labelForError(error, labels, 'addParticipantError')
+      alert(labelForError(error, labels, 'addParticipantError'))
     } finally {
       applying = false
     }
@@ -119,7 +118,6 @@
     {/if}
   {/if}
   {#if addError}<p class="error">{addError}</p>{/if}
-  {#if applyError}<p class="error">{applyError}</p>{/if}
 </section>
 
 <div class="sticky-actions">

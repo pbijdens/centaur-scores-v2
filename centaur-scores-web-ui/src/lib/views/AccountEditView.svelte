@@ -15,8 +15,6 @@
   let email = ''
   let authorization = ''
   let newPassword = ''
-  let saveMessage = ''
-  let saveError = ''
 
   async function loadAccount() {
     account = await api.fetchAccount(accountId)
@@ -31,8 +29,6 @@
 
   async function save() {
     if (!account) return
-    saveMessage = ''
-    saveError = ''
     try {
       account = await api.updateAccount(account.id, {
         username,
@@ -43,9 +39,9 @@
       })
       username = account.username
       newPassword = ''
-      saveMessage = labels.accountSaved
+      alert(labels.accountSaved)
     } catch (error) {
-      saveError = labelForError(error, labels, 'accountSaveError')
+      alert(labelForError(error, labels, 'accountSaveError'))
     }
   }
 </script>
@@ -70,8 +66,6 @@
       {#if isOwnAccount}<p class="muted">{labels.ownAuthorizationHint}</p>{/if}
       <label>{labels.newPassword}<input type="password" bind:value={newPassword} autocomplete="new-password" /></label>
       <p class="muted">{labels.newPasswordOptionalHint}</p>
-      {#if saveError}<p class="error">{saveError}</p>{/if}
-      {#if saveMessage}<p class="success">{saveMessage}</p>{/if}
     </form>
   </section>
   <div class="sticky-actions">

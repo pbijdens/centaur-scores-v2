@@ -14,7 +14,6 @@
   let name = ''
   let logoUrl: string | null | undefined = null
   let defaultNarrowcastScope = ''
-  let saveMessage = ''
   let saveError = ''
   let logoWarning = ''
   let deleteError = ''
@@ -40,13 +39,12 @@
   }
 
   async function save() {
-    saveMessage = ''
     saveError = ''
     try {
       tenant = await api.updateChildTenant(tenantId, { name, logoUrl, defaultNarrowcastScope: defaultNarrowcastScope.trim() || null })
-      saveMessage = labels.tenantSaved
+      alert(labels.tenantSaved)
     } catch {
-      saveError = labels.tenantSaveError
+      alert(labels.tenantSaveError)
     }
   }
 
@@ -88,7 +86,6 @@
       <label>{labels.defaultScopeLabel}<input bind:value={defaultNarrowcastScope} placeholder="all" /></label>
       <p class="muted">{labels.defaultScopeHint}</p>
       {#if saveError}<p class="error">{saveError}</p>{/if}
-      {#if saveMessage}<p class="success">{saveMessage}</p>{/if}
     </form>
   </section>
   <div class="sticky-actions">

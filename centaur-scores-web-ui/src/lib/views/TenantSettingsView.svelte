@@ -9,8 +9,6 @@
 
   let settings: DefaultScopeSettings | null = null
   let defaultNarrowcastScope = ''
-  let saveMessage = ''
-  let saveError = ''
 
   async function loadSettings() {
     settings = await api.fetchDefaultScopeSettings()
@@ -19,15 +17,13 @@
   loadSettings()
 
   async function save() {
-    saveMessage = ''
-    saveError = ''
     try {
       settings = await api.updateDefaultNarrowcastScope(defaultNarrowcastScope.trim() || null)
       defaultNarrowcastScope = settings.tenantValue ?? ''
-      saveMessage = labels.defaultScopeSaved
+      alert(labels.defaultScopeSaved)
       onSaved()
     } catch {
-      saveError = labels.defaultScopeSaveError
+      alert(labels.defaultScopeSaveError)
     }
   }
 </script>
@@ -42,8 +38,6 @@
       <label>{labels.defaultScopeLabel}<input bind:value={defaultNarrowcastScope} placeholder={settings.effectiveValue} /></label>
       <p class="muted">{labels.defaultScopeHint}</p>
       <p class="muted">{labels.defaultScopeEffective.replace('{scope}', settings.effectiveValue)}</p>
-      {#if saveError}<p class="error">{saveError}</p>{/if}
-      {#if saveMessage}<p class="success">{saveMessage}</p>{/if}
     </form>
   </section>
   <div class="sticky-actions">

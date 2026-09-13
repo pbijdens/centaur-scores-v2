@@ -20,8 +20,6 @@
   let allowFreeParticipants = template.allowFreeParticipants
   let deviceSelectionMode = template.deviceSelectionMode
   let config = parseTemplateConfiguration(template.configurationJson)
-  let saveMessage = ''
-  let saveError = ''
   let deleteError = ''
   let personalBestClassifier = template.personalBestClassifier ?? ''
   let personalBestClassifiers: string[] = []
@@ -160,8 +158,6 @@
   }
 
   async function save() {
-    saveMessage = ''
-    saveError = ''
     try {
       await api.updateTemplate(template.id, {
         name,
@@ -171,10 +167,10 @@
         configurationJson: JSON.stringify(config),
         personalBestClassifier: personalBestClassifier || null
       })
-      saveMessage = labels.templateSaved
+      alert(labels.templateSaved)
       onSaved()
     } catch (error) {
-      saveError = labelForError(error, labels, 'templateSaveError')
+      alert(labelForError(error, labels, 'templateSaveError'))
     }
   }
 
@@ -408,8 +404,6 @@
   <button class="primary" on:click={addLiveScope}>+ {labels.addLiveScope}</button>
 </section>
 
-{#if saveError}<p class="error">{saveError}</p>{/if}
-{#if saveMessage}<p class="success">{saveMessage}</p>{/if}
 <div class="sticky-actions">
   <button class="primary" on:click={save}>{labels.save}</button>
 </div>
