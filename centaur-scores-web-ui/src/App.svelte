@@ -28,6 +28,7 @@
   import { labelForError } from './lib/errors'
   import { translationsFor } from './lib/i18n'
   import { accountPath, categoryPath, competitionPath, matchDevicesPath, matchEditPath, matchParticipantPath, matchPath, navigateTo, participantListPath, participantMemberPath, resolveRoute, templatePath, tenantPath } from './lib/router'
+  import { isSessionWatchActive } from './lib/sessionWatch'
   import type { Account, Category, Competition, Language, Match, MatchTemplate, ParticipantList, ParticipantListMember, ParticipantListSummary, TenantAccess, Tenant, View } from './lib/types'
   import AccountEditView from './lib/views/AccountEditView.svelte'
   import AccountsView from './lib/views/AccountsView.svelte'
@@ -60,6 +61,7 @@
   import PersonalBestView from './lib/views/PersonalBestView.svelte'
   import ProfileView from './lib/views/ProfileView.svelte'
   import SelectTenantView from './lib/views/SelectTenantView.svelte'
+  import SessionExpiryWatcher from './lib/SessionExpiryWatcher.svelte'
   import TemplateEditView from './lib/views/TemplateEditView.svelte'
   import TemplatesView from './lib/views/TemplatesView.svelte'
   import TenantEditView from './lib/views/TenantEditView.svelte'
@@ -106,6 +108,7 @@
   $: headerUsername = $profile?.displayName || $profile?.username || username
   $: showPersonalBestButton = $personalBestStatus !== null && (!$personalBestStatus.enabled || $personalBestStatus.ownedHere)
   $: effectiveDefaultNarrowcastScope = $defaultScopeSettings?.effectiveValue ?? 'all'
+  $: sessionWatchActive = isSessionWatchActive({ token, loggedIn, sessionReady, tenantAccessError, view })
   $: homeQuickLinks = (
     [
       { path: 'categories', icon: '🏷️', title: t.homeTileCategoriesTitle, description: t.homeTileCategoriesDescription },
@@ -426,6 +429,10 @@
     return () => window.removeEventListener('popstate', handlePopState)
   })
 </script>
+
+{#if sessionWatchActive}
+  <SessionExpiryWatcher {token} labels={t} onExpired={signOut} />
+{/if}
 
 {#if view === 'narrowcast' && narrowcastScope}
   <LiveScoringView scope={narrowcastScope} />
