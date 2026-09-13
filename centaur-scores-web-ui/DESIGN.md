@@ -314,16 +314,36 @@ The result-page rendering:
       - The entries are shown in multiple columns:
          - Leftmost in a fixed-width column the entry position
             - If the entry is marked as as `.needsTieBreaker` then the position number is followed by a *
-         - Then one, two or three lines of data; filling all available space horizontally
+         - Then two lines of data; filling all available space horizontally
             - Line 1 is rendered bold and shows `.line1`
             - Line 2 is rendered in a smaller font, non-bold showing `.line2` or not shown then .line2 is empty.
-            - Line 3 is rendered in a smaller font, non-bold showing `.line3` or not shown then .line3 is empty.
          - Then in a smaller font the `.average` - but only if not `null`
          - Finally the `.score` value.
      - A column must never end with a header.
      - Headers with no entries are not rendered.
-   - Font sizes should be adjusted to the screen size so generally 50 entries with typiclaly 2 lines divided over 10 groups should fit on the screen.
-      - This means on portrait per column roughly 25 entries with 2 lines and 5 group headers and on landscape roughly 33 entries and 3 headers per column (so based on those numbers calculate font size, line height and block height for the entries, headers with whitespace)
+   - Layout is a strict grid, not free-flowing text: a category header and a result entry each
+     occupy exactly 1.0 "grid unit" of height. Of a result entry's unit, 68% is line 1, 28% is
+     line 2, and the remaining ~4% is padding. The unit height (px) is computed client-side from
+     the actual available height divided by however many rows one column needs to hold - without
+     scrolling - a fixed 48-participant capacity plus the category headers required to reach the
+     first 48 of them. This capacity is always assumed to be 48, even when the match has fewer
+     participants, so unit height/font size stay consistent across matches and only shift with
+     how many categories are in play, not with how many people showed up - a 6-participant match
+     is not blown up into a handful of giant rows. Font sizes for
+     both lines and the header are derived from that unit height, then capped separately by
+     available column *width* (assuming ~20 characters for a name, ~24 for a header) - name/
+     header text can otherwise get wide enough to overrun its column at very tall row heights,
+     given the column count doesn't shrink just because a match is small; the same logic caps
+     the position/average/score font from ballooning past its narrower columns. If the actual
+     entry+header count exceeds the 48-participant capacity, extra columns are appended beyond
+     the 2/3 baseline (same per-column width) and the page auto-scrolls horizontally over the
+     page's timeout duration, reaching 100% scroll when the countdown reaches zero. Column
+     assignment is computed explicitly (not via native CSS multi-column/`column-count`), since
+     the browser's own column-breaking heuristics do not reliably agree with this arithmetic -
+     they can strand a header alone or place a row in an area the page never reveals via scroll.
+     See `../documentation/NARROWCASTING-DEFINITION.md` for the original grid-sizing spec and
+     `LiveScoringView.svelte`'s script for the implementation constants (font/glyph-width
+     calibration in particular is font-specific and was tuned against the app's actual font).
  - A data model sample for the score endpoint therefore is:
    ```JSON
    {

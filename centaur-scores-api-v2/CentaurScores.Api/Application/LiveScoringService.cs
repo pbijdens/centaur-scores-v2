@@ -92,7 +92,7 @@ public sealed class LiveScoringService(IScoringService scoringService) : ILiveSc
             var equalizers = row.UsedEqualizers.Select(keyId => $"{row.Participant.Scores.Count(score => score.KeyId == keyId)}x{keyId}");
             details.Add($"({row.Result.Total} + {string.Join(", ", equalizers)})");
         }
-        if (hasPersonalBest) details.Add($"Personal best: {personalBest:0.00}");
+        if (hasPersonalBest) details.Add($"PB: {personalBest:0.00}");
 
         return new LiveScoringEntry(
             position,
