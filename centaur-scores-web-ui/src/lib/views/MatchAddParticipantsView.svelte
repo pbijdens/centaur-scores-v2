@@ -92,10 +92,12 @@
 
 <section class="panel section-gap">
   {#if sourceList}
-    <ParticipantSelectionTable members={sourceList.members} categories={matchCategories} {assignedMemberIds} {selectedIds} {labels} onToggle={toggleSelected} />
     {#if match.allowFreeParticipants}
-      <button type="button" class="text-button add-unlisted-button" on:click={() => (showManualCard = !showManualCard)}>+ {labels.addUnlistedParticipant}</button>
+      <div class="toolbar">
+        <button type="button" class="text-button" on:click={() => (showManualCard = !showManualCard)}>+ {labels.addUnlistedParticipant}</button>
+      </div>
     {/if}
+    <ParticipantSelectionTable members={sourceList.members} categories={matchCategories} {assignedMemberIds} {selectedIds} {labels} onToggle={toggleSelected} />
   {/if}
   {#if !sourceList || showManualCard}
     {#if match.allowFreeParticipants}
@@ -128,8 +130,10 @@
 </div>
 
 <style>
-  .add-unlisted-button {
-    margin-top: 12px;
+  .toolbar {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 12px;
   }
 
   .manual-card {
