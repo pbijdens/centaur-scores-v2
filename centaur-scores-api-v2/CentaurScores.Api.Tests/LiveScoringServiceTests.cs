@@ -49,6 +49,39 @@ public sealed class LiveScoringServiceTests
     }
 
     [Fact]
+    public void BuildBlocks_shows_configured_display_categories_alongside_tie_breaker_details()
+    {
+        var disciplineId = Guid.NewGuid();
+        var classId = Guid.NewGuid();
+        var participant = Participant("Alice", disciplineId, classId, ("X", 10), ("9", 9));
+        var match = new Match { Id = Guid.NewGuid(), ArrowsPerEnd = 3, Participants = [participant] };
+        var scope = new LiveScoreScope { IncludeEqualizers = true, DisplayCategoryIdsJson = $$"""["{{disciplineId}}","{{classId}}"]""" };
+        var categories = new List<Category>
+        {
+            new() { Id = disciplineId, Values = [new CategoryValue { CategoryId = disciplineId, ValueId = 1, Name = "Recurve" }] },
+            new() { Id = classId, Values = [new CategoryValue { CategoryId = classId, ValueId = 2, Name = "Class A" }] }
+        };
+
+        var blocks = new LiveScoringService(new ScoringService()).BuildBlocks(match, scope, categories);
+
+        var entry = Assert.Single(Assert.Single(blocks).Entries);
+        Assert.StartsWith("Recurve / Class A", entry.Line2);
+    }
+
+    [Fact]
+    public void BuildBlocks_omits_the_display_category_segment_when_none_are_configured()
+    {
+        var participant = Participant("Alice", Guid.NewGuid(), Guid.NewGuid(), ("X", 10), ("9", 9));
+        var match = new Match { Id = Guid.NewGuid(), ArrowsPerEnd = 3, Participants = [participant] };
+        var scope = new LiveScoreScope();
+
+        var blocks = new LiveScoringService(new ScoringService()).BuildBlocks(match, scope, []);
+
+        var entry = Assert.Single(Assert.Single(blocks).Entries);
+        Assert.Null(entry.Line2);
+    }
+
+    [Fact]
     public void BuildBlocks_renders_and_highlights_personal_best_when_a_lookup_is_supplied()
     {
         var participant = Participant("Alice", Guid.NewGuid(), Guid.NewGuid(), ("X", 10), ("9", 9));

@@ -206,7 +206,7 @@
       }
 
       for (const scope of liveScopes) {
-        await api.addLiveScope(copy.id, { scope: scope.scope, groupByCategoryIds: JSON.parse(scope.groupByCategoryIdsJson || '[]'), includeAverage: scope.includeAverage, includeGroupScores: scope.includeGroupScores, includeEqualizers: scope.includeEqualizers, includePersonalBest: scope.includePersonalBest })
+        await api.addLiveScope(copy.id, { scope: scope.scope, groupByCategoryIds: JSON.parse(scope.groupByCategoryIdsJson || '[]'), includeAverage: scope.includeAverage, includeGroupScores: scope.includeGroupScores, includeEqualizers: scope.includeEqualizers, includePersonalBest: scope.includePersonalBest, displayCategoryIds: JSON.parse(scope.displayCategoryIdsJson || '[]') })
       }
 
       if (copyIncludeParticipants) {

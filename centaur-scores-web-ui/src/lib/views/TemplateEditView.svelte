@@ -132,7 +132,7 @@
   }
 
   function addLiveScope() {
-    config.liveScopes = [...config.liveScopes, { scope: '', groupByCategoryIds: [], includeAverage: false, includeGroupScores: false, includeEqualizers: false, includePersonalBest: false }]
+    config.liveScopes = [...config.liveScopes, { scope: '', groupByCategoryIds: [], includeAverage: false, includeGroupScores: false, includeEqualizers: false, includePersonalBest: false, displayCategoryIds: [] }]
   }
 
   function removeLiveScope(index: number) {
@@ -146,6 +146,16 @@
         ? scope.groupByCategoryIds.filter((id) => id !== categoryId)
         : [...scope.groupByCategoryIds, categoryId]
       return { ...scope, groupByCategoryIds }
+    })
+  }
+
+  function toggleScopeDisplayCategory(scopeIndex: number, categoryId: string) {
+    config.liveScopes = config.liveScopes.map((scope, index) => {
+      if (index !== scopeIndex) return scope
+      const displayCategoryIds = scope.displayCategoryIds.includes(categoryId)
+        ? scope.displayCategoryIds.filter((id) => id !== categoryId)
+        : [...scope.displayCategoryIds, categoryId]
+      return { ...scope, displayCategoryIds }
     })
   }
 
@@ -373,6 +383,15 @@
         {#each categories as category}
           <label class="checkbox-label">
             <input type="checkbox" checked={scope.groupByCategoryIds.includes(category.id)} on:change={() => toggleScopeCategory(index, category.id)} />
+            {category.name}
+          </label>
+        {/each}
+      </div>
+      <div class="checkbox-grid">
+        <span class="muted">{labels.scopeDisplayCategoriesLabel}:</span>
+        {#each categories as category}
+          <label class="checkbox-label">
+            <input type="checkbox" checked={scope.displayCategoryIds.includes(category.id)} on:change={() => toggleScopeDisplayCategory(index, category.id)} />
             {category.name}
           </label>
         {/each}

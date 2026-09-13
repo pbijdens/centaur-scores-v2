@@ -192,7 +192,7 @@ export class ApiClient {
     return this.request(`/api/matches/${matchId}/devices/${deviceId}`, { method: 'DELETE' })
   }
 
-  addLiveScope(matchId: string, body: { scope: string; groupByCategoryIds: string[]; includeAverage: boolean; includeGroupScores: boolean; includeEqualizers: boolean; includePersonalBest: boolean }) {
+  addLiveScope(matchId: string, body: { scope: string; groupByCategoryIds: string[]; includeAverage: boolean; includeGroupScores: boolean; includeEqualizers: boolean; includePersonalBest: boolean; displayCategoryIds: string[] }) {
     return this.request(`/api/matches/${matchId}/live-scopes`, { method: 'POST', body: JSON.stringify(body) })
   }
 

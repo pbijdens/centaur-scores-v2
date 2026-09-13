@@ -29,4 +29,16 @@ describe('parseTemplateConfiguration', () => {
 
     expect(config.deviceNames).toEqual(['Lane 1', 'Lane 2', 'Finals'])
   })
+
+  it('defaults displayCategoryIds on live scopes saved before they existed', () => {
+    const config = parseTemplateConfiguration('{"liveScopes":[{"scope":"all","groupByCategoryIds":[],"includeAverage":true,"includeGroupScores":false,"includeEqualizers":false,"includePersonalBest":false}]}')
+
+    expect(config.liveScopes).toEqual([{ scope: 'all', groupByCategoryIds: [], includeAverage: true, includeGroupScores: false, includeEqualizers: false, includePersonalBest: false, displayCategoryIds: [] }])
+  })
+
+  it('preserves configured displayCategoryIds on live scopes', () => {
+    const config = parseTemplateConfiguration('{"liveScopes":[{"scope":"all","groupByCategoryIds":[],"includeAverage":false,"includeGroupScores":false,"includeEqualizers":false,"includePersonalBest":false,"displayCategoryIds":["cat-1","cat-2"]}]}')
+
+    expect(config.liveScopes[0].displayCategoryIds).toEqual(['cat-1', 'cat-2'])
+  })
 })

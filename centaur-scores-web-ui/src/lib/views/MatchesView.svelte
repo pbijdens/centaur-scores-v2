@@ -90,7 +90,8 @@
           includeAverage: true,
           includeGroupScores: false,
           includeEqualizers: true,
-          includePersonalBest: false
+          includePersonalBest: false,
+          displayCategoryIds: []
         })
       }
       newMatchName = ''

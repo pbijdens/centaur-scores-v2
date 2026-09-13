@@ -56,7 +56,7 @@ export type MatchParticipant = {
 }
 export type ArrowScore = { id: string; matchParticipantId: string; end: number; arrow: number; keyId: string; value: number }
 export type ScoreDevice = { id: string; matchId: string; name: string; sortOrder?: number }
-export type LiveScoreScope = { id: string; matchId: string; scope: string; groupByCategoryIdsJson: string; includeAverage: boolean; includeGroupScores: boolean; includeEqualizers: boolean; includePersonalBest: boolean }
+export type LiveScoreScope = { id: string; matchId: string; scope: string; groupByCategoryIdsJson: string; includeAverage: boolean; includeGroupScores: boolean; includeEqualizers: boolean; includePersonalBest: boolean; displayCategoryIdsJson: string }
 export type LiveScoringMatch = { id: string; date: string; name: string }
 export type LiveScoringEntry = { position: number; needsTieBreaker: boolean; line1: string; line2?: string | null; average?: number | null; arrows: number; score: number; aboveTarget: boolean }
 export type LiveScoringBlock = { name: string; entries: LiveScoringEntry[] }
@@ -86,7 +86,7 @@ export type KeyboardKeyColor = 'Yellow' | 'Red' | 'Blue' | 'Black' | 'White'
 export type KeyboardKey = { keyId: string; label: string; color: KeyboardKeyColor; value: number }
 export type DisabledKeyRule = { categoryId: string; valueId: number; disabledKeyIds: string[] }
 export type ScoringRule = { type: 'total' | 'countKey'; keyId?: string }
-export type LiveScopeConfig = { scope: string; groupByCategoryIds: string[]; includeAverage: boolean; includeGroupScores: boolean; includeEqualizers: boolean; includePersonalBest: boolean }
+export type LiveScopeConfig = { scope: string; groupByCategoryIds: string[]; includeAverage: boolean; includeGroupScores: boolean; includeEqualizers: boolean; includePersonalBest: boolean; displayCategoryIds: string[] }
 export type TemplateConfiguration = {
   ends: number
   arrowsPerEnd: number

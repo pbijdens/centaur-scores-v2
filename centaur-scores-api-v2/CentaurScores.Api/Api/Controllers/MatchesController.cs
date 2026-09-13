@@ -314,7 +314,7 @@ public sealed class MatchesController(ApplicationDbContext db, ITenantContext te
     {
         if (!CanManage) return Forbid();
         if (!await db.Matches.AnyAsync(item => item.Id == id && item.TenantId == TenantId, cancellationToken)) return NotFound();
-        var scope = new LiveScoreScope { Id = Guid.NewGuid(), TenantId = TenantId, MatchId = id, Scope = request.Scope, GroupByCategoryIdsJson = System.Text.Json.JsonSerializer.Serialize(request.GroupByCategoryIds), IncludeAverage = request.IncludeAverage, IncludeGroupScores = request.IncludeGroupScores, IncludeEqualizers = request.IncludeEqualizers, IncludePersonalBest = request.IncludePersonalBest };
+        var scope = new LiveScoreScope { Id = Guid.NewGuid(), TenantId = TenantId, MatchId = id, Scope = request.Scope, GroupByCategoryIdsJson = System.Text.Json.JsonSerializer.Serialize(request.GroupByCategoryIds), IncludeAverage = request.IncludeAverage, IncludeGroupScores = request.IncludeGroupScores, IncludeEqualizers = request.IncludeEqualizers, IncludePersonalBest = request.IncludePersonalBest, DisplayCategoryIdsJson = System.Text.Json.JsonSerializer.Serialize(request.DisplayCategoryIds) };
         db.LiveScoreScopes.Add(scope);
         await db.SaveChangesAsync(cancellationToken);
         return Created($"api/matches/{id}/live-scopes/{scope.Id}", scope);

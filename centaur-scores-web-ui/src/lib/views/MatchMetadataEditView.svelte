@@ -34,7 +34,8 @@
     includeAverage: scope.includeAverage,
     includeGroupScores: scope.includeGroupScores,
     includeEqualizers: scope.includeEqualizers,
-    includePersonalBest: scope.includePersonalBest
+    includePersonalBest: scope.includePersonalBest,
+    displayCategoryIds: parseGroupByCategoryIds(scope.displayCategoryIdsJson)
   }))
   let saveMessage = ''
   let saveError = ''
@@ -138,7 +139,7 @@
   }
 
   function addLiveScope() {
-    liveScopes = [...liveScopes, { id: '', scope: '', groupByCategoryIds: [], includeAverage: false, includeGroupScores: false, includeEqualizers: false, includePersonalBest: false }]
+    liveScopes = [...liveScopes, { id: '', scope: '', groupByCategoryIds: [], includeAverage: false, includeGroupScores: false, includeEqualizers: false, includePersonalBest: false, displayCategoryIds: [] }]
   }
 
   function removeLiveScope(index: number) {
@@ -152,6 +153,16 @@
         ? scope.groupByCategoryIds.filter((id) => id !== categoryId)
         : [...scope.groupByCategoryIds, categoryId]
       return { ...scope, groupByCategoryIds }
+    })
+  }
+
+  function toggleScopeDisplayCategory(scopeIndex: number, categoryId: string) {
+    liveScopes = liveScopes.map((scope, index) => {
+      if (index !== scopeIndex) return scope
+      const displayCategoryIds = scope.displayCategoryIds.includes(categoryId)
+        ? scope.displayCategoryIds.filter((id) => id !== categoryId)
+        : [...scope.displayCategoryIds, categoryId]
+      return { ...scope, displayCategoryIds }
     })
   }
 
@@ -182,7 +193,8 @@
           includeAverage: scope.includeAverage,
           includeGroupScores: scope.includeGroupScores,
           includeEqualizers: scope.includeEqualizers,
-          includePersonalBest: scope.includePersonalBest
+          includePersonalBest: scope.includePersonalBest,
+          displayCategoryIds: scope.displayCategoryIds
         })
       }
       saveMessage = labels.matchSaved
@@ -384,6 +396,15 @@
         {#each categories as category}
           <label class="checkbox-label">
             <input type="checkbox" checked={scope.groupByCategoryIds.includes(category.id)} on:change={() => toggleScopeCategory(index, category.id)} />
+            {category.name}
+          </label>
+        {/each}
+      </div>
+      <div class="checkbox-grid">
+        <span class="muted">{labels.scopeDisplayCategoriesLabel}:</span>
+        {#each categories as category}
+          <label class="checkbox-label">
+            <input type="checkbox" checked={scope.displayCategoryIds.includes(category.id)} on:change={() => toggleScopeDisplayCategory(index, category.id)} />
             {category.name}
           </label>
         {/each}

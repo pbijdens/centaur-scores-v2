@@ -23,13 +23,13 @@ public sealed class LiveScoringService(IScoringService scoringService) : ILiveSc
             .GroupBy(participant => GroupKey(participant, orderedCategoryIds))
             .Select(group => new LiveScoringBlock(
                 GroupName(group.First(), orderedCategoryIds, categoryById),
-                Rank(group, match, scope, personalBestByParticipant)))
+                Rank(group, match, scope, personalBestByParticipant, categoryById)))
             .Where(block => block.Entries.Count > 0)
             .OrderBy(block => block.Name)
             .ToList();
     }
 
-    private IReadOnlyList<LiveScoringEntry> Rank(IEnumerable<MatchParticipant> participants, Match match, LiveScoreScope scope, IReadOnlyDictionary<Guid, double> personalBests)
+    private IReadOnlyList<LiveScoringEntry> Rank(IEnumerable<MatchParticipant> participants, Match match, LiveScoreScope scope, IReadOnlyDictionary<Guid, double> personalBests, IReadOnlyDictionary<Guid, Category> categoryById)
     {
         var rows = participants.Select(participant => new RankedParticipant(participant, scoringService.Calculate(participant, match.ArrowsPerEnd, match.GroupEnds))).ToList();
         var rules = Deserialize<List<ScoringRule>>(match.ScoringRulesJson) ?? [];
@@ -65,18 +65,27 @@ public sealed class LiveScoringService(IScoringService scoringService) : ILiveSc
             var needsTieBreaker = bucket.Count > 1;
             foreach (var row in bucket.OrderBy(item => item.Result.Name))
             {
-                entries.Add(CreateEntry(row, position, needsTieBreaker, scope, personalBests));
+                entries.Add(CreateEntry(row, position, needsTieBreaker, scope, personalBests, categoryById));
             }
             position += bucket.Count;
         }
         return entries;
     }
 
-    private static LiveScoringEntry CreateEntry(RankedParticipant row, int position, bool needsTieBreaker, LiveScoreScope scope, IReadOnlyDictionary<Guid, double> personalBests)
+    private static LiveScoringEntry CreateEntry(RankedParticipant row, int position, bool needsTieBreaker, LiveScoreScope scope, IReadOnlyDictionary<Guid, double> personalBests, IReadOnlyDictionary<Guid, Category> categoryById)
     {
         var hasPersonalBest = personalBests.TryGetValue(row.Participant.Id, out var personalBest) && scope.IncludePersonalBest;
 
         var details = new List<string>();
+        var displayCategoryIds = Deserialize<List<Guid>>(scope.DisplayCategoryIdsJson) ?? [];
+        if (displayCategoryIds.Count > 0)
+        {
+            var displayValues = displayCategoryIds
+                .Select(id => categoryById.GetValueOrDefault(id)?.Values.FirstOrDefault(value => value.ValueId == row.Participant.Categories.GetValueOrDefault(id))?.Name)
+                .Where(value => !string.IsNullOrWhiteSpace(value));
+            var displayText = string.Join(" / ", displayValues);
+            if (!string.IsNullOrWhiteSpace(displayText)) details.Add(displayText);
+        }
         if (scope.IncludeGroupScores) details.Add(string.Join(", ", row.Result.GroupScores.OrderBy(item => item.Key).Select(item => item.Value)));
         if (scope.IncludeEqualizers && row.UsedEqualizers.Count > 0)
         {

@@ -1,4 +1,4 @@
-import type { KeyboardKey, TemplateConfiguration } from './types'
+import type { KeyboardKey, LiveScopeConfig, TemplateConfiguration } from './types'
 
 export const keyboardColors = ['Yellow', 'Red', 'Blue', 'Black', 'White'] as const
 
@@ -20,7 +20,7 @@ export function buildEmptyTemplateConfiguration(defaultScope: string = 'all'): T
     keyboard: defaultKeyboard,
     disabledKeyRules: [],
     scoringRules: [{ type: 'total' }],
-    liveScopes: [{ scope: defaultScope, groupByCategoryIds: [], includeAverage: true, includeGroupScores: false, includeEqualizers: true, includePersonalBest: false }]
+    liveScopes: [{ scope: defaultScope, groupByCategoryIds: [], includeAverage: true, includeGroupScores: false, includeEqualizers: true, includePersonalBest: false, displayCategoryIds: [] }]
   }
 }
 
@@ -40,7 +40,9 @@ export function parseTemplateConfiguration(json: string): TemplateConfiguration 
       keyboard: Array.isArray(parsed.keyboard) ? parsed.keyboard : [],
       disabledKeyRules: Array.isArray(parsed.disabledKeyRules) ? parsed.disabledKeyRules : [],
       scoringRules: Array.isArray(parsed.scoringRules) && parsed.scoringRules.length > 0 ? parsed.scoringRules : [{ type: 'total' }],
-      liveScopes: Array.isArray(parsed.liveScopes) ? parsed.liveScopes : []
+      liveScopes: Array.isArray(parsed.liveScopes)
+        ? parsed.liveScopes.map((scope: Partial<LiveScopeConfig>) => ({ ...scope, displayCategoryIds: Array.isArray(scope.displayCategoryIds) ? scope.displayCategoryIds : [] }))
+        : []
     }
   } catch {
     return structuredClone(emptyTemplateConfiguration)

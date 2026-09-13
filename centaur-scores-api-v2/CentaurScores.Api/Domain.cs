@@ -164,6 +164,9 @@ public sealed class LiveScoreScope : TenantOwnedEntity
     public bool IncludeGroupScores { get; set; }
     public bool IncludeEqualizers { get; set; }
     public bool IncludePersonalBest { get; set; }
+    // Categories whose value is always shown in small print below the participant's name (alongside
+    // the tie-breaker/equalizer details), regardless of whether this scope groups by them.
+    public string DisplayCategoryIdsJson { get; set; } = "[]";
 }
 
 public sealed class Competition : TenantOwnedEntity

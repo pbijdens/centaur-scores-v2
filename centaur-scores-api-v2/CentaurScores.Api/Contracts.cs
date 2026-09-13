@@ -30,7 +30,7 @@ public sealed record CreateDeviceRequest(string Name);
 public sealed record AssignParticipantDeviceRequest(Guid? DeviceId);
 public sealed record ReorderDevicesRequest(List<Guid> DeviceIds);
 public sealed record ReorderDeviceParticipantsRequest(List<Guid> ParticipantIds);
-public sealed record CreateScopeRequest(string Scope, List<Guid> GroupByCategoryIds, bool IncludeAverage, bool IncludeGroupScores, bool IncludeEqualizers, bool IncludePersonalBest);
+public sealed record CreateScopeRequest(string Scope, List<Guid> GroupByCategoryIds, bool IncludeAverage, bool IncludeGroupScores, bool IncludeEqualizers, bool IncludePersonalBest, List<Guid> DisplayCategoryIds);
 public sealed record LiveScoringMatch(Guid Id, DateOnly Date, string Name);
 public sealed record LiveScoringEntry(int Position, bool NeedsTieBreaker, string Line1, string? Line2, double? Average, int Arrows, int Score, bool AboveTarget = false);
 public sealed record LiveScoringBlock(string Name, IReadOnlyList<LiveScoringEntry> Entries);
