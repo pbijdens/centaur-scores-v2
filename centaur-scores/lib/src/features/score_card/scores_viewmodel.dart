@@ -39,14 +39,23 @@ class ScoresViewmodel extends EventViewModel {
     var participants = model.participants;
     activeKeyboard = activeKeyboard! + 1;
     if (activeKeyboard! >= participants.length) {
-      if (editingEnd < (model.ends - 1)) {
-        editingEnd = editingEnd + 1;
-      }
       activeKeyboard = 0;
     }
 
-    editingArrow =
-        scoring.firstNullIndexInEnd(model, participants[activeKeyboard!], editingEnd) ?? 0;
+    // Resume at this participant's own first unscored arrow, searching the
+    // whole match rather than just `editingEnd` - that end may already be
+    // fully scored for this participant (e.g. entered out of order), in
+    // which case the cursor must move on to the next gap instead of
+    // defaulting back to arrow 0 of an already-completed end.
+    final participant = participants[activeKeyboard!];
+    final firstNull = scoring.firstNullIndex(participant);
+    if (firstNull != null) {
+      editingEnd = firstNull ~/ model.arrowsPerEnd;
+      editingArrow = firstNull % model.arrowsPerEnd;
+    } else {
+      editingEnd = model.ends - 1;
+      editingArrow = model.arrowsPerEnd - 1;
+    }
 
     notifyViewmodelUpdated();
     notifyKeyboardShown();
