@@ -197,15 +197,20 @@ public sealed class ParticipantListExcelService : IParticipantListExcelService
                 foreach (var (category, column) in categoryColumns)
                 {
                     var text = row.Cell(column).GetString().Trim();
-                    if (text.Length == 0 || string.Equals(text, labels.Unknown, StringComparison.OrdinalIgnoreCase))
+                    if (text.Length == 0)
                     {
                         continue;
                     }
 
+                    // A category can legitimately have a value literally named "Unknown"/"Onbekend" - prefer matching
+                    // it over treating the text as the absence of a value.
                     var match = category.Values.FirstOrDefault(value => string.Equals(value.Name, text, StringComparison.OrdinalIgnoreCase));
                     if (match is null)
                     {
-                        warnings.Add($"Row {rowNumber}: '{text}' is not a known value for category '{category.Name}', treated as unknown.");
+                        if (!string.Equals(text, labels.Unknown, StringComparison.OrdinalIgnoreCase))
+                        {
+                            warnings.Add($"Row {rowNumber}: '{text}' is not a known value for category '{category.Name}', treated as unknown.");
+                        }
                         continue;
                     }
 
