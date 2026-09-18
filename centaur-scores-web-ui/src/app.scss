@@ -300,6 +300,11 @@ nav a,
   padding: 4px 0;
 }
 
+.text-button:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+
 nav button,
 nav a {
   position: relative;
@@ -414,8 +419,14 @@ nav a.active:after {
   border: 1px solid var(--line);
   background: var(--paper);
   padding: 6px 10px;
-  font-size: 18px;
   line-height: 1;
+}
+
+.flag-icon {
+  display: block;
+  width: 22px;
+  height: 14px;
+  border-radius: 2px;
 }
 
 .lang-flag-button.active {

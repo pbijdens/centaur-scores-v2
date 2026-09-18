@@ -15,16 +15,34 @@
   export let onSaved: (member: ParticipantListMember) => void
   export let onDeleted: () => void
 
-  let fullName = member?.fullName ?? prefill?.fullName ?? ''
-  let federationNumber = member?.federationNumber ?? prefill?.federationNumber ?? ''
-  let isActive = member?.isActive ?? true
+  let fullName = ''
+  let federationNumber = ''
+  let isActive = true
   let categoryValues: Record<string, string> = {}
-  for (const category of categories) {
-    const existing = member?.categories?.[category.id] ?? prefill?.categories?.[category.id]
-    categoryValues[category.id] = existing !== undefined ? String(existing) : ''
-  }
   let saveError = ''
   let deleteError = ''
+
+  // `member` can still be loading when this view first mounts (e.g. navigating here from a
+  // screen that never had the source list loaded) - a plain `let ... = member?.x ?? ...` only
+  // reads the prop once at mount and would then show a permanently empty form once `member`
+  // resolves. Re-prefill whenever the target we're editing actually changes, but only then, so
+  // an unrelated background refresh of `member`/`categories` never clobbers in-progress edits.
+  let prefilledFor: string | null = null
+  $: {
+    const targetKey = member?.id ?? 'new'
+    if (targetKey !== prefilledFor) {
+      prefilledFor = targetKey
+      fullName = member?.fullName ?? prefill?.fullName ?? ''
+      federationNumber = member?.federationNumber ?? prefill?.federationNumber ?? ''
+      isActive = member?.isActive ?? true
+      const values: Record<string, string> = {}
+      for (const category of categories) {
+        const existing = member?.categories?.[category.id] ?? prefill?.categories?.[category.id]
+        values[category.id] = existing !== undefined ? String(existing) : ''
+      }
+      categoryValues = values
+    }
+  }
 
   $: allCategoriesFilled = categories.every((category) => categoryValues[category.id])
 

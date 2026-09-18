@@ -8,6 +8,9 @@ export function matchDevicesPath(matchId: string): string { return `/matches/${m
 export function matchQrPath(matchId: string): string { return `/matches/${matchId}/qr` }
 export function matchResultsPath(matchId: string, scope: string): string { return `/matches/${matchId}/results/${encodeURIComponent(scope)}` }
 export function matchParticipantPath(matchId: string, participantId: string): string { return `/matches/${matchId}/participants/${participantId}` }
+export function matchParticipantEditPath(matchId: string, participantId: string): string { return `/matches/${matchId}/participants/${participantId}/edit` }
+export function matchParticipantReplacePath(matchId: string, participantId: string): string { return `/matches/${matchId}/participants/${participantId}/replace` }
+export function matchParticipantScorePath(matchId: string, participantId: string): string { return `/matches/${matchId}/participants/${participantId}/scores` }
 export function matchAddParticipantsPath(matchId: string): string { return `/matches/${matchId}/add-participants` }
 export function competitionPath(competitionId: string): string { return `/competitions/${competitionId}` }
 export function competitionResultsPath(competitionId: string): string { return `/competitions/${competitionId}/results` }
@@ -50,6 +53,9 @@ export function resolveRoute(path = location.pathname): Route {
     if (segments[2] === 'qr') return { view: 'match-qr', matchId: segments[1] }
     if (segments[2] === 'results' && segments[3]) return { view: 'match-results-scope', matchId: segments[1], scope: decodeURIComponent(segments[3]) }
     if (segments[2] === 'add-participants') return { view: 'match-add-participants', matchId: segments[1] }
+    if (segments[2] === 'participants' && segments[3] && segments[4] === 'edit') return { view: 'match-participant-edit', matchId: segments[1], participantId: segments[3] }
+    if (segments[2] === 'participants' && segments[3] && segments[4] === 'replace') return { view: 'match-participant-replace', matchId: segments[1], participantId: segments[3] }
+    if (segments[2] === 'participants' && segments[3] && segments[4] === 'scores') return { view: 'match-participant-scores', matchId: segments[1], participantId: segments[3] }
     if (segments[2] === 'participants' && segments[3]) return { view: 'match-participant', matchId: segments[1], participantId: segments[3] }
     return { view: 'match', matchId: segments[1] }
   }

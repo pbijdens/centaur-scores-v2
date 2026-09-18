@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount } from 'svelte'
   import type { Category, ParticipantListMember } from './types'
 
   export let members: ParticipantListMember[]
@@ -7,8 +8,10 @@
   export let selectedIds: Set<string>
   export let labels: Record<string, string>
   export let onToggle: (memberId: string) => void
+  export let fillHeight = false
 
   let filterText = ''
+  let scrollContainer: HTMLDivElement | undefined
 
   function categoryValue(member: ParticipantListMember, category: Category): string {
     return category.values.find((value) => value.valueId === member.categories[category.id])?.name ?? ''
@@ -20,6 +23,28 @@
     return haystack.includes(filter)
   }
 
+  function handleRowActivate(memberId: string, isAssigned: boolean) {
+    if (isAssigned) return
+    onToggle(memberId)
+  }
+
+  function handleRowKeydown(event: KeyboardEvent, memberId: string, isAssigned: boolean) {
+    if (event.key !== 'Enter' && event.key !== ' ') return
+    event.preventDefault()
+    handleRowActivate(memberId, isAssigned)
+  }
+
+  onMount(() => {
+    if (!scrollContainer || selectedIds.size === 0) return
+    for (const id of selectedIds) {
+      const row = scrollContainer.querySelector(`[data-member-id="${CSS.escape(id)}"]`)
+      if (row) {
+        row.scrollIntoView({ block: 'center' })
+        break
+      }
+    }
+  })
+
   $: normalizedFilter = filterText.trim().toLowerCase()
   $: unassignedRows = members
     .filter((member) => member.isActive && !assignedMemberIds.has(member.id) && matchesFilter(member, normalizedFilter))
@@ -30,13 +55,12 @@
   $: rows = [...unassignedRows, ...assignedRows]
 </script>
 
-<div class="participant-select">
+<div class="participant-select" class:fill={fillHeight}>
   <input class="filter-input" type="text" placeholder={labels.filterParticipantsPlaceholder} bind:value={filterText} />
-  <div class="table-scroll">
+  <div class="table-scroll" bind:this={scrollContainer}>
     <table class="data-table">
       <thead>
         <tr>
-          <th class="col-check"></th>
           <th>{labels.federationNumberLabel}</th>
           <th>{labels.fullNameLabel}</th>
           {#each categories as category}<th>{category.name}</th>{/each}
@@ -45,14 +69,23 @@
       <tbody>
         {#each rows as member (member.id)}
           {@const isAssigned = assignedMemberIds.has(member.id)}
-          <tr class:assigned-row={isAssigned}>
-            <td class="col-check"><input type="checkbox" checked={isAssigned || selectedIds.has(member.id)} disabled={isAssigned} on:change={() => onToggle(member.id)} /></td>
+          {@const isSelected = selectedIds.has(member.id)}
+          <tr
+            class:assigned-row={isAssigned}
+            class:selected-row={isSelected}
+            class:selectable-row={!isAssigned}
+            data-member-id={member.id}
+            tabindex={isAssigned ? -1 : 0}
+            aria-selected={isSelected}
+            on:click={() => handleRowActivate(member.id, isAssigned)}
+            on:keydown={(event) => handleRowKeydown(event, member.id, isAssigned)}
+          >
             <td>{member.federationNumber ?? ''}</td>
             <td>{member.fullName || member.lastName}</td>
             {#each categories as category}<td>{categoryValue(member, category)}</td>{/each}
           </tr>
         {/each}
-        {#if rows.length === 0}<tr><td class="empty-row" colspan={3 + categories.length}>{labels.noMatchingParticipants}</td></tr>{/if}
+        {#if rows.length === 0}<tr><td class="empty-row" colspan={2 + categories.length}>{labels.noMatchingParticipants}</td></tr>{/if}
       </tbody>
     </table>
   </div>
@@ -65,6 +98,11 @@
     gap: 12px;
   }
 
+  .participant-select.fill {
+    flex: 1 1 0;
+    min-height: 0;
+  }
+
   .filter-input {
     max-width: 320px;
   }
@@ -74,6 +112,12 @@
     max-height: 360px;
     overflow-y: auto;
     border: 1px solid var(--line);
+  }
+
+  .fill .table-scroll {
+    flex: 1 1 0;
+    min-height: 0;
+    max-height: none;
   }
 
   .data-table {
@@ -95,12 +139,25 @@
     background: var(--paper);
   }
 
-  .col-check {
-    width: 32px;
+  .selectable-row {
+    cursor: pointer;
+  }
+
+  .selectable-row:hover {
+    background: var(--neutral);
   }
 
   .assigned-row {
     background: #eaf3e9;
+    cursor: not-allowed;
+  }
+
+  .selected-row {
+    background: #fdf0c7;
+  }
+
+  .selected-row:hover {
+    background: #fdf0c7;
   }
 
   .empty-row {

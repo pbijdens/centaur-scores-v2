@@ -42,14 +42,28 @@
           class:active={language === 'en'}
           aria-label={labels.languageEnglish}
           on:click={() => onLanguageChange('en')}
-        >🇬🇧</button>
+        >
+          <svg class="flag-icon" viewBox="0 0 60 36" aria-hidden="true" focusable="false">
+            <rect width="60" height="36" fill="#00247d" />
+            <path d="M0,0 60,36 M60,0 0,36" stroke="#fff" stroke-width="6" />
+            <path d="M0,0 60,36 M60,0 0,36" stroke="#cf142b" stroke-width="2" />
+            <path d="M30,0 30,36 M0,18 60,18" stroke="#fff" stroke-width="10" />
+            <path d="M30,0 30,36 M0,18 60,18" stroke="#cf142b" stroke-width="6" />
+          </svg>
+        </button>
         <button
           type="button"
           class="lang-flag-button"
           class:active={language === 'nl'}
           aria-label={labels.languageDutch}
           on:click={() => onLanguageChange('nl')}
-        >🇳🇱</button>
+        >
+          <svg class="flag-icon" viewBox="0 0 60 36" aria-hidden="true" focusable="false">
+            <rect width="60" height="12" y="0" fill="#ae1c28" />
+            <rect width="60" height="12" y="12" fill="#fff" />
+            <rect width="60" height="12" y="24" fill="#21468b" />
+          </svg>
+        </button>
       </div>
       <hr class="menu-separator" />
       {#if showTenantSwitch}

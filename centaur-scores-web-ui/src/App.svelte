@@ -27,7 +27,7 @@
   } from './lib/data'
   import { labelForError } from './lib/errors'
   import { translationsFor } from './lib/i18n'
-  import { accountPath, categoryPath, competitionPath, matchAddParticipantsPath, matchDevicesPath, matchEditPath, matchParticipantPath, matchPath, navigateTo, participantListPath, participantMemberPath, resolveRoute, templatePath, tenantPath } from './lib/router'
+  import { accountPath, categoryPath, competitionPath, matchAddParticipantsPath, matchDevicesPath, matchEditPath, matchParticipantEditPath, matchParticipantPath, matchParticipantReplacePath, matchParticipantScorePath, matchPath, navigateTo, participantListPath, participantMemberPath, resolveRoute, templatePath, tenantPath } from './lib/router'
   import { isSessionWatchActive } from './lib/sessionWatch'
   import type { Account, Category, Competition, Language, Match, MatchTemplate, ParticipantList, ParticipantListMember, ParticipantListSummary, TenantAccess, Tenant, View } from './lib/types'
   import AccountEditView from './lib/views/AccountEditView.svelte'
@@ -47,6 +47,9 @@
   import MatchDevicesView from './lib/views/MatchDevicesView.svelte'
   import MatchesView from './lib/views/MatchesView.svelte'
   import MatchMetadataEditView from './lib/views/MatchMetadataEditView.svelte'
+  import MatchParticipantEditView from './lib/views/MatchParticipantEditView.svelte'
+  import MatchParticipantReplaceView from './lib/views/MatchParticipantReplaceView.svelte'
+  import MatchParticipantScoreView from './lib/views/MatchParticipantScoreView.svelte'
   import MatchParticipantView from './lib/views/MatchParticipantView.svelte'
   import MatchQrCodesView from './lib/views/MatchQrCodesView.svelte'
   import MatchResultsScopeView from './lib/views/MatchResultsScopeView.svelte'
@@ -96,11 +99,14 @@
   let narrowcastScope: string | null = null
   let selectedResultsScope: string | null = null
   // Set by beginAddParticipantToList() when a free match participant's "Add to {list}" button
-  // detours into the add-member screen; consumed by onMemberSaved()/onMemberBack() to prefill
-  // the form and return to (and link) the originating match participant. Cleared on every other
-  // entry into the add-member screen (addMember(), openMember()) so it never leaks into an
-  // unrelated add/edit.
-  let pendingParticipantLink: { matchId: string; participantId: string } | null = null
+  // detours into the add-member screen, and by beginEditSharedDetails() when a linked participant's
+  // "Edit shared details" menu item detours into the edit-member screen; consumed by
+  // onMemberSaved()/onMemberBack() to prefill the form (add flow only), return to the originating
+  // match participant, and - only when link is true (the add flow; edit-shared-details already
+  // points at the right member, nothing to (re)link) - update its participantListMemberId. Cleared
+  // on every other entry into the add/edit-member screen (addMember(), openMember()) so it never
+  // leaks into an unrelated add/edit.
+  let pendingParticipantLink: { matchId: string; participantId: string; link: boolean } | null = null
   let memberPrefill: { fullName: string; federationNumber: string | null; categories: Record<string, number> } | null = null
 
   $: t = translationsFor(language)
@@ -335,9 +341,18 @@
   // into the add-member screen, prefilled with their current details, and remembers where to
   // link the result back to.
   function beginAddParticipantToList(matchId: string, participant: { id: string; fullName: string; federationNumber?: string | null; categories: Record<string, number> }, listId: string) {
-    pendingParticipantLink = { matchId, participantId: participant.id }
+    pendingParticipantLink = { matchId, participantId: participant.id, link: true }
     memberPrefill = { fullName: participant.fullName, federationNumber: participant.federationNumber ?? null, categories: participant.categories }
     navigate(participantMemberPath(listId, 'new'))
+  }
+
+  // Entry point for MatchParticipantView's "Edit shared details" menu item: detours a linked
+  // participant into editing its existing shared member record, then returns without relinking
+  // (it's already linked to this member - only the shared fields changed).
+  function beginEditSharedDetails(matchId: string, participantId: string, listId: string, memberId: string) {
+    pendingParticipantLink = { matchId, participantId, link: false }
+    memberPrefill = null
+    navigate(participantMemberPath(listId, memberId))
   }
 
   function onMemberBack() {
@@ -353,7 +368,7 @@
     pendingParticipantLink = null
     memberPrefill = null
     if (pending) {
-      await api.updateMatchParticipant(pending.matchId, pending.participantId, { participantListMemberId: member.id, lastName: member.lastName, fullName: member.fullName, federationNumber: member.federationNumber, categories: member.categories })
+      if (pending.link) await api.updateMatchParticipant(pending.matchId, pending.participantId, { participantListMemberId: member.id, lastName: member.lastName, fullName: member.fullName, federationNumber: member.federationNumber, categories: member.categories })
       navigate(matchParticipantPath(pending.matchId, pending.participantId))
       refreshParticipantLists()
       return
@@ -398,7 +413,7 @@
     view = route.view
     narrowcastScope = route.view === 'narrowcast' ? route.scope ?? null : null
     selectedResultsScope = route.view === 'match-results-scope' ? route.scope ?? null : null
-    const matchScopedViews: View[] = ['match', 'match-metadata', 'match-devices', 'match-qr', 'match-results-scope', 'match-participant', 'match-add-participants']
+    const matchScopedViews: View[] = ['match', 'match-metadata', 'match-devices', 'match-qr', 'match-results-scope', 'match-participant', 'match-participant-edit', 'match-participant-replace', 'match-participant-scores', 'match-add-participants']
     selectedMatchId = matchScopedViews.includes(route.view) ? route.matchId ?? null : null
     if (selectedMatchId) loadSelectedMatch(selectedMatchId)
     else { selectedMatch = null; matchSourceList = null }
@@ -406,7 +421,8 @@
     selectedCompetitionId = competitionScopedViews.includes(route.view) ? route.competitionId ?? null : null
     if (selectedCompetitionId) loadSelectedCompetition(selectedCompetitionId)
     else selectedCompetition = null
-    selectedParticipantId = route.view === 'match-participant' ? route.participantId ?? null : null
+    const participantScopedViews: View[] = ['match-participant', 'match-participant-edit', 'match-participant-replace', 'match-participant-scores']
+    selectedParticipantId = participantScopedViews.includes(route.view) ? route.participantId ?? null : null
     selectedTenantId = route.view === 'tenant' ? route.tenantId ?? null : null
     if (route.view === 'tenants') loadChildTenants()
     selectedAccountId = route.view === 'account' ? route.accountId ?? null : null
@@ -472,7 +488,35 @@
       {:else if view === 'match-participant' && selectedMatch && selectedParticipant}
         {@const currentMatch = selectedMatch}
         {@const currentParticipant = selectedParticipant}
-        <MatchParticipantView {api} match={currentMatch} participant={currentParticipant} categories={$categories} sourceList={matchSourceList} {canManage} labels={t} onBack={returnToSelectedMatch} onChanged={refreshSelectedMatch} onRemoved={() => navigate(`/matches/${currentMatch.id}`)} onAddToList={() => matchSourceList && beginAddParticipantToList(currentMatch.id, currentParticipant, matchSourceList.id)} />
+        <MatchParticipantView
+          {api}
+          match={currentMatch}
+          participant={currentParticipant}
+          categories={$categories}
+          sourceList={matchSourceList}
+          {canManage}
+          labels={t}
+          onBack={returnToSelectedMatch}
+          onChanged={refreshSelectedMatch}
+          onRemoved={() => navigate(`/matches/${currentMatch.id}`)}
+          onAddToList={() => matchSourceList && beginAddParticipantToList(currentMatch.id, currentParticipant, matchSourceList.id)}
+          onEditSharedDetails={() => matchSourceList && currentParticipant.participantListMemberId && beginEditSharedDetails(currentMatch.id, currentParticipant.id, matchSourceList.id, currentParticipant.participantListMemberId)}
+          onEditDetails={() => navigate(matchParticipantEditPath(currentMatch.id, currentParticipant.id))}
+          onChangeParticipant={() => navigate(matchParticipantReplacePath(currentMatch.id, currentParticipant.id))}
+          onViewScores={() => navigate(matchParticipantScorePath(currentMatch.id, currentParticipant.id))}
+        />
+      {:else if view === 'match-participant-edit' && selectedMatch && selectedParticipant}
+        {@const currentMatch = selectedMatch}
+        {@const currentParticipant = selectedParticipant}
+        <MatchParticipantEditView {api} match={currentMatch} participant={currentParticipant} categories={$categories} labels={t} onBack={() => navigate(matchParticipantPath(currentMatch.id, currentParticipant.id))} onSaved={() => navigate(matchParticipantPath(currentMatch.id, currentParticipant.id))} />
+      {:else if view === 'match-participant-replace' && selectedMatch && selectedParticipant}
+        {@const currentMatch = selectedMatch}
+        {@const currentParticipant = selectedParticipant}
+        <MatchParticipantReplaceView {api} match={currentMatch} participant={currentParticipant} categories={$categories} sourceList={matchSourceList} labels={t} onBack={() => navigate(matchParticipantPath(currentMatch.id, currentParticipant.id))} onSaved={() => navigate(matchParticipantPath(currentMatch.id, currentParticipant.id))} />
+      {:else if view === 'match-participant-scores' && selectedMatch && selectedParticipant}
+        {@const currentMatch = selectedMatch}
+        {@const currentParticipant = selectedParticipant}
+        <MatchParticipantScoreView {api} match={currentMatch} participant={currentParticipant} labels={t} onBack={() => navigate(matchParticipantPath(currentMatch.id, currentParticipant.id))} />
       {:else if view === 'competitions'}
         <CompetitionsView {api} competitions={$competitions} {language} labels={t} onOpenCompetition={openCompetition} onChanged={loadCompetitionsList} />
       {:else if view === 'competition' && selectedCompetition}
