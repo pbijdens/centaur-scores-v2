@@ -147,9 +147,6 @@ class CS_Render {
 		$line2 = implode( ' · ', $round_summary );
 
 		$total = isset( $entry['total'] ) && null !== $entry['total'] ? (string) $entry['total'] : '–';
-		if ( ! empty( $entry['disqualified'] ) ) {
-			$name .= ' (' . __( 'DQ', 'centaur-scores' ) . ')';
-		}
 
 		return self::row_markup( $position, $name, $line2, '', $total );
 	}
