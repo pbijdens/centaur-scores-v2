@@ -1,22 +1,23 @@
 <script lang="ts">
-  import { groupBoundaryPercents, typicalEndsCompleted } from './matchProgress'
+  import { groupBoundaryPercents, totalArrows, typicalArrowsShot } from './matchProgress'
   import type { LiveScoringPage } from './types'
 
   export let page: LiveScoringPage
   export let label: string
 
-  $: completed = typicalEndsCompleted(page)
+  $: total = totalArrows(page)
+  $: completed = typicalArrowsShot(page)
   $: boundaries = groupBoundaryPercents(page)
-  $: fillPercent = page.ends > 0 ? Math.min(100, (completed / page.ends) * 100) : 0
+  $: fillPercent = total > 0 ? Math.min(100, (completed / total) * 100) : 0
 </script>
 
-{#if page.ends > 0}
-  <div class="match-progress" role="progressbar" aria-label={label} aria-valuemin="0" aria-valuemax={page.ends} aria-valuenow={completed}>
+{#if total > 0}
+  <div class="match-progress" role="progressbar" aria-label={label} aria-valuemin="0" aria-valuemax={total} aria-valuenow={completed}>
     <div class="progress-track">
       <div class="progress-fill" style="width: {fillPercent}%"></div>
       {#each boundaries as percent}<span class="progress-tick" style="left: {percent}%"></span>{/each}
     </div>
-    <span class="progress-text">{completed} / {page.ends}</span>
+    <span class="progress-text">{completed} / {total}</span>
   </div>
 {/if}
 

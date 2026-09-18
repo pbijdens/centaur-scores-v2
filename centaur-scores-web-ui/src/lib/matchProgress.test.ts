@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { groupBoundaryPercents, typicalEndsCompleted } from './matchProgress'
+import { groupBoundaryPercents, totalArrows, typicalArrowsShot } from './matchProgress'
 import type { LiveScoringBlock, LiveScoringPage } from './types'
 
 function page(overrides: Partial<LiveScoringPage> & { blocks: LiveScoringBlock[] }): LiveScoringPage {
@@ -13,26 +13,35 @@ function block(arrowsList: number[]): LiveScoringBlock {
   }
 }
 
-describe('typicalEndsCompleted', () => {
-  it('picks the most common ends-completed value across all entries', () => {
-    // arrowsPerEnd 3: 9 arrows -> 3 ends, 12 arrows -> 4 ends
-    expect(typicalEndsCompleted(page({ blocks: [block([9, 9, 12])] }))).toBe(3)
+describe('totalArrows', () => {
+  it('multiplies ends by arrows per end', () => {
+    expect(totalArrows(page({ ends: 10, arrowsPerEnd: 3, blocks: [] }))).toBe(30)
+  })
+
+  it('falls back to 1 arrow per end when arrowsPerEnd is not set', () => {
+    expect(totalArrows(page({ ends: 10, arrowsPerEnd: 0, blocks: [] }))).toBe(10)
+  })
+})
+
+describe('typicalArrowsShot', () => {
+  it('picks the most common arrows-shot value across all entries', () => {
+    expect(typicalArrowsShot(page({ blocks: [block([9, 9, 12])] }))).toBe(9)
   })
 
   it('spans multiple blocks', () => {
-    expect(typicalEndsCompleted(page({ blocks: [block([9, 9]), block([12])] }))).toBe(3)
+    expect(typicalArrowsShot(page({ blocks: [block([9, 9]), block([12])] }))).toBe(9)
   })
 
-  it('breaks ties by picking the larger ends-completed count', () => {
-    expect(typicalEndsCompleted(page({ blocks: [block([9, 12])] }))).toBe(4)
+  it('breaks ties by picking the larger arrows-shot count', () => {
+    expect(typicalArrowsShot(page({ blocks: [block([9, 12])] }))).toBe(12)
   })
 
-  it('clamps to the match end count', () => {
-    expect(typicalEndsCompleted(page({ ends: 5, blocks: [block([30])] }))).toBe(5)
+  it('clamps to the total arrow count for the match', () => {
+    expect(typicalArrowsShot(page({ ends: 5, arrowsPerEnd: 3, blocks: [block([30])] }))).toBe(15)
   })
 
   it('returns 0 for a match with no entries yet', () => {
-    expect(typicalEndsCompleted(page({ blocks: [] }))).toBe(0)
+    expect(typicalArrowsShot(page({ blocks: [] }))).toBe(0)
   })
 })
 

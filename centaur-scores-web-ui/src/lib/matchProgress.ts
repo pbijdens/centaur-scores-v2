@@ -1,10 +1,15 @@
 import type { LiveScoringPage } from './types'
 
-// A single archer can have fewer (not yet caught up) or more (input mistakes) arrows than the rest,
-// so the number of ends the majority of archers have shot is the representative match progress.
-export function typicalEndsCompleted(page: LiveScoringPage): number {
+// The total number of arrows a full match consists of.
+export function totalArrows(page: LiveScoringPage): number {
   const arrowsPerEnd = page.arrowsPerEnd > 0 ? page.arrowsPerEnd : 1
-  const counts = page.blocks.flatMap((block) => block.entries).map((entry) => Math.floor(entry.arrows / arrowsPerEnd))
+  return page.ends * arrowsPerEnd
+}
+
+// A single archer can have fewer (not yet caught up) or more (input mistakes) arrows than the rest,
+// so the number of arrows the majority of archers have shot is the representative match progress.
+export function typicalArrowsShot(page: LiveScoringPage): number {
+  const counts = page.blocks.flatMap((block) => block.entries).map((entry) => entry.arrows)
   if (counts.length === 0) return 0
 
   const frequency = new Map<number, number>()
@@ -18,7 +23,7 @@ export function typicalEndsCompleted(page: LiveScoringPage): number {
       bestFrequency = freq
     }
   }
-  return Math.min(typical, page.ends)
+  return Math.min(typical, totalArrows(page))
 }
 
 // Percent-of-track positions of the group boundaries, for drawing a multi-part progress bar.
