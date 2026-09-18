@@ -428,8 +428,8 @@
     padding: var(--header-pad) .5vw;
     display: flex;
     align-items: center;
-    background: #eef2eb;
-    color: #164a13;
+    color: #eef2eb;
+    background: #164a13;
     font-size: var(--header-font);
     line-height: 1;
     overflow: hidden;
