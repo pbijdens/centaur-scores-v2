@@ -5,12 +5,16 @@ using Microsoft.Extensions.Caching.Memory;
 
 namespace CentaurScores.Api.Application;
 
-// Builds the per-participant "personal best, expressed as an arrow average" map used to render the
-// "PB: x.xx" live-scoring line (see documentation/PERSONAL-BEST-FEATUE.md, "During a match"). Kept out of
+// The archer's current personal best: Score is the raw total shown on the live-scoring line ("PB: 270"),
+// Average is the same value expressed per-arrow, used only to judge whether the match-in-progress is on
+// pace to beat it (see documentation/PERSONAL-BEST-FEATUE.md, "During a match").
+public readonly record struct PersonalBestSnapshot(int Score, double Average);
+
+// Builds the per-participant personal-best map used to render the live-scoring "PB: x" line. Kept out of
 // LiveScoringService (which stays DB-free) - callers build this once per request and pass it in.
 public interface IPersonalBestLiveLookup
 {
-    Task<IReadOnlyDictionary<Guid, double>> BuildAsync(Match match, LiveScoreScope scope, CancellationToken cancellationToken);
+    Task<IReadOnlyDictionary<Guid, PersonalBestSnapshot>> BuildAsync(Match match, LiveScoreScope scope, CancellationToken cancellationToken);
 
     // Call after any change to a match's participants (add/remove/edit federation number or categories)
     // so the next BuildAsync recomputes instead of serving a stale cached result for up to 15 minutes.
@@ -26,12 +30,12 @@ public sealed class PersonalBestLiveLookup(ApplicationDbContext db, IPersonalBes
 
     private static string CacheKey(Guid matchId) => $"personal-best-live:{matchId}";
 
-    public async Task<IReadOnlyDictionary<Guid, double>> BuildAsync(Match match, LiveScoreScope scope, CancellationToken cancellationToken)
+    public async Task<IReadOnlyDictionary<Guid, PersonalBestSnapshot>> BuildAsync(Match match, LiveScoreScope scope, CancellationToken cancellationToken)
     {
-        if (!scope.IncludePersonalBest) return new Dictionary<Guid, double>();
+        if (!scope.IncludePersonalBest) return new Dictionary<Guid, PersonalBestSnapshot>();
 
         var cacheKey = CacheKey(match.Id);
-        if (cache.TryGetValue(cacheKey, out IReadOnlyDictionary<Guid, double>? cached)) return cached!;
+        if (cache.TryGetValue(cacheKey, out IReadOnlyDictionary<Guid, PersonalBestSnapshot>? cached)) return cached!;
 
         var result = await ComputeAsync(match, cancellationToken);
         cache.Set(cacheKey, result, CacheDuration);
@@ -40,9 +44,9 @@ public sealed class PersonalBestLiveLookup(ApplicationDbContext db, IPersonalBes
 
     public void Invalidate(Guid matchId) => cache.Remove(CacheKey(matchId));
 
-    private async Task<IReadOnlyDictionary<Guid, double>> ComputeAsync(Match match, CancellationToken cancellationToken)
+    private async Task<IReadOnlyDictionary<Guid, PersonalBestSnapshot>> ComputeAsync(Match match, CancellationToken cancellationToken)
     {
-        var empty = new Dictionary<Guid, double>();
+        var empty = new Dictionary<Guid, PersonalBestSnapshot>();
 
         // If the tenant has since disabled the feature entirely, ignore the scope's request - see the
         // doc's Q&A: "the request for PR information in the scope settings must be ignored."
@@ -61,7 +65,7 @@ public sealed class PersonalBestLiveLookup(ApplicationDbContext db, IPersonalBes
         ).ToListAsync(cancellationToken);
         if (mappings.Count == 0) return empty;
 
-        var result = new Dictionary<Guid, double>();
+        var result = new Dictionary<Guid, PersonalBestSnapshot>();
         foreach (var participant in match.Participants)
         {
             if (string.IsNullOrWhiteSpace(participant.FederationNumber)) continue;
@@ -74,7 +78,7 @@ public sealed class PersonalBestLiveLookup(ApplicationDbContext db, IPersonalBes
 
             var best = await engine.GetCurrentBestAsync(owningTenantId.Value, participant.FederationNumber!, matchedDisciplines[0], match.PersonalBestClassifier!, cancellationToken);
             if (best is null) continue;
-            result[participant.Id] = (double)best.Score / totalArrows;
+            result[participant.Id] = new PersonalBestSnapshot(best.Score, (double)best.Score / totalArrows);
         }
 
         return result;

@@ -207,7 +207,7 @@ Forbidden. Must be prevented at all cost. Do not allow save and mark as validati
 
 Arrow average for an archer during a match is the total score of arrows shot divided by the number of arrows shot (i.e. non-null) for that archer.
 
-The personal best score has an arrow average of that score divided by (the number of ends * the number of arrows per end) so if the match is for 3*10=30 arrows and the personal best is 240 then the arrow average for that is 8.00; if the archer is currently on 121 after 15 arrows, then the arrow average is 8.07 which suggets the archer is crrently above thier personal best score. So if personal best is enabled, we can in the results on the PB line show: PB: {archer\'s personal best to 2 decimals}. and if the per-arrow average they currently are achieving is higher we can highlight that text.
+The personal best score has an arrow average of that score divided by (the number of ends * the number of arrows per end) so if the match is for 3*10=30 arrows and the personal best is 240 then the arrow average for that is 8.00; if the archer is currently on 121 after 15 arrows, then the arrow average is 8.07 which suggets the archer is crrently above thier personal best score. So if personal best is enabled, we can in the results on the PB line show: PB: {archer\'s personal best total score}, keeping the arrow average purely as the internal number used to decide whether to highlight that text (i.e. the archer's current per-arrow average is higher).
 
 ### Should import rows with missing or invalid mappings be rejected, skipped, or added to the conflict list?
 

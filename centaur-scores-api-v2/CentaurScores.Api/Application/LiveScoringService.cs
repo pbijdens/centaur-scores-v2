@@ -6,18 +6,18 @@ namespace CentaurScores.Api.Application;
 
 public interface ILiveScoringService
 {
-    IReadOnlyList<LiveScoringBlock> BuildBlocks(Match match, LiveScoreScope scope, IReadOnlyList<Category> categories, IReadOnlyDictionary<Guid, double>? personalBests = null);
+    IReadOnlyList<LiveScoringBlock> BuildBlocks(Match match, LiveScoreScope scope, IReadOnlyList<Category> categories, IReadOnlyDictionary<Guid, PersonalBestSnapshot>? personalBests = null);
 }
 
 public sealed class LiveScoringService(IScoringService scoringService) : ILiveScoringService
 {
-    public IReadOnlyList<LiveScoringBlock> BuildBlocks(Match match, LiveScoreScope scope, IReadOnlyList<Category> categories, IReadOnlyDictionary<Guid, double>? personalBests = null)
+    public IReadOnlyList<LiveScoringBlock> BuildBlocks(Match match, LiveScoreScope scope, IReadOnlyList<Category> categories, IReadOnlyDictionary<Guid, PersonalBestSnapshot>? personalBests = null)
     {
         var categoryIds = Deserialize<List<Guid>>(scope.GroupByCategoryIdsJson) ?? [];
         var categoryOrder = Deserialize<KeyboardConfiguration>(match.KeyboardJson)?.CategoryOrder ?? [];
         var orderedCategoryIds = categoryOrder.Where(categoryIds.Contains).Concat(categoryIds.Where(id => !categoryOrder.Contains(id))).ToList();
         var categoryById = categories.ToDictionary(item => item.Id);
-        var personalBestByParticipant = personalBests ?? new Dictionary<Guid, double>();
+        var personalBestByParticipant = personalBests ?? new Dictionary<Guid, PersonalBestSnapshot>();
 
         return match.Participants
             .GroupBy(participant => GroupKey(participant, orderedCategoryIds))
@@ -29,7 +29,7 @@ public sealed class LiveScoringService(IScoringService scoringService) : ILiveSc
             .ToList();
     }
 
-    private IReadOnlyList<LiveScoringEntry> Rank(IEnumerable<MatchParticipant> participants, Match match, LiveScoreScope scope, IReadOnlyDictionary<Guid, double> personalBests, IReadOnlyDictionary<Guid, Category> categoryById)
+    private IReadOnlyList<LiveScoringEntry> Rank(IEnumerable<MatchParticipant> participants, Match match, LiveScoreScope scope, IReadOnlyDictionary<Guid, PersonalBestSnapshot> personalBests, IReadOnlyDictionary<Guid, Category> categoryById)
     {
         var rows = participants.Select(participant => new RankedParticipant(participant, scoringService.Calculate(participant, match.ArrowsPerEnd, match.GroupEnds))).ToList();
         var rules = Deserialize<List<ScoringRule>>(match.ScoringRulesJson) ?? [];
@@ -72,7 +72,7 @@ public sealed class LiveScoringService(IScoringService scoringService) : ILiveSc
         return entries;
     }
 
-    private static LiveScoringEntry CreateEntry(RankedParticipant row, int position, bool needsTieBreaker, LiveScoreScope scope, IReadOnlyDictionary<Guid, double> personalBests, IReadOnlyDictionary<Guid, Category> categoryById)
+    private static LiveScoringEntry CreateEntry(RankedParticipant row, int position, bool needsTieBreaker, LiveScoreScope scope, IReadOnlyDictionary<Guid, PersonalBestSnapshot> personalBests, IReadOnlyDictionary<Guid, Category> categoryById)
     {
         var hasPersonalBest = personalBests.TryGetValue(row.Participant.Id, out var personalBest) && scope.IncludePersonalBest;
 
@@ -92,7 +92,7 @@ public sealed class LiveScoringService(IScoringService scoringService) : ILiveSc
             var equalizers = row.UsedEqualizers.Select(keyId => $"{row.Participant.Scores.Count(score => score.KeyId == keyId)}x{keyId}");
             details.Add($"({row.Result.Total} + {string.Join(", ", equalizers)})");
         }
-        if (hasPersonalBest) details.Add($"PB: {personalBest:0.00}");
+        if (hasPersonalBest) details.Add($"PB: {personalBest.Score}");
 
         return new LiveScoringEntry(
             position,
@@ -102,7 +102,7 @@ public sealed class LiveScoringService(IScoringService scoringService) : ILiveSc
             scope.IncludeAverage ? Math.Round(row.Result.Average, 2) : null,
             row.Participant.Scores.Count,
             row.Result.Total,
-            hasPersonalBest && row.Result.Average > personalBest);
+            hasPersonalBest && row.Result.Average > personalBest.Average);
     }
 
     private static int RuleValue(RankedParticipant row, ScoringRule rule) => rule.Type switch

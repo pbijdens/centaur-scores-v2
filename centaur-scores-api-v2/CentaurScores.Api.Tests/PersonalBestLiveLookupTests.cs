@@ -46,14 +46,14 @@ public sealed class PersonalBestLiveLookupTests
         var lookup = new PersonalBestLiveLookup(db, new PersonalBestContext(db), new PersonalBestEngine(db), new MemoryCache(new MemoryCacheOptions()));
 
         var first = await lookup.BuildAsync(match, scope, CancellationToken.None);
-        Assert.Equal(270.0 / 30, Assert.Contains(participantId, first));
+        Assert.Equal(new PersonalBestSnapshot(270, 270.0 / 30), Assert.Contains(participantId, first));
 
         // A higher score is registered elsewhere while the match is live; the cached value should not change.
         db.PersonalBestLogEntries.Add(new PersonalBestLogEntry { Id = Guid.NewGuid(), TenantId = tenantId, FederationNumber = "123", Discipline = "Recurve", MatchClassifier = "Outdoor", Score = 300, Date = new DateOnly(2026, 2, 1), RecordedAt = DateTime.UtcNow });
         await db.SaveChangesAsync();
 
         var second = await lookup.BuildAsync(match, scope, CancellationToken.None);
-        Assert.Equal(270.0 / 30, Assert.Contains(participantId, second));
+        Assert.Equal(new PersonalBestSnapshot(270, 270.0 / 30), Assert.Contains(participantId, second));
     }
 
     [Fact]
@@ -95,6 +95,6 @@ public sealed class PersonalBestLiveLookupTests
         lookup.Invalidate(matchId);
 
         var afterInvalidate = await lookup.BuildAsync(match, scope, CancellationToken.None);
-        Assert.Equal(270.0 / 30, Assert.Contains(newParticipantId, afterInvalidate));
+        Assert.Equal(new PersonalBestSnapshot(270, 270.0 / 30), Assert.Contains(newParticipantId, afterInvalidate));
     }
 }
