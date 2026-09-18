@@ -3,7 +3,7 @@
  * Plugin Name:       Centaur Scores
  * Plugin URI:         https://net42.org/
  * Description:       Embed live Centaur Scores match results and competition results in posts and pages, via shortcodes or blocks. All API calls are made from the server; nothing is ever sent to the browser except the rendered results.
- * Version:            1.0.2
+ * Version:            1.0.3
  * Requires at least:  6.4
  * Requires PHP:       7.4
  * Author:              Centaur Scores
@@ -18,7 +18,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit; // No direct access.
 }
 
-define( 'CENTAUR_SCORES_VERSION', '1.0.2' );
+define( 'CENTAUR_SCORES_VERSION', '1.0.3' );
 define( 'CENTAUR_SCORES_FILE', __FILE__ );
 define( 'CENTAUR_SCORES_DIR', plugin_dir_path( __FILE__ ) );
 define( 'CENTAUR_SCORES_URL', plugin_dir_url( __FILE__ ) );
