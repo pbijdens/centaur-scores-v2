@@ -9,7 +9,15 @@
   let { onConfirm, onCancel }: Props = $props();
 </script>
 
-<div class="overlay" role="alertdialog" aria-modal="true">
+<div
+  class="overlay"
+  role="alertdialog"
+  aria-modal="true"
+  onpointerdown={(event) => event.stopPropagation()}
+  onpointermove={(event) => event.stopPropagation()}
+  onpointerup={(event) => event.stopPropagation()}
+  onpointercancel={(event) => event.stopPropagation()}
+>
   <div class="dialog">
     <h2>{$t('signConfirmTitle')}</h2>
     <p>{$t('signConfirmBody')}</p>
