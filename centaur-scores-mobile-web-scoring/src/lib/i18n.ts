@@ -65,6 +65,28 @@ const dict = {
   previous: { NL: 'Vorige', EN: 'Previous' },
   next: { NL: 'Volgende', EN: 'Next' },
   enterScoresNow: { NL: 'Scores invoeren', EN: 'Enter scores' },
+
+  // Scorecard signing - see documentation/SIGNING-SCORECARDS.md.
+  sign: { NL: 'Ondertekenen', EN: 'Sign' },
+  confirmAction: { NL: 'Bevestigen', EN: 'Confirm' },
+  signConfirmTitle: { NL: 'Scorekaart ondertekenen', EN: 'Sign scorecard' },
+  signConfirmBody: {
+    NL: 'Na het ondertekenen staan de scores vast en kunnen ze niet meer worden gewijzigd. Onderteken alleen met toestemming van de schutter, nadat is gecontroleerd of de scores volledig en juist zijn ingevuld.',
+    EN: "After signing, the scores are final and can't be altered anymore. Only sign with approval from the archer, after verifying that the scores have been fully and correctly filled out.",
+  },
+  signedReadOnly: {
+    NL: 'Deze scorekaart is ondertekend en kan niet meer worden gewijzigd.',
+    EN: 'This scorecard is signed and can no longer be altered.',
+  },
+  archerSignature: { NL: 'Handtekening schutter', EN: 'Archer signature' },
+  markerSignature: { NL: 'Handtekening scheidsrechter', EN: 'Marker signature' },
+  signatureCaptureTitle: { NL: 'Scorekaart ondertekenen', EN: 'Sign scorecard' },
+  signatureCaptureInstructions: {
+    NL: 'Schutter en scheidsrechter tekenen hieronder elk in hun eigen vak.',
+    EN: 'The archer and marker each sign below in their own area.',
+  },
+  clearSignature: { NL: 'Wissen', EN: 'Clear' },
+  signatureMissingError: { NL: 'Beide handtekeningen zijn verplicht.', EN: 'Both signatures are required.' },
 } as const;
 
 export type TranslationKey = keyof typeof dict;

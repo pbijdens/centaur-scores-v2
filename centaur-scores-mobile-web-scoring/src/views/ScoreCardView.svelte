@@ -1,5 +1,6 @@
 <script lang="ts">
   import Keyboard from '../components/Keyboard.svelte';
+  import SignArea from '../components/SignArea.svelte';
   import { t } from '../lib/i18n';
   import {
     availableKeys,
@@ -30,12 +31,25 @@
   let openEndIndex = $state<number | null>(null);
   let focusedIndex = $state<number | null>(null);
   let keyboardEl = $state<HTMLElement | null>(null);
+  let signAreaEl = $state<HTMLElement | null>(null);
 
   $effect(() => {
     if (openEndIndex !== null && keyboardEl) {
       keyboardEl.scrollIntoView({ block: 'end', behavior: 'smooth' });
     }
   });
+
+  // A signature-required, not-yet-signed, fully-filled-in card should
+  // scroll/focus to the Sign area instead of opening the keyboard - see
+  // documentation/SIGNING-SCORECARDS.md.
+  function requiresSignFocus(): boolean {
+    if (!$matchData || !participant) return false;
+    return $matchData.signatureMode !== 'none' && !participant.signed && firstNullIndex($matchData, participant) === null;
+  }
+
+  function scrollToSignArea() {
+    signAreaEl?.scrollIntoView({ block: 'end', behavior: 'smooth' });
+  }
 
   // Whenever this view is (re)activated for a participant - on first mount or after a
   // swipe switches to another participant - jump to their first unscored arrow.
@@ -44,10 +58,17 @@
     if (currentScreen.name !== 'score-card' || !$matchData || !participant) return;
     if (participant.matchParticipantId === autoFocusedParticipantId) return;
     autoFocusedParticipantId = participant.matchParticipantId;
+    if (participant.signed) {
+      // Permanently locked - never open the keyboard for a signed card.
+      openEndIndex = null;
+      focusedIndex = null;
+      return;
+    }
     const idx = firstNullIndex($matchData, participant);
     if (idx === null) {
       openEndIndex = null;
       focusedIndex = null;
+      if (requiresSignFocus()) scrollToSignArea();
       return;
     }
     openEndIndex = Math.floor(idx / $matchData.arrowsPerEnd);
@@ -70,7 +91,7 @@
   }
 
   function onArrowTap(endIndex: number, globalIndex: number) {
-    if (!$matchData || !participant) return;
+    if (!$matchData || !participant || participant.signed) return;
     const isNull = participant.arrowScores[globalIndex] === null;
     if (openEndIndex === endIndex) {
       focusedIndex = globalIndex;
@@ -85,7 +106,7 @@
   }
 
   function onKey(keyId: string) {
-    if (!$matchData || !participant || focusedIndex === null) return;
+    if (!$matchData || !participant || participant.signed || focusedIndex === null) return;
     const match = $matchData;
     const idx = focusedIndex;
     const endIndex = Math.floor(idx / match.arrowsPerEnd);
@@ -102,10 +123,15 @@
     } else {
       focusedIndex = idx + 1;
     }
+
+    // The card just became fully filled in while already active: scroll to
+    // the Sign area now, the same way activating an already-complete card
+    // does (the effect above only fires on (re)activation, not mid-edit).
+    if (isLastArrowOfEnd && requiresSignFocus()) scrollToSignArea();
   }
 
   function onDelete() {
-    if (!$matchData || !participant || focusedIndex === null) return;
+    if (!$matchData || !participant || participant.signed || focusedIndex === null) return;
     const idx = focusedIndex;
     const previous = participant.arrowScores[idx];
     recordScoreEdit(participant.matchParticipantId, idx, previous, null);
@@ -224,6 +250,10 @@
         {/if}
       </div>
     {/each}
+
+    <div bind:this={signAreaEl}>
+      <SignArea {match} {participant} />
+    </div>
   </div>
 {/if}
 

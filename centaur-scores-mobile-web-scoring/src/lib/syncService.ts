@@ -1,8 +1,8 @@
 import { get } from 'svelte/store';
 import { ApiError, NetworkError, ScorekeeperApi } from './api';
 import { mergeMatchData } from './matchService';
-import { apiBase, conflicts, matchData, navigate, pendingUpdates, screen, syncStatus } from './stores';
-import type { ParticipantScoreUpdates, PendingParticipantUpdates, ScoreConflictEntry } from './types';
+import { apiBase, conflicts, matchData, navigate, pendingSignatures, pendingUpdates, screen, syncStatus } from './stores';
+import type { ParticipantScoreUpdates, PendingParticipantUpdates, ScoreConflictEntry, SignRequest } from './types';
 
 const POLL_INTERVAL_MS = 60_000;
 const RETRY_INTERVAL_MS = 8_000;
@@ -21,7 +21,7 @@ export async function fetchMatchInfo(): Promise<boolean> {
   if (!api) return false;
   try {
     const next = await api.getMatchInfo();
-    const merged = mergeMatchData(next, get(pendingUpdates));
+    const merged = mergeMatchData(next, get(pendingUpdates), get(pendingSignatures));
     matchData.set(merged);
     const current = get(screen);
     if (current.name === 'no-active-match' || current.name === 'loading') {
@@ -136,6 +136,17 @@ function handleConflictResponse(sent: ParticipantScoreUpdates[], entries: ScoreC
         continue;
       }
 
+      if (entry.error === 'SCORECARD_SIGNED') {
+        // The card was signed (by this device or elsewhere) while an edit was
+        // still queued - it can never be applied now, and there's nothing to
+        // "resolve" (no conflict dialog entry, unlike PARTICIPANT_CONFLICT):
+        // drop every pending edit for this participant unconditionally. The
+        // next poll already reflects signed=true, and the read-only lock
+        // prevents queuing any further edits for them.
+        delete next[item.matchParticipantId];
+        continue;
+      }
+
       // SCORE_CONFLICT: drop the non-conflicting sent indexes, keep the
       // conflicting ones pending so the user can resolve them.
       const conflictIndexes = new Set(entry.conflicts.map((c) => c.index));
@@ -152,8 +163,16 @@ function handleConflictResponse(sent: ParticipantScoreUpdates[], entries: ScoreC
     return next;
   });
 
-  syncStatus.set('error');
-  conflicts.set(entries);
+  // SCORECARD_SIGNED entries are resolved automatically above (nothing left
+  // pending, nothing for the user to choose) - ConflictDialog only knows how
+  // to render PARTICIPANT_CONFLICT and SCORE_CONFLICT shapes.
+  const dialogEntries = entries.filter((e) => e.error !== 'SCORECARD_SIGNED');
+  conflicts.set(dialogEntries.length > 0 ? dialogEntries : null);
+  if (dialogEntries.length > 0) {
+    syncStatus.set('error');
+  } else {
+    syncStatus.set(Object.keys(get(pendingUpdates)).length > 0 ? 'pending' : 'idle');
+  }
 }
 
 /** SCORE_CONFLICT resolution for a single arrow.
@@ -243,6 +262,66 @@ function refreshSyncStatusAfterResolution(): void {
   }
 }
 
+// --- Scorecard signing (see documentation/SIGNING-SCORECARDS.md) ---
+//
+// Unlike scores, signing has no conflict resolution - a queued signature is
+// simply retried on the same 8s timer until it lands, and a SCORECARD_SIGNED
+// response (e.g. a raced duplicate send) is treated as success, not a
+// failure to keep retrying, since the end state is already correct.
+
+let signaturesSyncing = false;
+
+export function recordSignature(matchParticipantId: string, body: SignRequest): void {
+  pendingSignatures.update((pending) => ({ ...pending, [matchParticipantId]: body }));
+  matchData.update((match) => {
+    if (!match) return match;
+    return {
+      ...match,
+      participants: match.participants.map((p) =>
+        p.matchParticipantId === matchParticipantId
+          ? { ...p, signed: true, archerSignatureDataUrl: body.archerSignatureDataUrl, markerSignatureDataUrl: body.markerSignatureDataUrl }
+          : p,
+      ),
+    };
+  });
+  void flushPendingSignatures();
+}
+
+export async function flushPendingSignatures(): Promise<void> {
+  const api = getApi();
+  const pending = get(pendingSignatures);
+  if (!api || signaturesSyncing || Object.keys(pending).length === 0) return;
+
+  signaturesSyncing = true;
+  try {
+    // Snapshot so a signature queued mid-flush isn't dropped from the store
+    // we're iterating, and isn't double-sent either (it's simply picked up
+    // on the next retry tick).
+    const entries = Object.entries(pending);
+    for (const [matchParticipantId, body] of entries) {
+      try {
+        await api.postSign(matchParticipantId, body);
+        pendingSignatures.update((current) => {
+          const next = { ...current };
+          delete next[matchParticipantId];
+          return next;
+        });
+      } catch (err) {
+        if (err instanceof ApiError && err.code === 'SCORECARD_SIGNED') {
+          pendingSignatures.update((current) => {
+            const next = { ...current };
+            delete next[matchParticipantId];
+            return next;
+          });
+        }
+        // Otherwise leave it queued; the next retry tick will try again.
+      }
+    }
+  } finally {
+    signaturesSyncing = false;
+  }
+}
+
 export function recordScoreEdit(matchParticipantId: string, index: number, previousValue: string | null, newValue: string | null): void {
   pendingUpdates.update((pending) => {
     const next = { ...pending };
@@ -260,8 +339,12 @@ export function startBackgroundSync(): void {
   stopBackgroundSync();
   void fetchMatchInfo();
   void flushPendingScores();
+  void flushPendingSignatures();
   pollTimer = setInterval(() => void fetchMatchInfo(), POLL_INTERVAL_MS);
-  retryTimer = setInterval(() => void flushPendingScores(), RETRY_INTERVAL_MS);
+  retryTimer = setInterval(() => {
+    void flushPendingScores();
+    void flushPendingSignatures();
+  }, RETRY_INTERVAL_MS);
 }
 
 export function stopBackgroundSync(): void {
@@ -273,4 +356,5 @@ export function stopBackgroundSync(): void {
 
 export function forceSync(): void {
   void flushPendingScores();
+  void flushPendingSignatures();
 }

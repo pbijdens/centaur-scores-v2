@@ -36,7 +36,14 @@ export interface ScorekeeperMatchParticipant {
   tenantParticipantId: string | null;
   availableKeyIDs: string[] | null;
   arrowScores: (string | null)[];
+  signed: boolean;
+  signedAtUtc: string | null;
+  archerSignatureDataUrl: string | null;
+  markerSignatureDataUrl: string | null;
 }
+
+// "none" | "confirm" | "signature" - see documentation/SIGNING-SCORECARDS.md.
+export type SignatureMode = 'none' | 'confirm' | 'signature';
 
 export interface ScorekeeperMatch {
   device: string;
@@ -49,6 +56,7 @@ export interface ScorekeeperMatch {
   allowCustomParticipants: boolean;
   keyboard: ScorekeeperKey[];
   participants: ScorekeeperMatchParticipant[];
+  signatureMode: SignatureMode;
 }
 
 export interface ScoreKeeperParticipantInfo {
@@ -89,7 +97,7 @@ export interface ParticipantScoreUpdates {
   updates: ScoreUpdate[];
 }
 
-export type ScoreConflictErrorCode = 'SCORE_CONFLICT' | 'PARTICIPANT_CONFLICT';
+export type ScoreConflictErrorCode = 'SCORE_CONFLICT' | 'PARTICIPANT_CONFLICT' | 'SCORECARD_SIGNED';
 
 export interface ScoreConflict {
   index: number;
@@ -114,6 +122,9 @@ export type ApiErrorCode =
   | 'CUSTOM_PARTICIPANT_NOT_ALLOWED'
   | 'PARTICIPANT_UPDATE_NOT_ALLOWED'
   | 'UPDATE_SCORE_CONFLICT'
+  | 'SCORECARD_SIGNED'
+  | 'SIGNATURE_NOT_REQUIRED'
+  | 'SIGNATURE_TOO_LARGE'
   | string;
 
 // Application-level state
@@ -133,3 +144,12 @@ export type Screen =
 // index -> pending edit for that arrow
 export type PendingParticipantUpdates = Record<number, { old: string | null; new: string | null }>;
 export type PendingUpdates = Record<string, PendingParticipantUpdates>;
+
+// Signing has no conflict resolution (see documentation/SIGNING-SCORECARDS.md),
+// so unlike PendingUpdates there is no "old" value to track - just the payload
+// still waiting to be POSTed.
+export interface SignRequest {
+  archerSignatureDataUrl: string | null;
+  markerSignatureDataUrl: string | null;
+}
+export type PendingSignatures = Record<string, SignRequest>;

@@ -9,7 +9,7 @@
   import ScoreCardView from './views/ScoreCardView.svelte';
   import { apiBase, goToParent, screen } from './lib/stores';
   import { initializeFromStartupParams } from './lib/matchService';
-  import { fetchMatchInfo, flushPendingScores, startBackgroundSync, stopBackgroundSync } from './lib/syncService';
+  import { fetchMatchInfo, flushPendingScores, flushPendingSignatures, startBackgroundSync, stopBackgroundSync } from './lib/syncService';
   import { t } from './lib/i18n';
 
   onMount(() => {
@@ -27,6 +27,7 @@
     const resync = () => {
       void fetchMatchInfo();
       void flushPendingScores();
+      void flushPendingSignatures();
     };
     const onVisibilityChange = () => {
       if (document.visibilityState === 'visible') resync();

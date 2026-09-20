@@ -1,6 +1,6 @@
 import { get, writable } from 'svelte/store';
 import { readJson, writeJson } from './storage';
-import type { Language, PendingUpdates, Screen, ScorekeeperMatch, SyncStatus, ScoreConflictEntry } from './types';
+import type { Language, PendingSignatures, PendingUpdates, Screen, ScorekeeperMatch, SyncStatus, ScoreConflictEntry } from './types';
 
 function persisted<T>(key: string, initial: T) {
   const store = writable<T>(readJson(key, initial));
@@ -13,6 +13,7 @@ export const language = persisted<Language>('language', 'NL');
 export const screen = persisted<Screen>('screen', { name: 'loading' });
 export const matchData = persisted<ScorekeeperMatch | null>('matchData', null);
 export const pendingUpdates = persisted<PendingUpdates>('pendingUpdates', {});
+export const pendingSignatures = persisted<PendingSignatures>('pendingSignatures', {});
 
 export const syncStatus = writable<SyncStatus>('idle');
 export const conflicts = writable<ScoreConflictEntry[] | null>(null);
