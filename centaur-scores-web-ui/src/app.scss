@@ -484,6 +484,19 @@ nav a.active:after {
   padding: 60px 0;
 }
 
+// Used only by the print-sheet step of MatchPrintView: full-bleed, no header, matching how this page
+// rendered before it gained the normal site chrome for its selection step.
+.app-shell.app-shell-bare {
+  min-height: 0;
+  background: none;
+}
+
+.content.content-bare {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+}
+
 .page-intro {
   display: flex;
   align-items: end;
