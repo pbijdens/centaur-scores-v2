@@ -683,6 +683,22 @@ nav a.active:after {
   line-height: 1.4;
 }
 
+// Shared "scorecard signed/unsigned" status banner - see MatchParticipantView.svelte and
+// MatchParticipantScoreView.svelte, both of which show the same signing state for a participant.
+.signature-status-banner {
+  margin-top: 16px;
+  font-weight: 700;
+  background: #fdeeea;
+  border-color: #e8755b;
+  color: #b84232;
+}
+
+.signature-status-banner.is-signed {
+  background: #eaf7ee;
+  border-color: var(--green);
+  color: var(--green);
+}
+
 .toolbar {
   display: flex;
   gap: 10px;

@@ -48,6 +48,7 @@
   $: showGroupTotals = hasGroups(match)
   $: currentGroupTotals = showGroupTotals ? groupTotals(match, participant.scores) : []
   $: editSharedDetailsHref = sourceList && participant.participantListMemberId ? participantMemberPath(sourceList.id, participant.participantListMemberId) : ''
+  $: canEditScores = !participant.signed || canManage
 
   function categoryLabel(): string {
     return matchCategories
@@ -173,13 +174,18 @@
           <a class="menu-item" href={matchParticipantReplacePath(match.id, participant.id)} on:click={(event) => navigateOnClick(event, onChangeParticipant)}>{labels.linkParticipant}</a>
         {/if}
       {/if}
-      <a class="menu-item" href={matchParticipantScorePath(match.id, participant.id)} on:click={(event) => navigateOnClick(event, onViewScores)}>{labels.viewEditScores}</a>
-      <button class="menu-item" on:click={toggleQuickSet}>{labels.replaceScores}</button>
+      <a class="menu-item" href={matchParticipantScorePath(match.id, participant.id)} on:click={(event) => navigateOnClick(event, onViewScores)}>{canEditScores ? labels.viewEditScores : labels.viewScores}</a>
+      {#if canEditScores}<button class="menu-item" on:click={toggleQuickSet}>{labels.replaceScores}</button>{/if}
       <button class="menu-item menu-item-danger" on:click={remove}>{labels.removeParticipant}</button>
     </DropdownMenu>
   </div>
 </div>
 {#if removeError}<p class="error">{removeError}</p>{/if}
+{#if match.signatureMode !== 'none'}
+  <div class="panel signature-status-banner" class:is-signed={participant.signed}>
+    {participant.signed ? labels.scorecardSignedBanner : labels.scorecardNotSignedBanner}
+  </div>
+{/if}
 
 <section class="panel">
   <h2>{labels.participantDetailsLabel}</h2>
@@ -201,7 +207,9 @@
 <section class="panel section-gap">
   <div class="scores-header">
     <h2>{labels.scoresLabel}</h2>
-    <a class="edit-scores-pencil" href={matchParticipantScorePath(match.id, participant.id)} aria-label={labels.editScoresAria} title={labels.editScoresAria} on:click={(event) => navigateOnClick(event, onViewScores)}>✎</a>
+    {#if canEditScores}
+      <a class="edit-scores-pencil" href={matchParticipantScorePath(match.id, participant.id)} aria-label={labels.editScoresAria} title={labels.editScoresAria} on:click={(event) => navigateOnClick(event, onViewScores)}>✎</a>
+    {/if}
   </div>
   <div class="stats-row">
     <span><span class="muted">{labels.currentTotalLabel}</span><strong>{currentTotal}</strong></span>
@@ -215,6 +223,16 @@
     <div class="scorecard-preview">
       <ParticipantScorecard {match} scores={participant.scores} keyboard={keyboardConfig.keyboard} interactive={false} />
     </div>
+    {#if participant.signed && (participant.archerSignatureDataUrl || participant.markerSignatureDataUrl)}
+      <div class="signature-images">
+        {#if participant.archerSignatureDataUrl}
+          <div class="signature-block"><span class="muted">{labels.archerSignatureLabel}</span><img src={participant.archerSignatureDataUrl} alt={labels.archerSignatureLabel} /></div>
+        {/if}
+        {#if participant.markerSignatureDataUrl}
+          <div class="signature-block"><span class="muted">{labels.markerSignatureLabel}</span><img src={participant.markerSignatureDataUrl} alt={labels.markerSignatureLabel} /></div>
+        {/if}
+      </div>
+    {/if}
   {/if}
 </section>
 
@@ -269,5 +287,23 @@
     border: 1px solid var(--line);
     border-radius: 8px;
     padding: 4px 12px;
+  }
+
+  .signature-images {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-top: 12px;
+  }
+
+  .signature-block {
+    display: grid;
+    gap: 4px;
+  }
+
+  .signature-block img {
+    max-width: 320px;
+    border: 1px solid var(--line);
+    background: #fff;
   }
 </style>

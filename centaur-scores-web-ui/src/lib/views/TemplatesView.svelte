@@ -34,7 +34,7 @@
     if (!newTemplateName.trim()) return
     createError = ''
     try {
-      const template = await api.createTemplate({ name: newTemplateName.trim(), allowFreeParticipants: true, deviceSelectionMode: 'list-and-free', configurationJson: JSON.stringify(buildEmptyTemplateConfiguration(defaultNarrowcastScope)) })
+      const template = await api.createTemplate({ name: newTemplateName.trim(), allowFreeParticipants: true, deviceSelectionMode: 'list-and-free', signatureMode: 'none', configurationJson: JSON.stringify(buildEmptyTemplateConfiguration(defaultNarrowcastScope)) })
       newTemplateName = ''
       showAddForm = false
       onChanged()

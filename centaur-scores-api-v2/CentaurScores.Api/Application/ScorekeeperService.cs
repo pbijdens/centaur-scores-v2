@@ -15,6 +15,7 @@ public interface IScorekeeperService
     Task<ApiError?> SetParticipantsAsync(ScorekeeperContext context, IReadOnlyList<ScorekeeperParticipantRequest> request, CancellationToken cancellationToken);
     Task<IReadOnlyList<ScorekeeperScoreUpdateResult>> UpdateScoresAsync(ScorekeeperContext context, IReadOnlyList<ScorekeeperScoreUpdates> request, CancellationToken cancellationToken);
     Task<ScorekeeperParticipantOptions> GetParticipantOptionsAsync(ScorekeeperContext context, CancellationToken cancellationToken);
+    Task<ApiError?> SignParticipantAsync(ScorekeeperContext context, Guid matchParticipantId, SignParticipantRequest request, CancellationToken cancellationToken);
 }
 
 public sealed class ScorekeeperService(ApplicationDbContext db, IPersonalBestLiveLookup personalBestLiveLookup) : IScorekeeperService
@@ -41,7 +42,8 @@ public sealed class ScorekeeperService(ApplicationDbContext db, IPersonalBestLiv
             .Select(item => ToMatchParticipant(item, context.Match, categories, keyboard, parsedKeyboard.DisabledKeyRules))
             .ToList();
         return new(context.Device.Name, context.Match.Name, context.Match.Ends, context.Match.ArrowsPerEnd, context.Match.GroupEnds,
-            categories, context.Match.DeviceSelectionMode != "restricted", context.Match.AllowFreeParticipants, keyboard, participants);
+            categories, context.Match.DeviceSelectionMode != "restricted", context.Match.AllowFreeParticipants, keyboard, participants,
+            context.Match.SignatureMode);
     }
 
     public async Task<ApiError?> SetParticipantsAsync(ScorekeeperContext context, IReadOnlyList<ScorekeeperParticipantRequest> request, CancellationToken cancellationToken)
@@ -121,6 +123,11 @@ public sealed class ScorekeeperService(ApplicationDbContext db, IPersonalBestLiv
                 conflicts.Add(new(batch.MatchParticipantId, "PARTICIPANT_CONFLICT", []));
                 continue;
             }
+            if (participant.Signed)
+            {
+                conflicts.Add(new(batch.MatchParticipantId, "SCORECARD_SIGNED", []));
+                continue;
+            }
             var participantConflicts = new List<ScorekeeperScoreConflict>();
             foreach (var update in batch.Updates)
             {
@@ -159,6 +166,30 @@ public sealed class ScorekeeperService(ApplicationDbContext db, IPersonalBestLiv
         }
         await db.SaveChangesAsync(cancellationToken);
         return conflicts;
+    }
+
+    // Anonymous scorekeeper devices may only sign (never unsign - withdrawing a signature is manager-only,
+    // via the authenticated API) a card assigned to the calling device, and only once a match's signature
+    // mode actually calls for it.
+    public async Task<ApiError?> SignParticipantAsync(ScorekeeperContext context, Guid matchParticipantId, SignParticipantRequest request, CancellationToken cancellationToken)
+    {
+        if (context.Match.SignatureMode == "none")
+            return new("SIGNATURE_NOT_REQUIRED", "This match does not require scorecards to be signed.");
+        var participant = context.Match.Participants.SingleOrDefault(item => item.Id == matchParticipantId && item.DeviceId == context.Device.Id);
+        if (participant is null)
+            return new("PARTICIPANT_CONFLICT", "The participant is not assigned to this device.");
+        if (participant.Signed)
+            return new("SCORECARD_SIGNED", "This scorecard is already signed.");
+        var validationError = SignatureValidation.Validate(request.ArcherSignatureDataUrl, request.MarkerSignatureDataUrl);
+        if (validationError is not null)
+            return validationError;
+
+        participant.Signed = true;
+        participant.SignedAtUtc = DateTime.UtcNow;
+        participant.ArcherSignatureDataUrl = request.ArcherSignatureDataUrl;
+        participant.MarkerSignatureDataUrl = request.MarkerSignatureDataUrl;
+        await db.SaveChangesAsync(cancellationToken);
+        return null;
     }
 
     public async Task<ScorekeeperParticipantOptions> GetParticipantOptionsAsync(ScorekeeperContext context, CancellationToken cancellationToken)
@@ -202,7 +233,7 @@ public sealed class ScorekeeperService(ApplicationDbContext db, IPersonalBestLiv
         }
     }
 
-    private static ScorekeeperMatchParticipant ToMatchParticipant(MatchParticipant item, Match match, IReadOnlyList<ScorekeeperCategory> categories, IReadOnlyList<ScorekeeperKey> keyboard, IReadOnlyList<DisabledKeyRule> disabledKeyRules) => new(item.FederationNumber, item.FullName, Info(item.Categories, categories), CategoryValues(item.Categories, categories), item.Id, item.ParticipantListMemberId, AvailableKeyIds(item.Categories, keyboard, disabledKeyRules), Enumerable.Range(0, match.Ends * match.ArrowsPerEnd).Select(index => item.Scores.SingleOrDefault(score => (score.End - 1) * match.ArrowsPerEnd + score.Arrow - 1 == index)?.KeyId).ToList());
+    private static ScorekeeperMatchParticipant ToMatchParticipant(MatchParticipant item, Match match, IReadOnlyList<ScorekeeperCategory> categories, IReadOnlyList<ScorekeeperKey> keyboard, IReadOnlyList<DisabledKeyRule> disabledKeyRules) => new(item.FederationNumber, item.FullName, Info(item.Categories, categories), CategoryValues(item.Categories, categories), item.Id, item.ParticipantListMemberId, AvailableKeyIds(item.Categories, keyboard, disabledKeyRules), Enumerable.Range(0, match.Ends * match.ArrowsPerEnd).Select(index => item.Scores.SingleOrDefault(score => (score.End - 1) * match.ArrowsPerEnd + score.Arrow - 1 == index)?.KeyId).ToList(), item.Signed, item.SignedAtUtc is { } signedAtUtc ? new DateTimeOffset(signedAtUtc, TimeSpan.Zero) : null, item.ArcherSignatureDataUrl, item.MarkerSignatureDataUrl);
 
     // Keys disabled by any rule whose category/value matches this participant are removed from the
     // available set; null (all keys available) is returned only when no rule matches at all, per the

@@ -30,6 +30,7 @@ Returns a JSON structure of type `ScorekeeperMatch` with the following structure
 |allowCustomParticipants|`true`|True when it's allowed to add participants that are not in the tenant-level participant list that was configured for the match.|
 |keyboard|`[{...}]`|Ordered array of the keyboard keys that may be used for score entry in this match, elements of type `ScorekeeperKey`|
 |participants|`[{...}]`|Ordered array of 0 or more match participants each element of type `ScorekeeperMatchParticipant`|
+|signatureMode|`"confirm"`|One of `"none"`, `"confirm"`, or `"signature"` (see [SIGNING-SCORECARDS.md](SIGNING-SCORECARDS.md)). When `"none"`, devices must never show a Sign button or lock a scorecard. When `"confirm"`, signing is a plain confirm dialog with no drawn signature. When `"signature"`, signing requires capturing both an archer and a marker ink signature.|
 
 Where the `ScoreKeeperCategory` objects have structure:
 |property|example|description|
@@ -58,6 +59,10 @@ Where the `ScorekeeperMatchParticipant` structure is as follows:
 |tenantParticipantId|`"9F120000-0330-0550-8134-010101010101"`|The system wide unique ID we use for the match participant or `null` if unknown or not applicable|
 |availableKeyIDs|`["X", "10", "9", "8", "7", "6", "M"]`|The list of key IDs that are available when entering scores for this user, based on their categories, or `null` when all keys are available|
 |arrowScores|`["X", "8", "9", "10", "7", "M", null, null, null, ...]`|Ordered array of Key ID (or null if arrow has not yet been shot) values for each of the shot arrows, should be exactly `arrowsPerEnd` \* `ends` members long.|
+|signed|`false`|Whether this participant's scorecard has been signed. Once `true`, the scorecard is read-only for scoring devices - `Set participants for this device` and `Update scores for this device` both reject any change to this participant. Devices should never show score entry controls for a signed participant, only the signed-state display described in SIGNING-SCORECARDS.md.|
+|signedAtUtc|`"2026-09-20T15:04:00Z"`|UTC timestamp the scorecard was signed at, or `null` if not signed.|
+|archerSignatureDataUrl|`"data:image/png;base64,..."`|The archer's captured ink signature as a data URL, or `null` if not signed or if `signatureMode` was `"confirm"` (no drawn signature captured).|
+|markerSignatureDataUrl|`"data:image/png;base64,..."`|The marker's captured ink signature as a data URL, or `null` under the same conditions as `archerSignatureDataUrl`.|
 
 If the device, match or tenant can't be found, are missing or invalid will return a `404` error.
 
@@ -106,7 +111,7 @@ OR will apply all updates it can, and respond with a `409` `"UPDATE_SCORE_CONFLI
 |property|example|description|
 |--------|-------|-----------|
 |matchParticipantId|`"4B000000-0700-0800-1234-101010101010"`|The unique ID we use for the match participant in the scope of this match|
-|error|`"SCORE_CONFLICT"`|Either `"SCORE_CONFLICT"` or `"PARTICIPANT_CONFLICT"`|
+|error|`"SCORE_CONFLICT"`|One of `"SCORE_CONFLICT"`, `"PARTICIPANT_CONFLICT"`, or `"SCORECARD_SIGNED"` (the participant's scorecard is already signed - see SIGNING-SCORECARDS.md; `conflicts` is always empty for this error, the whole batch for that participant is rejected)|
 |conflicts|`[{...}]`|Ordered array of `ScoreConflict` elements|
 
 Where a `ScoreConflict` element is an object with this structure:
@@ -151,6 +156,28 @@ The `ScoreKeeperParticipantInfo` objects are structured as follows:
 |name|`"Pieter-Bas IJdens"`|The full name of the participant|
 |info|`"Recurve / Heren / Klasse C"`|A concatenation of the category values for the participant for the categories that are configured for the match (in that order also)|
 |categories|`[{ "id": "...", "name": "Discipline", "value": "Barebow" }]`|For each of the categories configured for the match (in that order) the currently active value for this participant|
+
+## Sign a participant's scorecard
+
+`POST /scorekeeper/{tenantId:guid}/{matchId:guid}/{deviceId:guid}/participants/{matchParticipantId:guid}/sign`
+
+See [SIGNING-SCORECARDS.md](SIGNING-SCORECARDS.md) for the full feature. Body:
+
+|property|example|description|
+|--------|-------|-----------|
+|archerSignatureDataUrl|`"data:image/png;base64,..."`|The archer's captured ink signature, or `null`/omitted for `signatureMode: "confirm"` (no drawn signature).|
+|markerSignatureDataUrl|`"data:image/png;base64,..."`|The marker's captured ink signature, or `null`/omitted for `signatureMode: "confirm"`.|
+
+On success responds `204 No Content`. The participant must be assigned to the calling device. Fails with a `409` error and one of these codes:
+
+|code|meaning|
+|----|-------|
+|`SIGNATURE_NOT_REQUIRED`|The match's `signatureMode` is `"none"`.|
+|`SCORECARD_SIGNED`|The participant is already signed.|
+|`PARTICIPANT_CONFLICT`|The participant is not assigned to the calling device (or doesn't exist).|
+|`SIGNATURE_TOO_LARGE`|One of the supplied images is too large.|
+
+There is no endpoint for a device to *withdraw* a signature - once signed, only a manager can do that, through the authenticated API (`POST /api/matches/{id}/participants/{participantId}/unsign`). This is deliberate: scoring devices are unauthenticated, so allowing an anonymous unsign would let anyone with the device URL undo a signature after the fact.
 
 ## Ping
 

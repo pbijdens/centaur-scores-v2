@@ -9,6 +9,7 @@ export type MatchInput = {
   isOpen: boolean
   participantListId?: string | null
   deviceSelectionMode: string
+  signatureMode: string
   ends: number
   arrowsPerEnd: number
   groupEnds?: number | null
@@ -168,6 +169,14 @@ export class ApiClient {
     return this.request(`/api/matches/${matchId}/participants/${participantId}/scores`, { method: 'POST', body: JSON.stringify(body) })
   }
 
+  signMatchParticipant(matchId: string, participantId: string, body: { archerSignatureDataUrl?: string | null; markerSignatureDataUrl?: string | null }): Promise<MatchParticipant> {
+    return this.request(`/api/matches/${matchId}/participants/${participantId}/sign`, { method: 'POST', body: JSON.stringify(body) })
+  }
+
+  unsignMatchParticipant(matchId: string, participantId: string): Promise<MatchParticipant> {
+    return this.request(`/api/matches/${matchId}/participants/${participantId}/unsign`, { method: 'POST' })
+  }
+
   fetchMatchResults(matchId: string) {
     return this.request(`/api/matches/${matchId}/results`)
   }
@@ -208,8 +217,8 @@ export class ApiClient {
     return this.request(`/api/matches/${matchId}/claim-scope`, { method: 'POST' })
   }
 
-  async downloadMatchExport(matchId: string): Promise<{ blob: Blob; filename: string }> {
-    const response = await fetch(`${apiBase}/api/matches/${matchId}/export.csv`, { headers: this.headers() })
+  async downloadMatchExport(matchId: string, language: Language): Promise<{ blob: Blob; filename: string }> {
+    const response = await fetch(`${apiBase}/api/matches/${matchId}/export.csv?language=${language}`, { headers: this.headers() })
     if (!response.ok) throw await readApiError(response)
     const disposition = response.headers.get('content-disposition') ?? ''
     const filenameMatch = /filename="?([^"]+)"?/.exec(disposition)
@@ -361,11 +370,11 @@ export class ApiClient {
     return this.request('/api/match-templates')
   }
 
-  createTemplate(body: { name: string; participantListId?: string | null; allowFreeParticipants: boolean; deviceSelectionMode: string; configurationJson: string; personalBestClassifier?: string | null }): Promise<MatchTemplate> {
+  createTemplate(body: { name: string; participantListId?: string | null; allowFreeParticipants: boolean; deviceSelectionMode: string; signatureMode: string; configurationJson: string; personalBestClassifier?: string | null }): Promise<MatchTemplate> {
     return this.request('/api/match-templates', { method: 'POST', body: JSON.stringify(body) })
   }
 
-  updateTemplate(id: string, body: { name: string; participantListId?: string | null; allowFreeParticipants: boolean; deviceSelectionMode: string; configurationJson: string; personalBestClassifier?: string | null }): Promise<MatchTemplate> {
+  updateTemplate(id: string, body: { name: string; participantListId?: string | null; allowFreeParticipants: boolean; deviceSelectionMode: string; signatureMode: string; configurationJson: string; personalBestClassifier?: string | null }): Promise<MatchTemplate> {
     return this.request(`/api/match-templates/${id}`, { method: 'PUT', body: JSON.stringify(body) })
   }
 

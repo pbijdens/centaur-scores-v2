@@ -4,7 +4,7 @@
   import { labelForError } from '../errors'
   import { parseMatchKeyboardConfig, parseMatchScoringRules } from '../matchConfig'
   import RowActions from '../RowActions.svelte'
-  import { deviceSelectionModes, keyboardColors } from '../templateConfig'
+  import { deviceSelectionModes, keyboardColors, signatureModes } from '../templateConfig'
   import type { Category, LiveScopeConfig, Match, ParticipantListSummary } from '../types'
 
   export let api: ApiClient
@@ -22,6 +22,7 @@
   let participantListId = match.participantListId ?? ''
   let allowFreeParticipants = match.allowFreeParticipants
   let deviceSelectionMode = match.deviceSelectionMode
+  let signatureMode = match.signatureMode
   let ends = match.ends
   let arrowsPerEnd = match.arrowsPerEnd
   let groupEnds = match.groupEnds ?? null
@@ -60,6 +61,12 @@
     if (mode === 'list') return labels.modeList
     if (mode === 'list-and-free') return labels.modeListAndFree
     return labels.modeRestricted
+  }
+
+  function signatureModeLabel(mode: string): string {
+    if (mode === 'confirm') return labels.signatureModeConfirm
+    if (mode === 'signature') return labels.signatureModeSignature
+    return labels.signatureModeNone
   }
 
   function toggleCategory(categoryId: string) {
@@ -173,6 +180,7 @@
         isOpen: match.isOpen,
         participantListId: participantListId || null,
         deviceSelectionMode,
+        signatureMode,
         ends,
         arrowsPerEnd,
         groupEnds,
@@ -232,6 +240,11 @@
   <label>{labels.endsLabel}<input type="number" min="1" bind:value={ends} /></label>
   <label>{labels.arrowsPerEndLabel}<input type="number" min="1" bind:value={arrowsPerEnd} /></label>
   <label>{labels.groupEndsLabel}<input type="number" min="1" bind:value={groupEnds} /></label>
+  <label>{labels.signatureModeLabel}
+    <select bind:value={signatureMode}>
+      {#each signatureModes as mode}<option value={mode}>{signatureModeLabel(mode)}</option>{/each}
+    </select>
+  </label>
   {#if personalBestClassifiers.length > 0}
     <label>{labels.personalBestClassifierLabel}
       <select bind:value={personalBestClassifier}>

@@ -4,6 +4,8 @@ export const keyboardColors = ['Yellow', 'Red', 'Blue', 'Black', 'White'] as con
 
 export const deviceSelectionModes = ['restricted', 'list', 'list-and-free'] as const
 
+export const signatureModes = ['none', 'confirm', 'signature'] as const
+
 const defaultKeyboardColors = ['Yellow', 'Yellow', 'Red', 'Red', 'Blue', 'Blue', 'Black', 'Black', 'White', 'White'] as const
 const defaultKeyboard: KeyboardKey[] = [...Array.from({ length: 10 }, (_, index) => {
   const value = 10 - index

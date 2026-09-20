@@ -475,7 +475,7 @@
         <MatchesView {api} matches={$matches} templates={$templates} defaultNarrowcastScope={effectiveDefaultNarrowcastScope} {language} labels={t} onOpenMatch={openMatch} onChanged={loadMatchesList} />
       {:else if view === 'match' && selectedMatch}
         {@const currentMatch = selectedMatch}
-        <MatchDetailView {api} match={currentMatch} categories={$categories} {language} labels={t} onBack={() => navigate('/matches')} onToggleOpen={toggleSelectedMatch} onDeleted={onMatchDeleted} onEditMetadata={() => navigate(matchEditPath(currentMatch.id))} onManageDevices={() => navigate(matchDevicesPath(currentMatch.id))} onAddParticipants={() => navigate(matchAddParticipantsPath(currentMatch.id))} onOpenParticipant={openParticipant} onCopied={(copy) => { loadMatchesList(); openMatch(copy) }} />
+        <MatchDetailView {api} match={currentMatch} categories={$categories} {language} {canManage} labels={t} onBack={() => navigate('/matches')} onToggleOpen={toggleSelectedMatch} onDeleted={onMatchDeleted} onEditMetadata={() => navigate(matchEditPath(currentMatch.id))} onManageDevices={() => navigate(matchDevicesPath(currentMatch.id))} onAddParticipants={() => navigate(matchAddParticipantsPath(currentMatch.id))} onOpenParticipant={openParticipant} onCopied={(copy) => { loadMatchesList(); openMatch(copy) }} />
       {:else if view === 'match-add-participants' && selectedMatch}
         {@const currentMatch = selectedMatch}
         <MatchAddParticipantsView {api} match={currentMatch} categories={$categories} sourceList={matchSourceList} labels={t} onBack={() => navigate(`/matches/${currentMatch.id}`)} onChanged={refreshSelectedMatch} />
@@ -516,7 +516,7 @@
       {:else if view === 'match-participant-scores' && selectedMatch && selectedParticipant}
         {@const currentMatch = selectedMatch}
         {@const currentParticipant = selectedParticipant}
-        <MatchParticipantScoreView {api} match={currentMatch} participant={currentParticipant} labels={t} onBack={() => navigate(matchParticipantPath(currentMatch.id, currentParticipant.id))} />
+        <MatchParticipantScoreView {api} match={currentMatch} participant={currentParticipant} {canManage} labels={t} onBack={() => navigate(matchParticipantPath(currentMatch.id, currentParticipant.id))} />
       {:else if view === 'competitions'}
         <CompetitionsView {api} competitions={$competitions} {language} labels={t} onOpenCompetition={openCompetition} onChanged={loadCompetitionsList} />
       {:else if view === 'competition' && selectedCompetition}

@@ -7,6 +7,7 @@
   export let api: ApiClient
   export let match: Match
   export let participant: MatchParticipant
+  export let canManage: boolean
   export let labels: Record<string, string>
   export let onBack: () => void
 
@@ -28,6 +29,7 @@
   $: entryKeys = keyboardConfig.keyboard.filter((key) => !disabledKeyIds.has(key.keyId))
   $: canUndo = undoStack.length > 0 && undoStack[undoStack.length - 1].previous !== null
   $: canRedo = redoStack.length > 0
+  $: canEditScores = !participant.signed || canManage
 
   function applyLocally(end: number, arrow: number, entry: ArrowScore) {
     const otherScores = (participant.scores ?? []).filter((score) => !(score.end === end && score.arrow === arrow))
@@ -82,13 +84,22 @@
 <div class="page-intro">
   <div><p class="eyebrow">{labels.eyebrowParticipantScores}</p><h1>{labels.viewEditScores}</h1></div>
   <div class="score-actions">
-    <button type="button" class="text-button" disabled={!canUndo} title={labels.undo} aria-label={labels.undo} on:click={undo}>↶ {labels.undo}</button>
-    <button type="button" class="text-button" disabled={!canRedo} title={labels.redo} aria-label={labels.redo} on:click={redo}>↷ {labels.redo}</button>
+    <button type="button" class="text-button" disabled={!canUndo || !canEditScores} title={labels.undo} aria-label={labels.undo} on:click={undo}>↶ {labels.undo}</button>
+    <button type="button" class="text-button" disabled={!canRedo || !canEditScores} title={labels.redo} aria-label={labels.redo} on:click={redo}>↷ {labels.redo}</button>
   </div>
 </div>
+{#if match.signatureMode !== 'none'}
+  <div class="panel signature-status-banner" class:is-signed={participant.signed}>
+    {participant.signed ? labels.scorecardSignedBanner : labels.scorecardNotSignedBanner}
+  </div>
+{/if}
 
 <section class="panel">
-  <ParticipantScorecard {match} scores={participant.scores} keyboard={keyboardConfig.keyboard} {entryKeys} interactive {onScore} closeLabel={labels.closeKeypad} />
+  {#if canEditScores}
+    <ParticipantScorecard {match} scores={participant.scores} keyboard={keyboardConfig.keyboard} {entryKeys} interactive {onScore} closeLabel={labels.closeKeypad} />
+  {:else}
+    <ParticipantScorecard {match} scores={participant.scores} keyboard={keyboardConfig.keyboard} interactive={false} />
+  {/if}
 </section>
 
 <style>

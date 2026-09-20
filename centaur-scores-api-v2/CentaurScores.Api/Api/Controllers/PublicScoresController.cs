@@ -75,6 +75,19 @@ public sealed class PublicScoresController(ApplicationDbContext db, ILiveScoring
         return conflicts.Count == 0 ? NoContent() : Conflict(new { error = new ApiError("UPDATE_SCORE_CONFLICT", "One or more score updates conflicted."), conflicts });
     }
 
+    // No anonymous unsign endpoint - withdrawing a signature is manager-only, via the authenticated API
+    // (see MatchesController.UnsignParticipant).
+    [HttpPost("scorekeeper/{tenantId:guid}/{matchId:guid}/{deviceId:guid}/participants/{matchParticipantId:guid}/sign")]
+    public async Task<IActionResult> SignScorekeeperParticipant(Guid tenantId, Guid matchId, Guid deviceId, Guid matchParticipantId, SignParticipantRequest request, CancellationToken cancellationToken)
+    {
+        var context = await LoadScorekeeperContext(tenantId, matchId, deviceId, cancellationToken);
+        if (context is null) return NotFound();
+        if (!context.Match.IsOpen) return MatchNoLongerActive();
+        LogCall(nameof(SignScorekeeperParticipant), tenantId, matchId, deviceId, matchParticipantId);
+        var error = await ScorekeeperService.SignParticipantAsync(context, matchParticipantId, request, cancellationToken);
+        return error is null ? NoContent() : Conflict(error);
+    }
+
     [HttpGet("scorekeeper/{tenantId:guid}/{matchId:guid}/{deviceId:guid}/participant-options")]
     public async Task<IActionResult> ScorekeeperParticipantOptions(Guid tenantId, Guid matchId, Guid deviceId, CancellationToken cancellationToken)
     {

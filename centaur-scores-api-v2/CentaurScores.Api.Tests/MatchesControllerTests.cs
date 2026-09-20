@@ -68,12 +68,12 @@ public sealed class MatchesControllerTests
         var personalBestEngine = new PersonalBestEngine(db);
         var controller = new MatchesController(db, new TestTenantContext(tenantId), scoring, new LiveScoringService(scoring), new PersonalBestRegistrationService(db, personalBestContext, personalBestEngine), new PersonalBestLiveLookup(db, personalBestContext, personalBestEngine, new MemoryCache(new MemoryCacheOptions())));
 
-        var result = Assert.IsType<FileContentResult>(await controller.Export(matchId, CancellationToken.None));
+        var result = Assert.IsType<FileContentResult>(await controller.Export(matchId, "en", CancellationToken.None));
 
         Assert.Equal("OPEN.csv", result.FileDownloadName);
         Assert.Equal(
-            "federation_number,full_name,total,\"Miss\",\"X\",Null,Split1,Split2,\"Class\",\"Discipline\",lastname\n" +
-            "\"123\",\"Robin Archer\",20,1,2,5,10,10,\"Senior\",\"Recurve\",\"Archer\"",
+            "federation_number,full_name,total,\"Miss\",\"X\",Null,Split1,Split2,\"Class\",\"Discipline\",lastname,Signed\n" +
+            "\"123\",\"Robin Archer\",20,1,2,5,10,10,\"Senior\",\"Recurve\",\"Archer\",No",
             Encoding.UTF8.GetString(result.FileContents));
     }
 
@@ -345,6 +345,107 @@ public sealed class MatchesControllerTests
             var results = Assert.IsAssignableFrom<IReadOnlyList<ParticipantResult>>(Assert.IsType<OkObjectResult>(await controller.Results(matchId, CancellationToken.None)).Value);
             Assert.Equal("New Name", Assert.Single(results).Name);
         }
+    }
+
+    [Fact]
+    public async Task SignParticipant_sets_signed_state_and_stores_the_signature_images()
+    {
+        await using var connection = new SqliteConnection("Filename=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>().UseSqlite(connection).Options;
+        await using var db = new ApplicationDbContext(options);
+        await db.Database.EnsureCreatedAsync();
+
+        var tenantId = Guid.NewGuid();
+        var matchId = Guid.NewGuid();
+        var participantId = Guid.NewGuid();
+        db.AddRange(
+            new Tenant { Id = tenantId, Name = "Tenant" },
+            new Match { Id = matchId, TenantId = tenantId, Name = "Open", SignatureMode = "signature", Participants = [new MatchParticipant { Id = participantId, TenantId = tenantId, MatchId = matchId, OwnLastName = "Archer", OwnFullName = "Robin Archer" }] });
+        await db.SaveChangesAsync();
+        var controller = NewController(db, tenantId);
+
+        var result = Assert.IsType<OkObjectResult>(await controller.SignParticipant(matchId, participantId, new SignParticipantRequest("data:image/png;base64,archer", "data:image/png;base64,marker"), CancellationToken.None));
+        var participant = Assert.IsType<MatchParticipant>(result.Value);
+
+        Assert.True(participant.Signed);
+        Assert.NotNull(participant.SignedAtUtc);
+        Assert.Equal("data:image/png;base64,archer", participant.ArcherSignatureDataUrl);
+        Assert.Equal("data:image/png;base64,marker", participant.MarkerSignatureDataUrl);
+    }
+
+    [Fact]
+    public async Task UnsignParticipant_fully_resets_the_signed_state_and_clears_stored_images()
+    {
+        await using var connection = new SqliteConnection("Filename=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>().UseSqlite(connection).Options;
+        await using var db = new ApplicationDbContext(options);
+        await db.Database.EnsureCreatedAsync();
+
+        var tenantId = Guid.NewGuid();
+        var matchId = Guid.NewGuid();
+        var participantId = Guid.NewGuid();
+        db.AddRange(
+            new Tenant { Id = tenantId, Name = "Tenant" },
+            new Match { Id = matchId, TenantId = tenantId, Name = "Open", SignatureMode = "signature", Participants = [new MatchParticipant { Id = participantId, TenantId = tenantId, MatchId = matchId, OwnLastName = "Archer", OwnFullName = "Robin Archer", Signed = true, SignedAtUtc = DateTime.UtcNow, ArcherSignatureDataUrl = "data:image/png;base64,archer", MarkerSignatureDataUrl = "data:image/png;base64,marker" }] });
+        await db.SaveChangesAsync();
+        var controller = NewController(db, tenantId);
+
+        var result = Assert.IsType<OkObjectResult>(await controller.UnsignParticipant(matchId, participantId, CancellationToken.None));
+        var participant = Assert.IsType<MatchParticipant>(result.Value);
+
+        Assert.False(participant.Signed);
+        Assert.Null(participant.SignedAtUtc);
+        Assert.Null(participant.ArcherSignatureDataUrl);
+        Assert.Null(participant.MarkerSignatureDataUrl);
+    }
+
+    [Fact]
+    public async Task SignParticipant_and_UnsignParticipant_are_forbidden_without_manage_rights()
+    {
+        await using var connection = new SqliteConnection("Filename=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>().UseSqlite(connection).Options;
+        await using var db = new ApplicationDbContext(options);
+        await db.Database.EnsureCreatedAsync();
+
+        var tenantId = Guid.NewGuid();
+        var matchId = Guid.NewGuid();
+        var participantId = Guid.NewGuid();
+        db.AddRange(
+            new Tenant { Id = tenantId, Name = "Tenant" },
+            new Match { Id = matchId, TenantId = tenantId, Name = "Open", SignatureMode = "signature", Participants = [new MatchParticipant { Id = participantId, TenantId = tenantId, MatchId = matchId }] });
+        await db.SaveChangesAsync();
+        var controller = NewController(db, tenantId, canManage: false);
+
+        Assert.IsType<ForbidResult>(await controller.SignParticipant(matchId, participantId, new SignParticipantRequest(null, null), CancellationToken.None));
+        Assert.IsType<ForbidResult>(await controller.UnsignParticipant(matchId, participantId, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task EnterScore_is_forbidden_for_non_managers_once_the_scorecard_is_signed_but_allowed_for_managers()
+    {
+        await using var connection = new SqliteConnection("Filename=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>().UseSqlite(connection).Options;
+        await using var db = new ApplicationDbContext(options);
+        await db.Database.EnsureCreatedAsync();
+
+        var tenantId = Guid.NewGuid();
+        var matchId = Guid.NewGuid();
+        var participantId = Guid.NewGuid();
+        db.AddRange(
+            new Tenant { Id = tenantId, Name = "Tenant" },
+            new Match { Id = matchId, TenantId = tenantId, Name = "Open", ArrowsPerEnd = 3, Participants = [new MatchParticipant { Id = participantId, TenantId = tenantId, MatchId = matchId, Signed = true }] });
+        await db.SaveChangesAsync();
+        var request = new EnterScoreRequest(1, 1, "10", 10);
+
+        var nonManagerController = NewController(db, tenantId, canManage: false);
+        Assert.IsType<ForbidResult>(await nonManagerController.EnterScore(matchId, participantId, request, CancellationToken.None));
+
+        var managerController = NewController(db, tenantId, canManage: true);
+        Assert.IsType<OkObjectResult>(await managerController.EnterScore(matchId, participantId, request, CancellationToken.None));
     }
 
     private static Match MatchWithScopes(Guid tenantId, string name, bool isOpen, IEnumerable<string> scopes)

@@ -11,6 +11,7 @@
   export let match: Match
   export let categories: Category[]
   export let language: Language
+  export let canManage: boolean
   export let labels: Record<string, string>
   export let onBack: () => void
   export let onToggleOpen: () => void
@@ -23,12 +24,12 @@
 
   type ResultRow = { participantId: string; total: number }
   type SortBy = 'name' | 'score'
-  type GroupBy = 'none' | 'category' | 'device'
+  type GroupBy = 'none' | 'category' | 'device' | 'signed'
 
   const storedSortBy = localStorage.getItem('centaur-match-sort-by')
   const storedGroupBy = localStorage.getItem('centaur-match-group-by')
   let sortBy: SortBy = storedSortBy === 'score' ? 'score' : 'name'
-  let groupBy: GroupBy = storedGroupBy === 'category' || storedGroupBy === 'device' ? storedGroupBy : 'none'
+  let groupBy: GroupBy = storedGroupBy === 'category' || storedGroupBy === 'device' || storedGroupBy === 'signed' ? storedGroupBy : 'none'
   let unlistedOnly = false
   let results: ResultRow[] = []
   let deleteError = ''
@@ -40,6 +41,7 @@
   let copyIncludeParticipants = false
   let copying = false
   let copyError = ''
+  let signToggleError = ''
 
   $: participants = match.participants ?? []
   $: devices = match.devices ?? []
@@ -76,7 +78,7 @@
   }
 
   function setGroupBy(value: string) {
-    groupBy = value === 'category' || value === 'device' ? value : 'none'
+    groupBy = value === 'category' || value === 'device' || value === 'signed' ? value : 'none'
     localStorage.setItem('centaur-match-group-by', groupBy)
   }
 
@@ -90,6 +92,14 @@
 
   $: groupedParticipants = (() => {
     if (groupBy === 'none') return [{ key: '', items: sortedParticipants }]
+    if (groupBy === 'signed') {
+      // Unsigned always sorts first here (unlike the alphabetical-with-unassigned-last order below),
+      // per the spec: unsigned scorecards are the ones needing attention.
+      return [
+        { key: labels.groupByUnsigned, items: sortedParticipants.filter((participant) => !participant.signed) },
+        { key: labels.groupBySigned, items: sortedParticipants.filter((participant) => participant.signed) }
+      ].filter((group) => group.items.length > 0)
+    }
     const groups = new Map<string, typeof sortedParticipants>()
     for (const participant of sortedParticipants) {
       const key = groupBy === 'category' ? categoryLabel(participant.categories) || labels.unassignedGroup : deviceName(participant.deviceId)
@@ -142,7 +152,7 @@
   async function exportCsv() {
     exportError = ''
     try {
-      const { blob, filename } = await api.downloadMatchExport(match.id)
+      const { blob, filename } = await api.downloadMatchExport(match.id, language)
       const url = URL.createObjectURL(blob)
       const link = document.createElement('a')
       link.href = url
@@ -151,6 +161,25 @@
       URL.revokeObjectURL(url)
     } catch (error) {
       exportError = labelForError(error, labels, 'exportError')
+    }
+  }
+
+  async function toggleSigned(participant: MatchParticipant) {
+    signToggleError = ''
+    const message = participant.signed ? labels.unsignConfirm : labels.signConfirm
+    if (!confirm(message)) return
+    try {
+      const updated = participant.signed
+        ? await api.unsignMatchParticipant(match.id, participant.id)
+        : await api.signMatchParticipant(match.id, participant.id, {})
+      // Optimistic local update, per spec: no full match reload needed for the toggle to reflect.
+      participant.signed = updated.signed
+      participant.signedAtUtc = updated.signedAtUtc
+      participant.archerSignatureDataUrl = updated.archerSignatureDataUrl
+      participant.markerSignatureDataUrl = updated.markerSignatureDataUrl
+      match = match
+    } catch (error) {
+      signToggleError = labelForError(error, labels, 'signToggleError')
     }
   }
 
@@ -177,6 +206,7 @@
         isOpen: false,
         participantListId: match.participantListId,
         deviceSelectionMode: match.deviceSelectionMode,
+        signatureMode: match.signatureMode,
         ends: match.ends,
         arrowsPerEnd: match.arrowsPerEnd,
         groupEnds: match.groupEnds,
@@ -284,6 +314,7 @@
         <option value="none">{labels.groupByNone}</option>
         <option value="category">{labels.groupByCategory}</option>
         <option value="device">{labels.groupByDevice}</option>
+        {#if match.signatureMode !== 'none'}<option value="signed">{labels.groupBySignedOption}</option>{/if}
       </select>
     </label>
     {#if unlistedParticipantCount > 0}
@@ -295,17 +326,26 @@
     <a class="primary" href={matchAddParticipantsPath(match.id)} on:click={(event) => navigateOnClick(event, onAddParticipants)}>+ {labels.addParticipant}</a>
   </div>
 
+  {#if signToggleError}<p class="error">{signToggleError}</p>{/if}
   {#if participants.length === 0}<p class="empty-state">{labels.emptyState}</p>{:else if sortedParticipants.length === 0}<p class="empty-state">{labels.noUnlistedParticipants}</p>{/if}
   {#each groupedParticipants as group}
     {#if group.key}<h2 class="group-heading">{group.key}</h2>{/if}
     <div class="list-panel">
       {#each group.items as participant}
-        <a class="list-row match-participant-row" class:unlisted-row={!participant.participantListMemberId} href={matchParticipantPath(match.id, participant.id)} on:click={(event) => navigateOnClick(event, () => onOpenParticipant(participant.id))}>
-          <span class="management-icon">◇</span>
-          <span class="participant-name"><strong>{participant.fullName || participant.lastName}</strong>{#if !participant.participantListMemberId}<span class="unlisted-tag">{labels.unlistedParticipantsWarning}</span>{/if}{#if participantDetailLabel(participant)}<span class="member-categories"> ({participantDetailLabel(participant)})</span>{/if}</span>
-          <strong class="participant-score">{participantTotal(participant.id, totalsByParticipantId)}</strong>
-          <span class="arrow">→</span>
-        </a>
+        <div class="match-participant-row-shell">
+          <a class="list-row match-participant-row" class:unlisted-row={!participant.participantListMemberId} class:with-signed-badge={match.signatureMode !== 'none'} href={matchParticipantPath(match.id, participant.id)} on:click={(event) => navigateOnClick(event, () => onOpenParticipant(participant.id))}>
+            <span class="management-icon">◇</span>
+            <span class="participant-name"><strong>{participant.fullName || participant.lastName}</strong>{#if !participant.participantListMemberId}<span class="unlisted-tag">{labels.unlistedParticipantsWarning}</span>{/if}{#if participantDetailLabel(participant)}<span class="member-categories"> ({participantDetailLabel(participant)})</span>{/if}</span>
+            {#if match.signatureMode !== 'none'}
+              <span class="signed-badge" class:is-signed={participant.signed}>{participant.signed ? labels.signedBadge : labels.unsignedBadge}</span>
+            {/if}
+            <strong class="participant-score">{participantTotal(participant.id, totalsByParticipantId)}</strong>
+            <span class="arrow">→</span>
+          </a>
+          {#if canManage && match.signatureMode !== 'none'}
+            <button type="button" class="sign-toggle-button" on:click={() => toggleSigned(participant)}>{participant.signed ? labels.unsignAction : labels.signAction}</button>
+          {/if}
+        </div>
       {/each}
     </div>
   {/each}
@@ -378,10 +418,25 @@
     margin-bottom: 2px;
   }
 
+  .match-participant-row-shell {
+    display: flex;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .match-participant-row-shell > .match-participant-row {
+    flex: 1;
+    min-width: 0;
+  }
+
   .match-participant-row {
     display: grid;
     grid-template-columns: 24px minmax(0, 1fr) minmax(5ch, 76px) 44px;
     gap: 14px;
+  }
+
+  .match-participant-row.with-signed-badge {
+    grid-template-columns: 24px minmax(0, 1fr) auto minmax(5ch, 76px) 44px;
   }
 
   .match-participant-row.unlisted-row {
@@ -390,6 +445,38 @@
     padding-right: 12px;
     background: #fdeeea;
     border-color: #e8755b;
+  }
+
+  .signed-badge {
+    align-self: center;
+    padding: 4px 10px;
+    border: 1px solid var(--line);
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+    color: var(--muted);
+  }
+
+  .signed-badge.is-signed {
+    color: var(--green);
+    border-color: var(--green);
+  }
+
+  .sign-toggle-button {
+    flex: 0 0 auto;
+    padding: 0 14px;
+    border: 1px solid var(--line);
+    background: var(--paper);
+    color: var(--ink);
+    white-space: nowrap;
+  }
+
+  .sign-toggle-button:hover,
+  .sign-toggle-button:focus-visible {
+    border-color: var(--green);
+    color: var(--green);
   }
 
   .unlisted-tag {
@@ -437,8 +524,21 @@
       gap: 10px;
     }
 
+    .match-participant-row.with-signed-badge {
+      grid-template-columns: 18px minmax(0, 1fr) auto minmax(4ch, 64px) 44px;
+    }
+
     .participant-score {
       font-size: 21px;
+    }
+
+    .match-participant-row-shell {
+      flex-direction: column;
+    }
+
+    .sign-toggle-button {
+      width: 100%;
+      min-height: 40px;
     }
   }
 </style>
