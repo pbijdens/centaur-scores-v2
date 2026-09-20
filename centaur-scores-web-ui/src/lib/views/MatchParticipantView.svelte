@@ -310,21 +310,4 @@
     padding: 4px 12px;
   }
 
-  .signature-images {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 16px;
-    margin-top: 12px;
-  }
-
-  .signature-block {
-    display: grid;
-    gap: 4px;
-  }
-
-  .signature-block img {
-    max-width: 320px;
-    border: 1px solid var(--line);
-    background: #fff;
-  }
 </style>

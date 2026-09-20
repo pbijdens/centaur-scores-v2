@@ -723,6 +723,27 @@ nav a.active:after {
   color: var(--green);
 }
 
+// Recorded archer/marker signature images, shown below a signed scorecard - see MatchParticipantView.svelte
+// (the participant detail page's expand-on-demand scorecard preview) and MatchParticipantScoreView.svelte
+// (the dedicated score-entry/editing view), both of which render the same signed scorecard's images.
+.signature-images {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 12px;
+}
+
+.signature-block {
+  display: grid;
+  gap: 4px;
+}
+
+.signature-block img {
+  max-width: 320px;
+  border: 1px solid var(--line);
+  background: #fff;
+}
+
 .toolbar {
   display: flex;
   gap: 10px;

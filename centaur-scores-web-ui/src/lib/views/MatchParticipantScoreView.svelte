@@ -100,6 +100,16 @@
   {:else}
     <ParticipantScorecard {match} scores={participant.scores} keyboard={keyboardConfig.keyboard} interactive={false} />
   {/if}
+  {#if participant.signed && (participant.archerSignatureDataUrl || participant.markerSignatureDataUrl)}
+    <div class="signature-images">
+      {#if participant.archerSignatureDataUrl}
+        <div class="signature-block"><span class="muted">{labels.archerSignatureLabel}</span><img src={participant.archerSignatureDataUrl} alt={labels.archerSignatureLabel} /></div>
+      {/if}
+      {#if participant.markerSignatureDataUrl}
+        <div class="signature-block"><span class="muted">{labels.markerSignatureLabel}</span><img src={participant.markerSignatureDataUrl} alt={labels.markerSignatureLabel} /></div>
+      {/if}
+    </div>
+  {/if}
 </section>
 
 <style>
