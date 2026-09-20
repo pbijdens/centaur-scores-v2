@@ -310,12 +310,13 @@
     {#if group.key}<h2 class="group-heading">{group.key}</h2>{/if}
     <div class="list-panel">
       {#each group.items as participant}
-        <a class="list-row match-participant-row" class:unlisted-row={!participant.participantListMemberId} class:with-signed-badge={match.signatureMode !== 'none'} href={matchParticipantPath(match.id, participant.id)} on:click={(event) => navigateOnClick(event, () => onOpenParticipant(participant.id))}>
-          <span class="management-icon">◇</span>
-          <span class="participant-name"><strong>{participant.fullName || participant.lastName}</strong>{#if !participant.participantListMemberId}<span class="unlisted-tag">{labels.unlistedParticipantsWarning}</span>{/if}{#if participantDetailLabel(participant)}<span class="member-categories"> ({participantDetailLabel(participant)})</span>{/if}</span>
+        <a class="list-row match-participant-row" class:unlisted-row={!participant.participantListMemberId} href={matchParticipantPath(match.id, participant.id)} on:click={(event) => navigateOnClick(event, () => onOpenParticipant(participant.id))}>
           {#if match.signatureMode !== 'none'}
-            <span class="signed-badge" class:is-signed={participant.signed}>{participant.signed ? labels.signedBadge : labels.unsignedBadge}</span>
+            <span class="management-icon signed-icon" class:is-signed={participant.signed} role="img" title={participant.signed ? labels.signedBadge : labels.unsignedBadge} aria-label={participant.signed ? labels.signedBadge : labels.unsignedBadge}>{participant.signed ? '✓' : '○'}</span>
+          {:else}
+            <span class="management-icon">◇</span>
           {/if}
+          <span class="participant-name"><strong>{participant.fullName || participant.lastName}</strong>{#if !participant.participantListMemberId}<span class="unlisted-tag">{labels.unlistedParticipantsWarning}</span>{/if}{#if participantDetailLabel(participant)}<span class="member-categories"> ({participantDetailLabel(participant)})</span>{/if}</span>
           <strong class="participant-score">{participantTotal(participant.id, totalsByParticipantId)}</strong>
           <span class="arrow">→</span>
         </a>
@@ -397,10 +398,6 @@
     gap: 14px;
   }
 
-  .match-participant-row.with-signed-badge {
-    grid-template-columns: 24px minmax(0, 1fr) auto minmax(5ch, 76px) 44px;
-  }
-
   .match-participant-row.unlisted-row {
     margin: 0 -12px;
     padding-left: 12px;
@@ -409,21 +406,16 @@
     border-color: #e8755b;
   }
 
-  .signed-badge {
-    align-self: center;
-    padding: 4px 10px;
-    border: 1px solid var(--line);
-    font-size: 12px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    white-space: nowrap;
+  /* Reuses the plain, unstyled .management-icon slot every list row already reserves - swapping
+     its glyph/color for the signed state, rather than adding a whole new column, is what keeps
+     this free on narrow screens where every extra column steals from the name. */
+  .management-icon.signed-icon {
     color: var(--muted);
+    font-weight: 700;
   }
 
-  .signed-badge.is-signed {
+  .management-icon.signed-icon.is-signed {
     color: var(--green);
-    border-color: var(--green);
   }
 
   .unlisted-tag {
@@ -467,12 +459,12 @@
     }
 
     .match-participant-row {
-      grid-template-columns: 18px minmax(0, 1fr) minmax(4ch, 64px) 44px;
+      grid-template-columns: 18px minmax(0, 1fr) minmax(4ch, 64px);
       gap: 10px;
     }
 
-    .match-participant-row.with-signed-badge {
-      grid-template-columns: 18px minmax(0, 1fr) auto minmax(4ch, 64px) 44px;
+    .match-participant-row .arrow {
+      display: none;
     }
 
     .participant-score {
