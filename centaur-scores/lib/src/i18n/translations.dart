@@ -109,10 +109,10 @@ const Map<String, Map<String, String>> _dict = {
     'EN': 'This scorecard is signed and can no longer be altered.'
   },
   'archerSignature': {'NL': 'Handtekening schutter', 'EN': 'Archer signature'},
-  'markerSignature': {'NL': 'Handtekening scheidsrechter', 'EN': 'Marker signature'},
+  'markerSignature': {'NL': 'Handtekening marker', 'EN': 'Marker signature'},
   'signatureCaptureTitle': {'NL': 'Scorekaart ondertekenen', 'EN': 'Sign scorecard'},
   'signatureCaptureInstructions': {
-    'NL': 'Schutter en scheidsrechter tekenen hieronder elk in hun eigen vak.',
+    'NL': 'Schutter en marker tekenen hieronder elk in hun eigen vak.',
     'EN': 'The archer and marker each sign below in their own area.'
   },
   'clearSignature': {'NL': 'Wissen', 'EN': 'Clear'},
