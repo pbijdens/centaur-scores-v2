@@ -3,7 +3,7 @@ import type { View } from './types'
 // Views that render without ever requiring a fresh session: narrowcast displays and result
 // pages run unattended on kiosks/printers/public screens with no one there to dismiss a popup
 // or be redirected, and match-qr shares that "standalone, no chrome" treatment (see CLAUDE.md).
-const VIEWS_WITHOUT_SESSION_WATCH = new Set<View>(['narrowcast', 'match-qr', 'match-results-scope', 'competition-results'])
+const VIEWS_WITHOUT_SESSION_WATCH = new Set<View>(['narrowcast', 'match-qr', 'match-print', 'match-results-scope', 'competition-results'])
 
 export type SessionWatchState = {
   token: string

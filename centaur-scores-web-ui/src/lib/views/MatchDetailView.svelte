@@ -4,7 +4,7 @@
   import DropdownMenu from '../DropdownMenu.svelte'
   import { labelForError } from '../errors'
   import { parseMatchKeyboardConfig } from '../matchConfig'
-  import { matchAddParticipantsPath, matchDevicesPath, matchEditPath, matchParticipantPath, matchQrPath, matchResultsPath, navigateOnClick } from '../router'
+  import { matchAddParticipantsPath, matchDevicesPath, matchEditPath, matchParticipantPath, matchPrintPath, matchQrPath, matchResultsPath, navigateOnClick } from '../router'
   import type { Category, Language, Match, MatchParticipant, ScopeConflict } from '../types'
 
   export let api: ApiClient
@@ -17,6 +17,7 @@
   export let onDeleted: () => void
   export let onEditMetadata: () => void
   export let onManageDevices: () => void
+  export let onPrintScorecards: () => void
   export let onAddParticipants: () => void
   export let onOpenParticipant: (participantId: string) => void
   export let onCopied: (match: Match) => void
@@ -236,6 +237,7 @@
       <a class="menu-item" href={matchEditPath(match.id)} on:click={(event) => navigateOnClick(event, onEditMetadata)}>{labels.editMetadata}</a>
       <a class="menu-item" href={matchDevicesPath(match.id)} on:click={(event) => navigateOnClick(event, onManageDevices)}>{labels.manageDevices}</a>
       <a class="menu-item" href={matchQrPath(match.id)} target="_blank" rel="noopener">{labels.viewQrCodes}</a>
+      <a class="menu-item" href={matchPrintPath(match.id)} on:click={(event) => navigateOnClick(event, onPrintScorecards)}>{labels.printScorecards}</a>
       <button class="menu-item" on:click={exportCsv}>{labels.exportCsv}</button>
       <button class="menu-item" on:click={() => (showCopyForm = !showCopyForm)}>{labels.copyMatch}</button>
       <hr class="menu-separator" />
