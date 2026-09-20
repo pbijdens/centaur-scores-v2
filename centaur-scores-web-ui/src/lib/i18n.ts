@@ -866,7 +866,7 @@ export const labels = {
         scorecardNotSignedBanner: 'Deze scorekaart is nog niet ondertekend.',
         scorecardSignedBanner: 'Deze scorekaart is ondertekend en definitief.',
         archerSignatureLabel: 'Handtekening schutter',
-        markerSignatureLabel: 'Handtekening scheidsrechter',
+        markerSignatureLabel: 'Handtekening marker',
         participantDetailsLabel: 'Deelnemergegevens',
         editParticipantDetails: 'Gegevens bewerken',
         addToParticipantList: 'Toevoegen aan {name}',
