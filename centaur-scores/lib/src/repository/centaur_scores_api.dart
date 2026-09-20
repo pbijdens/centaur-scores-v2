@@ -56,6 +56,17 @@ class CentaurScoresAPI {
     return DateTime.parse(json['time'] as String);
   }
 
+  /// See PUBLIC-API-DESIGN.md "Sign a participant's scorecard". No anonymous
+  /// unsign - withdrawing a signature is manager-only, via the authenticated
+  /// (full) API, not exposed to scoring devices.
+  Future<void> postSign(String matchParticipantId,
+      {String? archerSignatureDataUrl, String? markerSignatureDataUrl}) async {
+    await _request('POST', '/participants/$matchParticipantId/sign', body: {
+      'archerSignatureDataUrl': archerSignatureDataUrl,
+      'markerSignatureDataUrl': markerSignatureDataUrl,
+    });
+  }
+
   // --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- ---
 
   Future<dynamic> _request(String method, String pathSuffix, {dynamic body}) async {
@@ -82,6 +93,10 @@ class CentaurScoresAPI {
           break;
         case 'PUT':
           response = await client.put(uri,
+              headers: headers, body: body != null ? jsonEncode(body) : null);
+          break;
+        case 'POST':
+          response = await client.post(uri,
               headers: headers, body: body != null ? jsonEncode(body) : null);
           break;
         default:

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import 'package:centaur_scores/src/model/api_error.dart';
+import 'package:centaur_scores/src/model/pending_signatures.dart';
 import 'package:centaur_scores/src/model/pending_updates.dart';
 import 'package:centaur_scores/src/model/scorekeeper_match.dart';
 import 'package:centaur_scores/src/model/scorekeeper_participant_update.dart';
@@ -43,6 +44,7 @@ class MatchRepository with ChangeNotifier {
   bool _isConfigured = false;
   ScorekeeperMatch? _matchData;
   PendingUpdates _pendingUpdates = PendingUpdates();
+  PendingSignatures _pendingSignatures = PendingSignatures();
   List<ScoreConflictEntry>? _conflicts;
   SyncStatus _syncStatus = SyncStatus.idle;
   bool _busy = false;
@@ -66,6 +68,7 @@ class MatchRepository with ChangeNotifier {
       _isConfigured = true;
       _matchData = await _store.loadMatchData();
       _pendingUpdates = await _store.loadPendingUpdates();
+      _pendingSignatures = await _store.loadPendingSignatures();
       AppNavigator().current =
           _matchData != null ? const HomeScreen() : const AppLoadingScreen();
       startBackgroundSync();
@@ -89,6 +92,7 @@ class MatchRepository with ChangeNotifier {
     await _store.clearPairingData();
     _matchData = null;
     _pendingUpdates = PendingUpdates();
+    _pendingSignatures = PendingSignatures();
     _conflicts = null;
     _syncStatus = SyncStatus.idle;
     _isConfigured = true;
@@ -105,6 +109,7 @@ class MatchRepository with ChangeNotifier {
     await _store.clearPairingData();
     _matchData = null;
     _pendingUpdates = PendingUpdates();
+    _pendingSignatures = PendingSignatures();
     _conflicts = null;
     _syncStatus = SyncStatus.idle;
     _isConfigured = false;
@@ -122,9 +127,13 @@ class MatchRepository with ChangeNotifier {
   void startBackgroundSync() {
     stopBackgroundSync();
     _pollTimer = Timer.periodic(_pollInterval, (_) => fetchMatchInfo());
-    _retryTimer = Timer.periodic(_retryInterval, (_) => flushPendingScores());
+    _retryTimer = Timer.periodic(_retryInterval, (_) {
+      flushPendingScores();
+      flushPendingSignatures();
+    });
     fetchMatchInfo();
     flushPendingScores();
+    flushPendingSignatures();
   }
 
   void stopBackgroundSync() {
@@ -187,11 +196,18 @@ class MatchRepository with ChangeNotifier {
   void _mergeMatchData(ScorekeeperMatch fresh) {
     for (final participant in fresh.participants) {
       final pending = _pendingUpdates.byParticipant[participant.matchParticipantId];
-      if (pending == null) continue;
-      for (final entry in pending.entries) {
-        if (entry.key >= 0 && entry.key < participant.arrowScores.length) {
-          participant.arrowScores[entry.key] = entry.value.newValue;
+      if (pending != null) {
+        for (final entry in pending.entries) {
+          if (entry.key >= 0 && entry.key < participant.arrowScores.length) {
+            participant.arrowScores[entry.key] = entry.value.newValue;
+          }
         }
+      }
+      final pendingSignature = _pendingSignatures.byParticipant[participant.matchParticipantId];
+      if (pendingSignature != null) {
+        participant.signed = true;
+        participant.archerSignatureDataUrl = pendingSignature.archerSignatureDataUrl;
+        participant.markerSignatureDataUrl = pendingSignature.markerSignatureDataUrl;
       }
     }
     _matchData = fresh;
@@ -405,6 +421,88 @@ class MatchRepository with ChangeNotifier {
     if (_conflicts != null && _conflicts!.isEmpty) _conflicts = null;
     _store.savePendingUpdates(_pendingUpdates);
     notifyListeners();
+  }
+
+  // --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- ---
+  // Scorecard signing
+  // --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- ---
+
+  /// Queues a signature for sync and applies it optimistically to the
+  /// locally held match data. Unlike score edits, there is no conflict
+  /// resolution for signing (see documentation/SIGNING-SCORECARDS.md) - a
+  /// queued signature is simply retried until it lands.
+  void recordSignature(String matchParticipantId,
+      {String? archerSignatureDataUrl, String? markerSignatureDataUrl}) {
+    _pendingSignatures.byParticipant[matchParticipantId] = PendingSignature(
+        archerSignatureDataUrl: archerSignatureDataUrl,
+        markerSignatureDataUrl: markerSignatureDataUrl);
+    _setLocalSigned(matchParticipantId, archerSignatureDataUrl, markerSignatureDataUrl);
+    _store.savePendingSignatures(_pendingSignatures);
+    notifyListeners();
+    flushPendingSignatures();
+  }
+
+  void _setLocalSigned(
+      String matchParticipantId, String? archerSignatureDataUrl, String? markerSignatureDataUrl) {
+    final match = _matchData;
+    if (match == null) return;
+    for (final participant in match.participants) {
+      if (participant.matchParticipantId == matchParticipantId) {
+        participant.signed = true;
+        participant.archerSignatureDataUrl = archerSignatureDataUrl;
+        participant.markerSignatureDataUrl = markerSignatureDataUrl;
+        return;
+      }
+    }
+  }
+
+  bool _signaturesSyncing = false;
+
+  Future<void> flushPendingSignatures() async {
+    if (_pendingSignatures.isEmpty) return;
+    // Mirrors flushPendingScores' syncing guard: two overlapping flushes
+    // (e.g. signing two participants in quick succession, each triggering
+    // its own fire-and-forget flush) would otherwise both snapshot and
+    // resend the same still-pending entry, and the second attempt would
+    // fail with SCORECARD_SIGNED forever after the first one lands.
+    if (_signaturesSyncing) return;
+    _signaturesSyncing = true;
+    try {
+      // Snapshot so a signature queued mid-flush isn't dropped from the map
+      // we're iterating, and isn't double-sent either (it's simply picked up
+      // on the next retry tick).
+      final entries = Map.of(_pendingSignatures.byParticipant);
+      var changed = false;
+      for (final entry in entries.entries) {
+        try {
+          await _api.postSign(entry.key,
+              archerSignatureDataUrl: entry.value.archerSignatureDataUrl,
+              markerSignatureDataUrl: entry.value.markerSignatureDataUrl);
+          _pendingSignatures.byParticipant.remove(entry.key);
+          changed = true;
+        } on ApiException catch (e) {
+          if (e.code == 'SCORECARD_SIGNED') {
+            // Already signed server-side (e.g. a raced duplicate send, or a
+            // manager signed it via the full API meanwhile) - the local
+            // state already reflects signed=true correctly, so this is a
+            // successful outcome, not a failure to keep retrying.
+            _pendingSignatures.byParticipant.remove(entry.key);
+            changed = true;
+          } else {
+            debugPrint("flushPendingSignatures failed for ${entry.key}: $e");
+          }
+        } catch (error) {
+          debugPrint("flushPendingSignatures failed for ${entry.key}: $error");
+          // Leave queued; the next retry tick will try again.
+        }
+      }
+      if (changed) {
+        await _store.savePendingSignatures(_pendingSignatures);
+        notifyListeners();
+      }
+    } finally {
+      _signaturesSyncing = false;
+    }
   }
 
   void _removeResolvedConflictIndex(String matchParticipantId, int index) {

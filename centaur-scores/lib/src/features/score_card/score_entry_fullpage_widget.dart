@@ -1,4 +1,5 @@
 import 'package:centaur_scores/src/features/score_card/score_column_keyboard.dart';
+import 'package:centaur_scores/src/features/score_card/sign_area.dart';
 import 'package:centaur_scores/src/repository/repository.dart';
 import 'package:centaur_scores/src/mvvm/events/loading_event.dart';
 import 'package:centaur_scores/src/mvvm/observer.dart';
@@ -13,6 +14,7 @@ import 'package:flutter/material.dart';
 
 import '../../model/scorekeeper_match.dart';
 import '../../model/scorekeeper_match_participant.dart';
+import '../../scoring/scoring.dart' as scoring;
 
 class ScoreEntryFullPageWidget extends StatefulWidget {
   const ScoreEntryFullPageWidget({super.key});
@@ -139,6 +141,11 @@ class ScoreEntryFullPageWidgetState extends State<ScoreEntryFullPageWidget>
                   currentModel,
                   participant,
                   participants.indexWhere(
+                      (e) => e.matchParticipantId == participant.matchParticipantId)),
+              signArea(
+                  currentModel,
+                  participant,
+                  participants.indexWhere(
                       (e) => e.matchParticipantId == participant.matchParticipantId))
             ]))
         .toList();
@@ -180,9 +187,12 @@ class ScoreEntryFullPageWidgetState extends State<ScoreEntryFullPageWidget>
         .toList();
   }
 
+  // Once signed, a participant's card is permanently locked - the numeric
+  // keypad must never open for them again, regardless of activeKeyboard.
   Widget keyboard(BuildContext context, ScorekeeperMatch model,
       ScorekeeperMatchParticipant participantModel, int participantIndex) {
-    if (participantIndex == _viewModel.activeKeyboard) {
+    final isActive = participantIndex == _viewModel.activeKeyboard;
+    if (isActive && !participantModel.signed && !_requiresSignFocus(model, participantModel)) {
       return IntrinsicHeight(
           key: _keyboardScrollKey,
           child: ScoreColumnKeyboard(_viewModel, model, participantModel));
@@ -191,6 +201,30 @@ class ScoreEntryFullPageWidgetState extends State<ScoreEntryFullPageWidget>
       width: StyleHelper.scoreCardColumnWidth(context, model),
       height: 0,
       child: Container(color: Colors.transparent),
+    );
+  }
+
+  // A signature-required card that's activated and fully filled in should
+  // scroll/focus to the Sign area instead of reopening the numeric keypad -
+  // see documentation/SIGNING-SCORECARDS.md.
+  bool _requiresSignFocus(ScorekeeperMatch model, ScorekeeperMatchParticipant participant) {
+    return model.signatureMode != 'none' &&
+        !participant.signed &&
+        scoring.firstNullIndex(participant) == null;
+  }
+
+  // Reuses the same GlobalKey/KeyboardShownEvent scroll mechanism as the
+  // numeric keypad above - at any moment only one of {keyboard, sign area}
+  // is ever the "focused" widget for the active column, so it's safe for
+  // both to conditionally claim the same key.
+  Widget signArea(ScorekeeperMatch model, ScorekeeperMatchParticipant participantModel,
+      int participantIndex) {
+    final isActive = participantIndex == _viewModel.activeKeyboard;
+    final shouldFocus = isActive && _requiresSignFocus(model, participantModel);
+    return SignArea(
+      key: shouldFocus ? _keyboardScrollKey : null,
+      model: model,
+      participant: participantModel,
     );
   }
 }

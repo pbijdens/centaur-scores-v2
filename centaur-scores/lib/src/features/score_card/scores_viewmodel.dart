@@ -109,6 +109,16 @@ class ScoresViewmodel extends EventViewModel {
 
       notify(ArrowStateChangedEvent(
           participant: participant, end: editingEnd, arrow: editingArrow!));
+
+      // The card just became fully filled in while already active: the
+      // keyboard is about to collapse in favor of the Sign area (see
+      // ScoreEntryFullPageWidgetState._requiresSignFocus) - scroll/focus to
+      // it the same way activating an already-complete card does.
+      if (model.signatureMode != 'none' &&
+          !participant.signed &&
+          scoring.firstNullIndex(participant) == null) {
+        notifyKeyboardShown();
+      }
     }
   }
 

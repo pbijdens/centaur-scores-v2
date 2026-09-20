@@ -24,7 +24,8 @@ ScorekeeperMatch _$ScorekeeperMatchFromJson(Map<String, dynamic> json) =>
       ..participants = (json['participants'] as List<dynamic>)
           .map((e) =>
               ScorekeeperMatchParticipant.fromJson(e as Map<String, dynamic>))
-          .toList();
+          .toList()
+      ..signatureMode = json['signatureMode'] as String? ?? 'none';
 
 Map<String, dynamic> _$ScorekeeperMatchToJson(ScorekeeperMatch instance) =>
     <String, dynamic>{
@@ -38,4 +39,5 @@ Map<String, dynamic> _$ScorekeeperMatchToJson(ScorekeeperMatch instance) =>
       'allowCustomParticipants': instance.allowCustomParticipants,
       'keyboard': instance.keyboard.map((e) => e.toJson()).toList(),
       'participants': instance.participants.map((e) => e.toJson()).toList(),
+      'signatureMode': instance.signatureMode,
     };
