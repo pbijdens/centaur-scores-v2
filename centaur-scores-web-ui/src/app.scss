@@ -685,8 +685,15 @@ nav a.active:after {
 
 // Shared "scorecard signed/unsigned" status banner - see MatchParticipantView.svelte and
 // MatchParticipantScoreView.svelte, both of which show the same signing state for a participant.
+// MatchParticipantView also puts the manager sign/unsign toggle in here (see .sign-toggle-button below).
 .signature-status-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
   margin-top: 16px;
+  margin-bottom: 16px;
   font-weight: 700;
   background: #fdeeea;
   border-color: #e8755b;
@@ -695,6 +702,23 @@ nav a.active:after {
 
 .signature-status-banner.is-signed {
   background: #eaf7ee;
+  border-color: var(--green);
+  color: var(--green);
+}
+
+.sign-toggle-button {
+  flex: 0 0 auto;
+  padding: 0 14px;
+  min-height: 36px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--ink);
+  font-weight: 400;
+  white-space: nowrap;
+}
+
+.sign-toggle-button:hover,
+.sign-toggle-button:focus-visible {
   border-color: var(--green);
   color: var(--green);
 }

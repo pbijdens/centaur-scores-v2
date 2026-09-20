@@ -11,7 +11,6 @@
   export let match: Match
   export let categories: Category[]
   export let language: Language
-  export let canManage: boolean
   export let labels: Record<string, string>
   export let onBack: () => void
   export let onToggleOpen: () => void
@@ -41,7 +40,6 @@
   let copyIncludeParticipants = false
   let copying = false
   let copyError = ''
-  let signToggleError = ''
 
   $: participants = match.participants ?? []
   $: devices = match.devices ?? []
@@ -161,25 +159,6 @@
       URL.revokeObjectURL(url)
     } catch (error) {
       exportError = labelForError(error, labels, 'exportError')
-    }
-  }
-
-  async function toggleSigned(participant: MatchParticipant) {
-    signToggleError = ''
-    const message = participant.signed ? labels.unsignConfirm : labels.signConfirm
-    if (!confirm(message)) return
-    try {
-      const updated = participant.signed
-        ? await api.unsignMatchParticipant(match.id, participant.id)
-        : await api.signMatchParticipant(match.id, participant.id, {})
-      // Optimistic local update, per spec: no full match reload needed for the toggle to reflect.
-      participant.signed = updated.signed
-      participant.signedAtUtc = updated.signedAtUtc
-      participant.archerSignatureDataUrl = updated.archerSignatureDataUrl
-      participant.markerSignatureDataUrl = updated.markerSignatureDataUrl
-      match = match
-    } catch (error) {
-      signToggleError = labelForError(error, labels, 'signToggleError')
     }
   }
 
@@ -326,26 +305,20 @@
     <a class="primary" href={matchAddParticipantsPath(match.id)} on:click={(event) => navigateOnClick(event, onAddParticipants)}>+ {labels.addParticipant}</a>
   </div>
 
-  {#if signToggleError}<p class="error">{signToggleError}</p>{/if}
   {#if participants.length === 0}<p class="empty-state">{labels.emptyState}</p>{:else if sortedParticipants.length === 0}<p class="empty-state">{labels.noUnlistedParticipants}</p>{/if}
   {#each groupedParticipants as group}
     {#if group.key}<h2 class="group-heading">{group.key}</h2>{/if}
     <div class="list-panel">
       {#each group.items as participant}
-        <div class="match-participant-row-shell">
-          <a class="list-row match-participant-row" class:unlisted-row={!participant.participantListMemberId} class:with-signed-badge={match.signatureMode !== 'none'} href={matchParticipantPath(match.id, participant.id)} on:click={(event) => navigateOnClick(event, () => onOpenParticipant(participant.id))}>
-            <span class="management-icon">◇</span>
-            <span class="participant-name"><strong>{participant.fullName || participant.lastName}</strong>{#if !participant.participantListMemberId}<span class="unlisted-tag">{labels.unlistedParticipantsWarning}</span>{/if}{#if participantDetailLabel(participant)}<span class="member-categories"> ({participantDetailLabel(participant)})</span>{/if}</span>
-            {#if match.signatureMode !== 'none'}
-              <span class="signed-badge" class:is-signed={participant.signed}>{participant.signed ? labels.signedBadge : labels.unsignedBadge}</span>
-            {/if}
-            <strong class="participant-score">{participantTotal(participant.id, totalsByParticipantId)}</strong>
-            <span class="arrow">→</span>
-          </a>
-          {#if canManage && match.signatureMode !== 'none'}
-            <button type="button" class="sign-toggle-button" on:click={() => toggleSigned(participant)}>{participant.signed ? labels.unsignAction : labels.signAction}</button>
+        <a class="list-row match-participant-row" class:unlisted-row={!participant.participantListMemberId} class:with-signed-badge={match.signatureMode !== 'none'} href={matchParticipantPath(match.id, participant.id)} on:click={(event) => navigateOnClick(event, () => onOpenParticipant(participant.id))}>
+          <span class="management-icon">◇</span>
+          <span class="participant-name"><strong>{participant.fullName || participant.lastName}</strong>{#if !participant.participantListMemberId}<span class="unlisted-tag">{labels.unlistedParticipantsWarning}</span>{/if}{#if participantDetailLabel(participant)}<span class="member-categories"> ({participantDetailLabel(participant)})</span>{/if}</span>
+          {#if match.signatureMode !== 'none'}
+            <span class="signed-badge" class:is-signed={participant.signed}>{participant.signed ? labels.signedBadge : labels.unsignedBadge}</span>
           {/if}
-        </div>
+          <strong class="participant-score">{participantTotal(participant.id, totalsByParticipantId)}</strong>
+          <span class="arrow">→</span>
+        </a>
       {/each}
     </div>
   {/each}
@@ -418,17 +391,6 @@
     margin-bottom: 2px;
   }
 
-  .match-participant-row-shell {
-    display: flex;
-    align-items: stretch;
-    gap: 8px;
-  }
-
-  .match-participant-row-shell > .match-participant-row {
-    flex: 1;
-    min-width: 0;
-  }
-
   .match-participant-row {
     display: grid;
     grid-template-columns: 24px minmax(0, 1fr) minmax(5ch, 76px) 44px;
@@ -462,21 +424,6 @@
   .signed-badge.is-signed {
     color: var(--green);
     border-color: var(--green);
-  }
-
-  .sign-toggle-button {
-    flex: 0 0 auto;
-    padding: 0 14px;
-    border: 1px solid var(--line);
-    background: var(--paper);
-    color: var(--ink);
-    white-space: nowrap;
-  }
-
-  .sign-toggle-button:hover,
-  .sign-toggle-button:focus-visible {
-    border-color: var(--green);
-    color: var(--green);
   }
 
   .unlisted-tag {
@@ -530,15 +477,6 @@
 
     .participant-score {
       font-size: 21px;
-    }
-
-    .match-participant-row-shell {
-      flex-direction: column;
-    }
-
-    .sign-toggle-button {
-      width: 100%;
-      min-height: 40px;
     }
   }
 </style>

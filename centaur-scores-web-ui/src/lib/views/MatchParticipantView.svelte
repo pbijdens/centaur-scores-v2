@@ -32,6 +32,7 @@
   let showQuickSet = false
   let showScorecard = false
   let quickSetSection: HTMLElement | null = null
+  let signToggleError = ''
 
   $: keyboardConfig = parseMatchKeyboardConfig(match.keyboardJson)
   $: matchCategories = keyboardConfig.categoryOrder.map((id) => categories.find((category) => category.id === id)).filter((category): category is Category => !!category)
@@ -128,6 +129,22 @@
     }
   }
 
+  async function toggleSigned() {
+    signToggleError = ''
+    const message = participant.signed ? labels.unsignConfirm : labels.signConfirm
+    if (!confirm(message)) return
+    try {
+      const updated = participant.signed
+        ? await api.unsignMatchParticipant(match.id, participant.id)
+        : await api.signMatchParticipant(match.id, participant.id, {})
+      // Optimistic local update, per spec: no full reload needed for the toggle to reflect.
+      participant = { ...participant, signed: updated.signed, signedAtUtc: updated.signedAtUtc, archerSignatureDataUrl: updated.archerSignatureDataUrl, markerSignatureDataUrl: updated.markerSignatureDataUrl }
+      await onChanged()
+    } catch (error) {
+      signToggleError = labelForError(error, labels, 'signToggleError')
+    }
+  }
+
   async function assignDevice(deviceId: string) {
     participant = { ...participant, deviceId: deviceId || null }
     await api.assignParticipantDevice(match.id, participant.id, deviceId || null)
@@ -183,8 +200,12 @@
 {#if removeError}<p class="error">{removeError}</p>{/if}
 {#if match.signatureMode !== 'none'}
   <div class="panel signature-status-banner" class:is-signed={participant.signed}>
-    {participant.signed ? labels.scorecardSignedBanner : labels.scorecardNotSignedBanner}
+    <span>{participant.signed ? labels.scorecardSignedBanner : labels.scorecardNotSignedBanner}</span>
+    {#if canManage}
+      <button type="button" class="sign-toggle-button" on:click={toggleSigned}>{participant.signed ? labels.unsignAction : labels.signAction}</button>
+    {/if}
   </div>
+  {#if signToggleError}<p class="error">{signToggleError}</p>{/if}
 {/if}
 
 <section class="panel">
