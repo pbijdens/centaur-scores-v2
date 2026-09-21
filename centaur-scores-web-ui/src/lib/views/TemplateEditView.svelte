@@ -3,7 +3,7 @@
   import DropdownMenu from '../DropdownMenu.svelte'
   import { labelForError } from '../errors'
   import RowActions from '../RowActions.svelte'
-  import { keyboardColors, deviceSelectionModes, parseTemplateConfiguration } from '../templateConfig'
+  import { keyboardColors, deviceSelectionModes, signatureModes, parseTemplateConfiguration } from '../templateConfig'
   import type { Category, MatchTemplate, ParticipantListSummary } from '../types'
 
   export let api: ApiClient
@@ -19,6 +19,7 @@
   let participantListId = template.participantListId ?? ''
   let allowFreeParticipants = template.allowFreeParticipants
   let deviceSelectionMode = template.deviceSelectionMode
+  let signatureMode = template.signatureMode
   let config = parseTemplateConfiguration(template.configurationJson)
   let deleteError = ''
   let personalBestClassifier = template.personalBestClassifier ?? ''
@@ -42,6 +43,12 @@
     if (mode === 'list') return labels.modeList
     if (mode === 'list-and-free') return labels.modeListAndFree
     return labels.modeRestricted
+  }
+
+  function signatureModeLabel(mode: string): string {
+    if (mode === 'confirm') return labels.signatureModeConfirm
+    if (mode === 'signature') return labels.signatureModeSignature
+    return labels.signatureModeNone
   }
 
   function toggleCategory(categoryId: string) {
@@ -164,6 +171,7 @@
         participantListId: participantListId || null,
         allowFreeParticipants,
         deviceSelectionMode,
+        signatureMode,
         configurationJson: JSON.stringify(config),
         personalBestClassifier: personalBestClassifier || null
       })
@@ -204,6 +212,11 @@
   <label>{labels.endsLabel}<input type="number" min="1" bind:value={config.ends} /></label>
   <label>{labels.arrowsPerEndLabel}<input type="number" min="1" bind:value={config.arrowsPerEnd} /></label>
   <label>{labels.groupEndsLabel}<input type="number" min="1" bind:value={config.groupEnds} /></label>
+  <label>{labels.signatureModeLabel}
+    <select bind:value={signatureMode}>
+      {#each signatureModes as mode}<option value={mode}>{signatureModeLabel(mode)}</option>{/each}
+    </select>
+  </label>
   <label>{labels.participantListLabel}
     <select bind:value={participantListId}>
       <option value="">{labels.noParticipantList}</option>

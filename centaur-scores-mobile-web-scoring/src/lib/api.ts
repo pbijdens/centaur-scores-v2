@@ -5,6 +5,7 @@ import type {
   ScoreConflictEntry,
   ScorekeeperMatch,
   ScorekeeperParticipantUpdate,
+  SignRequest,
   TimeResponse,
 } from './types';
 
@@ -103,5 +104,15 @@ export class ScorekeeperApi {
 
   getTime(): Promise<TimeResponse> {
     return request<TimeResponse>(this.url('/time'));
+  }
+
+  /** See PUBLIC-API-DESIGN.md "Sign a participant's scorecard". No anonymous
+   * unsign - withdrawing a signature is manager-only, via the authenticated
+   * (full) API, never exposed to scoring devices. */
+  postSign(matchParticipantId: string, body: SignRequest): Promise<void> {
+    return request(this.url(`/participants/${matchParticipantId}/sign`), {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
   }
 }

@@ -1,5 +1,6 @@
 import type {
   Language,
+  PendingSignatures,
   PendingUpdates,
   ScoreKeeperParticipantInfo,
   ScorekeeperMatch,
@@ -7,7 +8,7 @@ import type {
   ScorekeeperParticipantUpdate,
 } from './types';
 import { clearAppState } from './storage';
-import { apiBase, language, matchData, pendingUpdates, screen } from './stores';
+import { apiBase, language, matchData, pendingSignatures, pendingUpdates, screen } from './stores';
 import { get } from 'svelte/store';
 
 export function readStartupParams(): { apiBase: string | null; language: Language | null } {
@@ -27,6 +28,7 @@ export function initializeFromStartupParams(): void {
     clearAppState();
     matchData.set(null);
     pendingUpdates.set({});
+    pendingSignatures.set({});
     screen.set({ name: 'loading' });
     apiBase.set(newBase);
   }
@@ -37,18 +39,32 @@ export function initializeFromStartupParams(): void {
 }
 
 /** Merges freshly fetched match data into the store, keeping any not-yet
- * synchronized local edits so a background poll never clobbers them. */
-export function mergeMatchData(next: ScorekeeperMatch, pending: PendingUpdates): ScorekeeperMatch {
+ * synchronized local edits (scores and/or a signature) so a background poll
+ * never clobbers them. */
+export function mergeMatchData(next: ScorekeeperMatch, pending: PendingUpdates, pendingSigned: PendingSignatures): ScorekeeperMatch {
   const mergedParticipants = next.participants.map((participant) => {
+    let merged = participant;
+
     const participantPending = pending[participant.matchParticipantId];
-    if (!participantPending || Object.keys(participantPending).length === 0) {
-      return participant;
+    if (participantPending && Object.keys(participantPending).length > 0) {
+      const arrowScores = [...merged.arrowScores];
+      for (const [indexStr, edit] of Object.entries(participantPending)) {
+        arrowScores[Number(indexStr)] = edit.new;
+      }
+      merged = { ...merged, arrowScores };
     }
-    const arrowScores = [...participant.arrowScores];
-    for (const [indexStr, edit] of Object.entries(participantPending)) {
-      arrowScores[Number(indexStr)] = edit.new;
+
+    const pendingSignature = pendingSigned[participant.matchParticipantId];
+    if (pendingSignature) {
+      merged = {
+        ...merged,
+        signed: true,
+        archerSignatureDataUrl: pendingSignature.archerSignatureDataUrl,
+        markerSignatureDataUrl: pendingSignature.markerSignatureDataUrl,
+      };
     }
-    return { ...participant, arrowScores };
+
+    return merged;
   });
   return { ...next, participants: mergedParticipants };
 }

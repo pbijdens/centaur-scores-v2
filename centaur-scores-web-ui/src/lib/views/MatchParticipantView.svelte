@@ -32,6 +32,7 @@
   let showQuickSet = false
   let showScorecard = false
   let quickSetSection: HTMLElement | null = null
+  let signToggleError = ''
 
   $: keyboardConfig = parseMatchKeyboardConfig(match.keyboardJson)
   $: matchCategories = keyboardConfig.categoryOrder.map((id) => categories.find((category) => category.id === id)).filter((category): category is Category => !!category)
@@ -48,6 +49,7 @@
   $: showGroupTotals = hasGroups(match)
   $: currentGroupTotals = showGroupTotals ? groupTotals(match, participant.scores) : []
   $: editSharedDetailsHref = sourceList && participant.participantListMemberId ? participantMemberPath(sourceList.id, participant.participantListMemberId) : ''
+  $: canEditScores = !participant.signed || canManage
 
   function categoryLabel(): string {
     return matchCategories
@@ -127,6 +129,22 @@
     }
   }
 
+  async function toggleSigned() {
+    signToggleError = ''
+    const message = participant.signed ? labels.unsignConfirm : labels.signConfirm
+    if (!confirm(message)) return
+    try {
+      const updated = participant.signed
+        ? await api.unsignMatchParticipant(match.id, participant.id)
+        : await api.signMatchParticipant(match.id, participant.id, {})
+      // Optimistic local update, per spec: no full reload needed for the toggle to reflect.
+      participant = { ...participant, signed: updated.signed, signedAtUtc: updated.signedAtUtc, archerSignatureDataUrl: updated.archerSignatureDataUrl, markerSignatureDataUrl: updated.markerSignatureDataUrl }
+      await onChanged()
+    } catch (error) {
+      signToggleError = labelForError(error, labels, 'signToggleError')
+    }
+  }
+
   async function assignDevice(deviceId: string) {
     participant = { ...participant, deviceId: deviceId || null }
     await api.assignParticipantDevice(match.id, participant.id, deviceId || null)
@@ -173,13 +191,22 @@
           <a class="menu-item" href={matchParticipantReplacePath(match.id, participant.id)} on:click={(event) => navigateOnClick(event, onChangeParticipant)}>{labels.linkParticipant}</a>
         {/if}
       {/if}
-      <a class="menu-item" href={matchParticipantScorePath(match.id, participant.id)} on:click={(event) => navigateOnClick(event, onViewScores)}>{labels.viewEditScores}</a>
-      <button class="menu-item" on:click={toggleQuickSet}>{labels.replaceScores}</button>
+      <a class="menu-item" href={matchParticipantScorePath(match.id, participant.id)} on:click={(event) => navigateOnClick(event, onViewScores)}>{canEditScores ? labels.viewEditScores : labels.viewScores}</a>
+      {#if canEditScores}<button class="menu-item" on:click={toggleQuickSet}>{labels.replaceScores}</button>{/if}
       <button class="menu-item menu-item-danger" on:click={remove}>{labels.removeParticipant}</button>
     </DropdownMenu>
   </div>
 </div>
 {#if removeError}<p class="error">{removeError}</p>{/if}
+{#if match.signatureMode !== 'none'}
+  <div class="panel signature-status-banner" class:is-signed={participant.signed}>
+    <span>{participant.signed ? labels.scorecardSignedBanner : labels.scorecardNotSignedBanner}</span>
+    {#if canManage}
+      <button type="button" class="sign-toggle-button" on:click={toggleSigned}>{participant.signed ? labels.unsignAction : labels.signAction}</button>
+    {/if}
+  </div>
+  {#if signToggleError}<p class="error">{signToggleError}</p>{/if}
+{/if}
 
 <section class="panel">
   <h2>{labels.participantDetailsLabel}</h2>
@@ -201,7 +228,9 @@
 <section class="panel section-gap">
   <div class="scores-header">
     <h2>{labels.scoresLabel}</h2>
-    <a class="edit-scores-pencil" href={matchParticipantScorePath(match.id, participant.id)} aria-label={labels.editScoresAria} title={labels.editScoresAria} on:click={(event) => navigateOnClick(event, onViewScores)}>✎</a>
+    {#if canEditScores}
+      <a class="edit-scores-pencil" href={matchParticipantScorePath(match.id, participant.id)} aria-label={labels.editScoresAria} title={labels.editScoresAria} on:click={(event) => navigateOnClick(event, onViewScores)}>✎</a>
+    {/if}
   </div>
   <div class="stats-row">
     <span><span class="muted">{labels.currentTotalLabel}</span><strong>{currentTotal}</strong></span>
@@ -215,6 +244,16 @@
     <div class="scorecard-preview">
       <ParticipantScorecard {match} scores={participant.scores} keyboard={keyboardConfig.keyboard} interactive={false} />
     </div>
+    {#if participant.signed && (participant.archerSignatureDataUrl || participant.markerSignatureDataUrl)}
+      <div class="signature-images">
+        {#if participant.archerSignatureDataUrl}
+          <div class="signature-block"><span class="muted">{labels.archerSignatureLabel}</span><img src={participant.archerSignatureDataUrl} alt={labels.archerSignatureLabel} /></div>
+        {/if}
+        {#if participant.markerSignatureDataUrl}
+          <div class="signature-block"><span class="muted">{labels.markerSignatureLabel}</span><img src={participant.markerSignatureDataUrl} alt={labels.markerSignatureLabel} /></div>
+        {/if}
+      </div>
+    {/if}
   {/if}
 </section>
 
@@ -270,4 +309,5 @@
     border-radius: 8px;
     padding: 4px 12px;
   }
+
 </style>

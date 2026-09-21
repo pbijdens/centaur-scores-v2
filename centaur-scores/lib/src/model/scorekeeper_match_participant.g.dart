@@ -23,7 +23,11 @@ ScorekeeperMatchParticipant _$ScorekeeperMatchParticipantFromJson(
           .toList()
       ..arrowScores = (json['arrowScores'] as List<dynamic>)
           .map((e) => e as String?)
-          .toList();
+          .toList()
+      ..signed = json['signed'] as bool? ?? false
+      ..signedAtUtc = json['signedAtUtc'] as String?
+      ..archerSignatureDataUrl = json['archerSignatureDataUrl'] as String?
+      ..markerSignatureDataUrl = json['markerSignatureDataUrl'] as String?;
 
 Map<String, dynamic> _$ScorekeeperMatchParticipantToJson(
         ScorekeeperMatchParticipant instance) =>
@@ -36,4 +40,8 @@ Map<String, dynamic> _$ScorekeeperMatchParticipantToJson(
       'tenantParticipantId': instance.tenantParticipantId,
       'availableKeyIDs': instance.availableKeyIDs,
       'arrowScores': instance.arrowScores,
+      'signed': instance.signed,
+      'signedAtUtc': instance.signedAtUtc,
+      'archerSignatureDataUrl': instance.archerSignatureDataUrl,
+      'markerSignatureDataUrl': instance.markerSignatureDataUrl,
     };

@@ -24,6 +24,12 @@ class ScorekeeperMatch {
   late List<ScorekeeperKey> keyboard;
   late List<ScorekeeperMatchParticipant> participants;
 
+  // "none" | "confirm" | "signature" - see documentation/SIGNING-SCORECARDS.md.
+  // Defaults to "none" so a match cached before this field existed still
+  // parses (no signing UI shown until the next successful fetch).
+  @JsonKey(defaultValue: 'none')
+  late String signatureMode;
+
   ScorekeeperMatch();
 
   factory ScorekeeperMatch.fromJson(Map<String, dynamic> json) =>

@@ -1,4 +1,4 @@
-export type View = 'home' | 'matches' | 'match' | 'match-metadata' | 'match-devices' | 'match-qr' | 'match-results-scope' | 'match-participant' | 'match-participant-edit' | 'match-participant-replace' | 'match-participant-scores' | 'match-add-participants' | 'competitions' | 'competition' | 'competition-results' | 'participants' | 'participant-list' | 'participant' | 'categories' | 'category' | 'templates' | 'template' | 'accounts' | 'account' | 'profile' | 'tenants' | 'tenant' | 'tenant-settings' | 'select-tenant' | 'narrowcast' | 'personal-best' | 'personal-best-classifiers' | 'personal-best-disciplines' | 'personal-best-export-config' | 'personal-best-import-config' | 'personal-best-log' | 'backup-restore'
+export type View = 'home' | 'matches' | 'match' | 'match-metadata' | 'match-devices' | 'match-qr' | 'match-print' | 'match-results-scope' | 'match-participant' | 'match-participant-edit' | 'match-participant-replace' | 'match-participant-scores' | 'match-add-participants' | 'competitions' | 'competition' | 'competition-results' | 'participants' | 'participant-list' | 'participant' | 'categories' | 'category' | 'templates' | 'template' | 'accounts' | 'account' | 'profile' | 'tenants' | 'tenant' | 'tenant-settings' | 'select-tenant' | 'narrowcast' | 'personal-best' | 'personal-best-classifiers' | 'personal-best-disciplines' | 'personal-best-export-config' | 'personal-best-import-config' | 'personal-best-log' | 'backup-restore'
 export type Language = 'en' | 'nl'
 export type Tenant = { id: string; name: string; logoUrl?: string | null; defaultNarrowcastScope?: string | null }
 export type DefaultScopeSettings = { tenantValue: string | null; effectiveValue: string }
@@ -11,6 +11,7 @@ export type Match = {
   isOpen: boolean
   participantListId?: string | null
   deviceSelectionMode: string
+  signatureMode: string
   ends: number
   arrowsPerEnd: number
   groupEnds?: number | null
@@ -32,6 +33,7 @@ export type MatchListItem = {
   isOpen: boolean
   participantListId?: string | null
   deviceSelectionMode: string
+  signatureMode: string
   ends: number
   arrowsPerEnd: number
   groupEnds?: number | null
@@ -53,6 +55,10 @@ export type MatchParticipant = {
   deviceId?: string | null
   deviceOrder?: number | null
   scores?: ArrowScore[]
+  signed: boolean
+  signedAtUtc?: string | null
+  archerSignatureDataUrl?: string | null
+  markerSignatureDataUrl?: string | null
 }
 export type ArrowScore = { id: string; matchParticipantId: string; end: number; arrow: number; keyId: string; value: number }
 export type ScoreDevice = { id: string; matchId: string; name: string; sortOrder?: number }
@@ -80,7 +86,7 @@ export type ParticipantList = { id: string; name: string; isActive: boolean; mem
 // Shape of GET /api/participant-lists: unlike ParticipantList (one list's full detail, with members),
 // this never carries the (potentially huge) members collection - just counts for list rendering.
 export type ParticipantListSummary = { id: string; name: string; isActive: boolean; memberCount: number; activeMemberCount: number }
-export type MatchTemplate = { id: string; name: string; participantListId?: string | null; allowFreeParticipants: boolean; deviceSelectionMode: string; configurationJson: string; personalBestClassifier?: string | null }
+export type MatchTemplate = { id: string; name: string; participantListId?: string | null; allowFreeParticipants: boolean; deviceSelectionMode: string; signatureMode: string; configurationJson: string; personalBestClassifier?: string | null }
 
 export type KeyboardKeyColor = 'Yellow' | 'Red' | 'Blue' | 'Black' | 'White'
 export type KeyboardKey = { keyId: string; label: string; color: KeyboardKeyColor; value: number }

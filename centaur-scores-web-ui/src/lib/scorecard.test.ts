@@ -4,7 +4,7 @@ import type { ArrowScore, Match } from './types'
 
 function match(overrides: Partial<Match> = {}): Match {
   return {
-    id: 'm', name: 'Match', date: '2026-01-01', isOpen: true, deviceSelectionMode: 'list-and-free',
+    id: 'm', name: 'Match', date: '2026-01-01', isOpen: true, deviceSelectionMode: 'list-and-free', signatureMode: 'none',
     ends: 6, arrowsPerEnd: 3, groupEnds: null, allowFreeParticipants: true, keyboardJson: '{}', scoringRulesJson: '[]',
     ...overrides
   }

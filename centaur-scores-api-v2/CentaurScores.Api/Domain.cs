@@ -72,6 +72,8 @@ public sealed class MatchTemplate : TenantOwnedEntity
     public Guid? ParticipantListId { get; set; }
     public bool AllowFreeParticipants { get; set; } = true;
     public string DeviceSelectionMode { get; set; } = "list-and-free";
+    // "none" | "confirm" | "signature" - see documentation/SIGNING-SCORECARDS.md.
+    public string SignatureMode { get; set; } = "none";
     public string ConfigurationJson { get; set; } = MatchDefaults.KeyboardJson;
     public string? PersonalBestClassifier { get; set; }
 }
@@ -84,6 +86,8 @@ public sealed class Match : TenantOwnedEntity
     public bool IsOpen { get; set; }
     public Guid? ParticipantListId { get; set; }
     public string DeviceSelectionMode { get; set; } = "list-and-free";
+    // "none" | "confirm" | "signature" - see documentation/SIGNING-SCORECARDS.md.
+    public string SignatureMode { get; set; } = "none";
     public int Ends { get; set; }
     public int ArrowsPerEnd { get; set; }
     public int? GroupEnds { get; set; }
@@ -137,6 +141,15 @@ public sealed class MatchParticipant : TenantOwnedEntity
     public Guid? DeviceId { get; set; }
     public int? DeviceOrder { get; set; }
     public List<ArrowScore> Scores { get; set; } = [];
+
+    // Scorecard signing (see documentation/SIGNING-SCORECARDS.md). Once Signed is true, anonymous
+    // scorekeeper devices must refuse further edits; only a manager can edit via the full API or
+    // withdraw the signature. Signature images are base64 data-URL strings, mirroring how Tenant.LogoUrl
+    // stores an image, not a binary blob column - they stay null for "confirm" mode signatures.
+    public bool Signed { get; set; }
+    public DateTime? SignedAtUtc { get; set; }
+    public string? ArcherSignatureDataUrl { get; set; }
+    public string? MarkerSignatureDataUrl { get; set; }
 }
 
 public sealed class ArrowScore : TenantOwnedEntity

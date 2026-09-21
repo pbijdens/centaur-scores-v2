@@ -49,6 +49,7 @@
     let participantListId: string | null = null
     let allowFreeParticipants = true
     let deviceSelectionMode = 'list-and-free'
+    let signatureMode = 'none'
     let ends = 10
     let arrowsPerEnd = 3
     let groupEnds: number | null = null
@@ -59,6 +60,7 @@
       participantListId = template.participantListId ?? null
       allowFreeParticipants = template.allowFreeParticipants
       deviceSelectionMode = template.deviceSelectionMode
+      signatureMode = template.signatureMode
       ends = config.ends
       arrowsPerEnd = config.arrowsPerEnd
       groupEnds = config.groupEnds
@@ -70,6 +72,7 @@
         isOpen: false,
         participantListId,
         deviceSelectionMode,
+        signatureMode,
         ends,
         arrowsPerEnd,
         groupEnds,

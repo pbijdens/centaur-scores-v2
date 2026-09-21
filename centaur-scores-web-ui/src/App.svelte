@@ -27,7 +27,7 @@
   } from './lib/data'
   import { labelForError } from './lib/errors'
   import { translationsFor } from './lib/i18n'
-  import { accountPath, categoryPath, competitionPath, matchAddParticipantsPath, matchDevicesPath, matchEditPath, matchParticipantEditPath, matchParticipantPath, matchParticipantReplacePath, matchParticipantScorePath, matchPath, navigateTo, participantListPath, participantMemberPath, resolveRoute, templatePath, tenantPath } from './lib/router'
+  import { accountPath, categoryPath, competitionPath, matchAddParticipantsPath, matchDevicesPath, matchEditPath, matchParticipantEditPath, matchParticipantPath, matchParticipantReplacePath, matchParticipantScorePath, matchPath, matchPrintPath, navigateTo, participantListPath, participantMemberPath, resolveRoute, templatePath, tenantPath } from './lib/router'
   import { isSessionWatchActive } from './lib/sessionWatch'
   import type { Account, Category, Competition, Language, Match, MatchTemplate, ParticipantList, ParticipantListMember, ParticipantListSummary, TenantAccess, Tenant, View } from './lib/types'
   import AccountEditView from './lib/views/AccountEditView.svelte'
@@ -51,6 +51,7 @@
   import MatchParticipantReplaceView from './lib/views/MatchParticipantReplaceView.svelte'
   import MatchParticipantScoreView from './lib/views/MatchParticipantScoreView.svelte'
   import MatchParticipantView from './lib/views/MatchParticipantView.svelte'
+  import MatchPrintView from './lib/views/MatchPrintView.svelte'
   import MatchQrCodesView from './lib/views/MatchQrCodesView.svelte'
   import MatchResultsScopeView from './lib/views/MatchResultsScopeView.svelte'
   import NoTenantAccessView from './lib/views/NoTenantAccessView.svelte'
@@ -81,6 +82,7 @@
   let password = ''
   let language = (localStorage.getItem('centaur-language') ?? 'nl') as Language
   let view: View = 'home'
+  let matchPrintStep: 'select' | 'sheet' = 'select'
   let selectedMatch: Match | null = null
   let matchSourceList: ParticipantList | null = null
   let selectedList: ParticipantList | null = null
@@ -411,9 +413,10 @@
   function applyRouteResult(route: ReturnType<typeof resolveRoute>) {
     if (route.invalid) { navigate('/', true); return }
     view = route.view
+    if (route.view === 'match-print') matchPrintStep = 'select'
     narrowcastScope = route.view === 'narrowcast' ? route.scope ?? null : null
     selectedResultsScope = route.view === 'match-results-scope' ? route.scope ?? null : null
-    const matchScopedViews: View[] = ['match', 'match-metadata', 'match-devices', 'match-qr', 'match-results-scope', 'match-participant', 'match-participant-edit', 'match-participant-replace', 'match-participant-scores', 'match-add-participants']
+    const matchScopedViews: View[] = ['match', 'match-metadata', 'match-devices', 'match-qr', 'match-print', 'match-results-scope', 'match-participant', 'match-participant-edit', 'match-participant-replace', 'match-participant-scores', 'match-add-participants']
     selectedMatchId = matchScopedViews.includes(route.view) ? route.matchId ?? null : null
     if (selectedMatchId) loadSelectedMatch(selectedMatchId)
     else { selectedMatch = null; matchSourceList = null }
@@ -455,6 +458,18 @@
   <LiveScoringView scope={narrowcastScope} />
 {:else if view === 'match-qr' && selectedMatch}
   <MatchQrCodesView match={selectedMatch} tenantId={tenant} {language} labels={t} />
+{:else if view === 'match-print' && selectedMatch}
+  <!-- MatchPrintView is rendered from this single spot (not duplicated per step) so switching between
+       its 'select' and 'sheet' steps only toggles the surrounding chrome - it never destroys/recreates
+       the component, which would silently reset the organizer's participant selection mid-workflow. -->
+  <div class="app-shell" class:app-shell-bare={matchPrintStep === 'sheet'}>
+    {#if matchPrintStep !== 'sheet'}
+      <AppHeader username={headerUsername} {language} {view} labels={t} tenantName={$currentTenant?.name} tenantLogoUrl={$currentTenant?.logoUrl} showTenantSwitch={($profile?.authorizedForTenants?.length ?? 0) > 1} onNavigate={navigate} onLanguageChange={setLanguage} onLogout={signOut} />
+    {/if}
+    <main class="content" class:content-bare={matchPrintStep === 'sheet'}>
+      <MatchPrintView bind:step={matchPrintStep} match={selectedMatch} categories={$categories} tenantLogoUrl={$currentTenant?.logoUrl} {language} labels={t} />
+    </main>
+  </div>
 {:else if view === 'match-results-scope' && selectedMatchId && selectedResultsScope}
   <MatchResultsScopeView {api} matchId={selectedMatchId} scope={selectedResultsScope} {language} labels={t} />
 {:else if view === 'competition-results' && selectedCompetitionId}
@@ -475,7 +490,7 @@
         <MatchesView {api} matches={$matches} templates={$templates} defaultNarrowcastScope={effectiveDefaultNarrowcastScope} {language} labels={t} onOpenMatch={openMatch} onChanged={loadMatchesList} />
       {:else if view === 'match' && selectedMatch}
         {@const currentMatch = selectedMatch}
-        <MatchDetailView {api} match={currentMatch} categories={$categories} {language} labels={t} onBack={() => navigate('/matches')} onToggleOpen={toggleSelectedMatch} onDeleted={onMatchDeleted} onEditMetadata={() => navigate(matchEditPath(currentMatch.id))} onManageDevices={() => navigate(matchDevicesPath(currentMatch.id))} onAddParticipants={() => navigate(matchAddParticipantsPath(currentMatch.id))} onOpenParticipant={openParticipant} onCopied={(copy) => { loadMatchesList(); openMatch(copy) }} />
+        <MatchDetailView {api} match={currentMatch} categories={$categories} {language} labels={t} onBack={() => navigate('/matches')} onToggleOpen={toggleSelectedMatch} onDeleted={onMatchDeleted} onEditMetadata={() => navigate(matchEditPath(currentMatch.id))} onManageDevices={() => navigate(matchDevicesPath(currentMatch.id))} onPrintScorecards={() => navigate(matchPrintPath(currentMatch.id))} onAddParticipants={() => navigate(matchAddParticipantsPath(currentMatch.id))} onOpenParticipant={openParticipant} onCopied={(copy) => { loadMatchesList(); openMatch(copy) }} />
       {:else if view === 'match-add-participants' && selectedMatch}
         {@const currentMatch = selectedMatch}
         <MatchAddParticipantsView {api} match={currentMatch} categories={$categories} sourceList={matchSourceList} labels={t} onBack={() => navigate(`/matches/${currentMatch.id}`)} onChanged={refreshSelectedMatch} />
@@ -516,7 +531,7 @@
       {:else if view === 'match-participant-scores' && selectedMatch && selectedParticipant}
         {@const currentMatch = selectedMatch}
         {@const currentParticipant = selectedParticipant}
-        <MatchParticipantScoreView {api} match={currentMatch} participant={currentParticipant} labels={t} onBack={() => navigate(matchParticipantPath(currentMatch.id, currentParticipant.id))} />
+        <MatchParticipantScoreView {api} match={currentMatch} participant={currentParticipant} {canManage} labels={t} onBack={() => navigate(matchParticipantPath(currentMatch.id, currentParticipant.id))} />
       {:else if view === 'competitions'}
         <CompetitionsView {api} competitions={$competitions} {language} labels={t} onOpenCompetition={openCompetition} onChanged={loadCompetitionsList} />
       {:else if view === 'competition' && selectedCompetition}

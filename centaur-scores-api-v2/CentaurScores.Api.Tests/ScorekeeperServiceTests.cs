@@ -227,4 +227,127 @@ public sealed class ScorekeeperServiceTests
         Assert.Equal(["10", "M"], restricted.AvailableKeyIDs);
         Assert.Null(unrestricted.AvailableKeyIDs);
     }
+
+    [Fact]
+    public async Task SignParticipantAsync_signs_a_participant_assigned_to_the_calling_device()
+    {
+        await using var connection = new SqliteConnection("Filename=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>().UseSqlite(connection).Options;
+        await using var db = new ApplicationDbContext(options);
+        await db.Database.EnsureCreatedAsync();
+
+        var tenantId = Guid.NewGuid();
+        var matchId = Guid.NewGuid();
+        var deviceId = Guid.NewGuid();
+        var participantId = Guid.NewGuid();
+        db.AddRange(
+            new Tenant { Id = tenantId, Name = "Tenant" },
+            new Match
+            {
+                Id = matchId,
+                TenantId = tenantId,
+                SignatureMode = "confirm",
+                Devices = [new ScoreDevice { Id = deviceId, TenantId = tenantId, MatchId = matchId, Name = "Device" }],
+                Participants = [new MatchParticipant { Id = participantId, TenantId = tenantId, MatchId = matchId, DeviceId = deviceId, OwnFullName = "Robin Archer", OwnLastName = "Archer" }]
+            });
+        await db.SaveChangesAsync();
+
+        var service = new ScorekeeperService(db, new PersonalBestLiveLookup(db, new PersonalBestContext(db), new PersonalBestEngine(db), new MemoryCache(new MemoryCacheOptions())));
+        var context = await service.FindAsync(tenantId, matchId, deviceId, CancellationToken.None);
+        Assert.NotNull(context);
+
+        var error = await service.SignParticipantAsync(context!, participantId, new SignParticipantRequest(null, null), CancellationToken.None);
+
+        Assert.Null(error);
+        var participant = await db.MatchParticipants.AsNoTracking().SingleAsync(item => item.Id == participantId);
+        Assert.True(participant.Signed);
+        Assert.NotNull(participant.SignedAtUtc);
+    }
+
+    [Fact]
+    public async Task SignParticipantAsync_is_rejected_when_the_match_does_not_require_signing_or_the_card_is_already_signed()
+    {
+        await using var connection = new SqliteConnection("Filename=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>().UseSqlite(connection).Options;
+        await using var db = new ApplicationDbContext(options);
+        await db.Database.EnsureCreatedAsync();
+
+        var tenantId = Guid.NewGuid();
+        var noneMatchId = Guid.NewGuid();
+        var signedMatchId = Guid.NewGuid();
+        var deviceOneId = Guid.NewGuid();
+        var deviceTwoId = Guid.NewGuid();
+        var unsignedParticipantId = Guid.NewGuid();
+        var alreadySignedParticipantId = Guid.NewGuid();
+        db.AddRange(
+            new Tenant { Id = tenantId, Name = "Tenant" },
+            new Match
+            {
+                Id = noneMatchId,
+                TenantId = tenantId,
+                SignatureMode = "none",
+                Devices = [new ScoreDevice { Id = deviceOneId, TenantId = tenantId, MatchId = noneMatchId, Name = "Device" }],
+                Participants = [new MatchParticipant { Id = unsignedParticipantId, TenantId = tenantId, MatchId = noneMatchId, DeviceId = deviceOneId }]
+            },
+            new Match
+            {
+                Id = signedMatchId,
+                TenantId = tenantId,
+                SignatureMode = "confirm",
+                Devices = [new ScoreDevice { Id = deviceTwoId, TenantId = tenantId, MatchId = signedMatchId, Name = "Device" }],
+                Participants = [new MatchParticipant { Id = alreadySignedParticipantId, TenantId = tenantId, MatchId = signedMatchId, DeviceId = deviceTwoId, Signed = true }]
+            });
+        await db.SaveChangesAsync();
+
+        var service = new ScorekeeperService(db, new PersonalBestLiveLookup(db, new PersonalBestContext(db), new PersonalBestEngine(db), new MemoryCache(new MemoryCacheOptions())));
+        var request = new SignParticipantRequest(null, null);
+
+        var noneContext = await service.FindAsync(tenantId, noneMatchId, deviceOneId, CancellationToken.None);
+        var noneError = await service.SignParticipantAsync(noneContext!, unsignedParticipantId, request, CancellationToken.None);
+        Assert.Equal("SIGNATURE_NOT_REQUIRED", noneError?.Code);
+
+        var signedContext = await service.FindAsync(tenantId, signedMatchId, deviceTwoId, CancellationToken.None);
+        var signedError = await service.SignParticipantAsync(signedContext!, alreadySignedParticipantId, request, CancellationToken.None);
+        Assert.Equal("SCORECARD_SIGNED", signedError?.Code);
+    }
+
+    [Fact]
+    public async Task UpdateScoresAsync_rejects_updates_to_a_signed_participant()
+    {
+        await using var connection = new SqliteConnection("Filename=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>().UseSqlite(connection).Options;
+        await using var db = new ApplicationDbContext(options);
+        await db.Database.EnsureCreatedAsync();
+
+        var tenantId = Guid.NewGuid();
+        var matchId = Guid.NewGuid();
+        var deviceId = Guid.NewGuid();
+        var participantId = Guid.NewGuid();
+        db.AddRange(
+            new Tenant { Id = tenantId, Name = "Tenant" },
+            new Match
+            {
+                Id = matchId,
+                TenantId = tenantId,
+                ArrowsPerEnd = 3,
+                KeyboardJson = """{"categoryOrder":[],"keyboard":[{"keyId":"10","label":"10","value":10}]}""",
+                Devices = [new ScoreDevice { Id = deviceId, TenantId = tenantId, MatchId = matchId, Name = "Device" }],
+                Participants = [new MatchParticipant { Id = participantId, TenantId = tenantId, MatchId = matchId, DeviceId = deviceId, Signed = true }]
+            });
+        await db.SaveChangesAsync();
+
+        var service = new ScorekeeperService(db, new PersonalBestLiveLookup(db, new PersonalBestContext(db), new PersonalBestEngine(db), new MemoryCache(new MemoryCacheOptions())));
+        var context = await service.FindAsync(tenantId, matchId, deviceId, CancellationToken.None);
+        Assert.NotNull(context);
+        var request = new ScorekeeperScoreUpdates(participantId, [new ScorekeeperScoreUpdate(0, null, "10")]);
+
+        var conflicts = await service.UpdateScoresAsync(context!, [request], CancellationToken.None);
+
+        var conflict = Assert.Single(conflicts);
+        Assert.Equal("SCORECARD_SIGNED", conflict.Error);
+        Assert.Empty(await db.ArrowScores.AsNoTracking().Where(item => item.MatchParticipantId == participantId).ToListAsync());
+    }
 }

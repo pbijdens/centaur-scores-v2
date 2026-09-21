@@ -163,8 +163,10 @@ class SingeParticipantScoreForm extends StatelessWidget {
   }
 
   // Opens the score entry on the field that was tapped. If a summary field is
-  // tapped, open the editor on the first field.
+  // tapped, open the editor on the first field. A signed scorecard is
+  // permanently locked - tapping it must do nothing at all.
   void onTapScoreField(BuildContext context, int endNo, int arrowNo) {
+    if (_participant.signed) return;
     _onSelect(context, endNo,
         arrowNo < 0 || arrowNo >= _model.arrowsPerEnd ? null : arrowNo);
   }

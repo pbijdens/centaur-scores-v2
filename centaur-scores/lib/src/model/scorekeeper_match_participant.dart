@@ -20,6 +20,14 @@ class ScorekeeperMatchParticipant {
   // Key IDs (or null for a not-yet-shot arrow), length ends*arrowsPerEnd.
   late List<String?> arrowScores;
 
+  // Scorecard signing (see documentation/SIGNING-SCORECARDS.md). Once true,
+  // this device must never let the participant's scores be edited further.
+  @JsonKey(defaultValue: false)
+  late bool signed;
+  String? signedAtUtc;
+  String? archerSignatureDataUrl;
+  String? markerSignatureDataUrl;
+
   ScorekeeperMatchParticipant();
 
   factory ScorekeeperMatchParticipant.fromJson(Map<String, dynamic> json) =>

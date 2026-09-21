@@ -18,7 +18,7 @@ public sealed class MatchesController(ApplicationDbContext db, ITenantContext te
         .OrderByDescending(item => item.IsOpen).ThenBy(item => item.Date)
         .Select(item => new MatchListItem(
             item.Id, item.TenantId, item.Name, item.Date, item.ShortCode, item.IsOpen, item.ParticipantListId,
-            item.DeviceSelectionMode, item.Ends, item.ArrowsPerEnd, item.GroupEnds, item.AllowFreeParticipants,
+            item.DeviceSelectionMode, item.SignatureMode, item.Ends, item.ArrowsPerEnd, item.GroupEnds, item.AllowFreeParticipants,
             item.KeyboardJson, item.ScoringRulesJson,
             item.Participants.Count,
             item.Participants.Count(participant => participant.ParticipantListMemberId == null),
@@ -29,7 +29,7 @@ public sealed class MatchesController(ApplicationDbContext db, ITenantContext te
     public async Task<IActionResult> Create(CreateMatchRequest request, CancellationToken cancellationToken)
     {
         if (!CanManage) return Forbid();
-        var match = new Match { Id = Guid.NewGuid(), TenantId = TenantId, Name = request.Name, Date = request.Date, ShortCode = request.ShortCode, IsOpen = request.IsOpen, ParticipantListId = request.ParticipantListId, DeviceSelectionMode = string.IsNullOrWhiteSpace(request.DeviceSelectionMode) ? "list-and-free" : request.DeviceSelectionMode, Ends = request.Ends, ArrowsPerEnd = request.ArrowsPerEnd, GroupEnds = request.GroupEnds, AllowFreeParticipants = request.AllowFreeParticipants, KeyboardJson = string.IsNullOrWhiteSpace(request.KeyboardJson) ? MatchDefaults.KeyboardJson : request.KeyboardJson, ScoringRulesJson = request.ScoringRulesJson, PersonalBestClassifier = request.PersonalBestClassifier };
+        var match = new Match { Id = Guid.NewGuid(), TenantId = TenantId, Name = request.Name, Date = request.Date, ShortCode = request.ShortCode, IsOpen = request.IsOpen, ParticipantListId = request.ParticipantListId, DeviceSelectionMode = string.IsNullOrWhiteSpace(request.DeviceSelectionMode) ? "list-and-free" : request.DeviceSelectionMode, SignatureMode = string.IsNullOrWhiteSpace(request.SignatureMode) ? "none" : request.SignatureMode, Ends = request.Ends, ArrowsPerEnd = request.ArrowsPerEnd, GroupEnds = request.GroupEnds, AllowFreeParticipants = request.AllowFreeParticipants, KeyboardJson = string.IsNullOrWhiteSpace(request.KeyboardJson) ? MatchDefaults.KeyboardJson : request.KeyboardJson, ScoringRulesJson = request.ScoringRulesJson, PersonalBestClassifier = request.PersonalBestClassifier };
         db.Matches.Add(match);
         await db.SaveChangesAsync(cancellationToken);
         return CreatedAtAction(nameof(Get), new { id = match.Id }, match);
@@ -53,6 +53,7 @@ public sealed class MatchesController(ApplicationDbContext db, ITenantContext te
         match.IsOpen = request.IsOpen;
         match.ParticipantListId = request.ParticipantListId;
         match.DeviceSelectionMode = request.DeviceSelectionMode;
+        match.SignatureMode = string.IsNullOrWhiteSpace(request.SignatureMode) ? "none" : request.SignatureMode;
         match.Ends = request.Ends;
         match.ArrowsPerEnd = request.ArrowsPerEnd;
         match.GroupEnds = request.GroupEnds;
@@ -221,11 +222,44 @@ public sealed class MatchesController(ApplicationDbContext db, ITenantContext te
         return NoContent();
     }
 
+    [HttpPost("{id:guid}/participants/{participantId:guid}/sign")]
+    public async Task<IActionResult> SignParticipant(Guid id, Guid participantId, SignParticipantRequest request, CancellationToken cancellationToken)
+    {
+        if (!CanManage) return Forbid();
+        var participant = await db.MatchParticipants.SingleOrDefaultAsync(item => item.Id == participantId && item.MatchId == id && item.TenantId == TenantId, cancellationToken);
+        if (participant is null) return NotFound();
+        var validationError = SignatureValidation.Validate(request.ArcherSignatureDataUrl, request.MarkerSignatureDataUrl);
+        if (validationError is not null) return BadRequest(validationError);
+        participant.Signed = true;
+        participant.SignedAtUtc = DateTime.UtcNow;
+        participant.ArcherSignatureDataUrl = request.ArcherSignatureDataUrl;
+        participant.MarkerSignatureDataUrl = request.MarkerSignatureDataUrl;
+        await db.SaveChangesAsync(cancellationToken);
+        return Ok(participant);
+    }
+
+    // Withdrawing a signature is a full reset, not just a flag flip - the stored images are cleared too,
+    // so a subsequent re-sign never risks showing a stale image if it were re-signed without new ones.
+    [HttpPost("{id:guid}/participants/{participantId:guid}/unsign")]
+    public async Task<IActionResult> UnsignParticipant(Guid id, Guid participantId, CancellationToken cancellationToken)
+    {
+        if (!CanManage) return Forbid();
+        var participant = await db.MatchParticipants.SingleOrDefaultAsync(item => item.Id == participantId && item.MatchId == id && item.TenantId == TenantId, cancellationToken);
+        if (participant is null) return NotFound();
+        participant.Signed = false;
+        participant.SignedAtUtc = null;
+        participant.ArcherSignatureDataUrl = null;
+        participant.MarkerSignatureDataUrl = null;
+        await db.SaveChangesAsync(cancellationToken);
+        return Ok(participant);
+    }
+
     [HttpPost("{id:guid}/participants/{participantId:guid}/scores")]
     public async Task<IActionResult> EnterScore(Guid id, Guid participantId, EnterScoreRequest request, CancellationToken cancellationToken)
     {
         var participant = await db.MatchParticipants.SingleOrDefaultAsync(item => item.Id == participantId && item.MatchId == id && item.TenantId == TenantId, cancellationToken);
         if (participant is null) return NotFound();
+        if (participant.Signed && !CanManage) return Forbid();
 
         var updated = await db.ArrowScores
             .Where(item => item.MatchParticipantId == participantId && item.End == request.End && item.Arrow == request.Arrow && item.TenantId == TenantId)
@@ -402,8 +436,9 @@ public sealed class MatchesController(ApplicationDbContext db, ITenantContext te
     }
 
     [HttpGet("{id:guid}/export.csv")]
-    public async Task<IActionResult> Export(Guid id, CancellationToken cancellationToken)
+    public async Task<IActionResult> Export(Guid id, [FromQuery] string language = "en", CancellationToken cancellationToken = default)
     {
+        var labels = ExportLabels(language);
         var match = await db.Matches.AsNoTracking().Include(item => item.Participants).ThenInclude(item => item.Scores)
             .Include(item => item.Participants).ThenInclude(item => item.ParticipantListMember)
             .SingleOrDefaultAsync(item => item.Id == id && item.TenantId == TenantId, cancellationToken);
@@ -425,6 +460,7 @@ public sealed class MatchesController(ApplicationDbContext db, ITenantContext te
         headers.AddRange(Enumerable.Range(1, splitCount).Select(index => $"Split{index}"));
         headers.AddRange(categories.Select(category => Csv(category.Name)));
         headers.Add("lastname");
+        headers.Add(labels.SignedHeader);
 
         var lines = new List<string> { string.Join(",", headers) };
         foreach (var participant in match.Participants)
@@ -436,6 +472,7 @@ public sealed class MatchesController(ApplicationDbContext db, ITenantContext te
             values.AddRange(Enumerable.Range(1, splitCount).Select(index => result.GroupScores.GetValueOrDefault(index).ToString()));
             values.AddRange(categories.Select(category => Csv(CategoryValueName(participant, category))));
             values.Add(Csv(participant.LastName));
+            values.Add(participant.Signed ? labels.Yes : labels.No);
             lines.Add(string.Join(",", values));
         }
 
@@ -461,6 +498,13 @@ public sealed class MatchesController(ApplicationDbContext db, ITenantContext te
     }
 
     private static string Csv(string? value) => $"\"{(value ?? "").Replace("\"", "\"\"")}\"";
+
+    // Same "only the export is concerned with translated text" convention as ParticipantListExcelLabels.
+    private static CsvExportLabels ExportLabels(string? language) => string.Equals(language, "nl", StringComparison.OrdinalIgnoreCase)
+        ? new CsvExportLabels("Ondertekend", "Ja", "Nee")
+        : new CsvExportLabels("Signed", "Yes", "No");
+
+    private sealed record CsvExportLabels(string SignedHeader, string Yes, string No);
 
     private sealed record KeyboardConfiguration(List<Guid> CategoryOrder, List<KeyboardKey> Keyboard);
     private sealed record KeyboardKey(string KeyId, string Label);

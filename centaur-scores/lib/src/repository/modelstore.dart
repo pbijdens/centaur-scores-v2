@@ -1,3 +1,4 @@
+import 'package:centaur_scores/src/model/pending_signatures.dart';
 import 'package:centaur_scores/src/model/pending_updates.dart';
 import 'package:centaur_scores/src/model/scorekeeper_match.dart';
 import 'package:centaur_scores/src/model/settings_model.dart';
@@ -75,6 +76,27 @@ class ModelStore {
         await storage.setItem('pendingUpdates', updates.toJson());
       });
 
+  Future<PendingSignatures> loadPendingSignatures() => _enqueue(() async {
+        await storage.ready;
+
+        try {
+          var loaded = await storage.getItem('pendingSignatures');
+          if (null == loaded) {
+            return PendingSignatures();
+          } else {
+            return PendingSignatures.fromJson(loaded);
+          }
+        } catch (error) {
+          log('Error: $error');
+          return PendingSignatures();
+        }
+      });
+
+  Future<void> savePendingSignatures(PendingSignatures signatures) => _enqueue(() async {
+        await storage.ready;
+        await storage.setItem('pendingSignatures', signatures.toJson());
+      });
+
   /// Wipes cached match/edit state, used both when a fresh pairing arrives
   /// (a different apiBaseUrl than before) and when the user explicitly
   /// re-pairs. Deliberately does not touch settings (apiBaseUrl/language) -
@@ -83,6 +105,7 @@ class ModelStore {
         await storage.ready;
         await storage.deleteItem('matchData');
         await storage.deleteItem('pendingUpdates');
+        await storage.deleteItem('pendingSignatures');
       });
 
   Future<String?> getApiBaseUrl() async {

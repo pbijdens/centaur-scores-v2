@@ -4,7 +4,7 @@
   import DropdownMenu from '../DropdownMenu.svelte'
   import { labelForError } from '../errors'
   import { parseMatchKeyboardConfig } from '../matchConfig'
-  import { matchAddParticipantsPath, matchDevicesPath, matchEditPath, matchParticipantPath, matchQrPath, matchResultsPath, navigateOnClick } from '../router'
+  import { matchAddParticipantsPath, matchDevicesPath, matchEditPath, matchParticipantPath, matchPrintPath, matchQrPath, matchResultsPath, navigateOnClick } from '../router'
   import type { Category, Language, Match, MatchParticipant, ScopeConflict } from '../types'
 
   export let api: ApiClient
@@ -17,18 +17,19 @@
   export let onDeleted: () => void
   export let onEditMetadata: () => void
   export let onManageDevices: () => void
+  export let onPrintScorecards: () => void
   export let onAddParticipants: () => void
   export let onOpenParticipant: (participantId: string) => void
   export let onCopied: (match: Match) => void
 
   type ResultRow = { participantId: string; total: number }
   type SortBy = 'name' | 'score'
-  type GroupBy = 'none' | 'category' | 'device'
+  type GroupBy = 'none' | 'category' | 'device' | 'signed'
 
   const storedSortBy = localStorage.getItem('centaur-match-sort-by')
   const storedGroupBy = localStorage.getItem('centaur-match-group-by')
   let sortBy: SortBy = storedSortBy === 'score' ? 'score' : 'name'
-  let groupBy: GroupBy = storedGroupBy === 'category' || storedGroupBy === 'device' ? storedGroupBy : 'none'
+  let groupBy: GroupBy = storedGroupBy === 'category' || storedGroupBy === 'device' || storedGroupBy === 'signed' ? storedGroupBy : 'none'
   let unlistedOnly = false
   let results: ResultRow[] = []
   let deleteError = ''
@@ -76,7 +77,7 @@
   }
 
   function setGroupBy(value: string) {
-    groupBy = value === 'category' || value === 'device' ? value : 'none'
+    groupBy = value === 'category' || value === 'device' || value === 'signed' ? value : 'none'
     localStorage.setItem('centaur-match-group-by', groupBy)
   }
 
@@ -90,6 +91,14 @@
 
   $: groupedParticipants = (() => {
     if (groupBy === 'none') return [{ key: '', items: sortedParticipants }]
+    if (groupBy === 'signed') {
+      // Unsigned always sorts first here (unlike the alphabetical-with-unassigned-last order below),
+      // per the spec: unsigned scorecards are the ones needing attention.
+      return [
+        { key: labels.groupByUnsigned, items: sortedParticipants.filter((participant) => !participant.signed) },
+        { key: labels.groupBySigned, items: sortedParticipants.filter((participant) => participant.signed) }
+      ].filter((group) => group.items.length > 0)
+    }
     const groups = new Map<string, typeof sortedParticipants>()
     for (const participant of sortedParticipants) {
       const key = groupBy === 'category' ? categoryLabel(participant.categories) || labels.unassignedGroup : deviceName(participant.deviceId)
@@ -142,7 +151,7 @@
   async function exportCsv() {
     exportError = ''
     try {
-      const { blob, filename } = await api.downloadMatchExport(match.id)
+      const { blob, filename } = await api.downloadMatchExport(match.id, language)
       const url = URL.createObjectURL(blob)
       const link = document.createElement('a')
       link.href = url
@@ -177,6 +186,7 @@
         isOpen: false,
         participantListId: match.participantListId,
         deviceSelectionMode: match.deviceSelectionMode,
+        signatureMode: match.signatureMode,
         ends: match.ends,
         arrowsPerEnd: match.arrowsPerEnd,
         groupEnds: match.groupEnds,
@@ -227,6 +237,7 @@
       <a class="menu-item" href={matchEditPath(match.id)} on:click={(event) => navigateOnClick(event, onEditMetadata)}>{labels.editMetadata}</a>
       <a class="menu-item" href={matchDevicesPath(match.id)} on:click={(event) => navigateOnClick(event, onManageDevices)}>{labels.manageDevices}</a>
       <a class="menu-item" href={matchQrPath(match.id)} target="_blank" rel="noopener">{labels.viewQrCodes}</a>
+      <a class="menu-item" href={matchPrintPath(match.id)} on:click={(event) => navigateOnClick(event, onPrintScorecards)}>{labels.printScorecards}</a>
       <button class="menu-item" on:click={exportCsv}>{labels.exportCsv}</button>
       <button class="menu-item" on:click={() => (showCopyForm = !showCopyForm)}>{labels.copyMatch}</button>
       <hr class="menu-separator" />
@@ -284,6 +295,7 @@
         <option value="none">{labels.groupByNone}</option>
         <option value="category">{labels.groupByCategory}</option>
         <option value="device">{labels.groupByDevice}</option>
+        {#if match.signatureMode !== 'none'}<option value="signed">{labels.groupBySignedOption}</option>{/if}
       </select>
     </label>
     {#if unlistedParticipantCount > 0}
@@ -301,7 +313,11 @@
     <div class="list-panel">
       {#each group.items as participant}
         <a class="list-row match-participant-row" class:unlisted-row={!participant.participantListMemberId} href={matchParticipantPath(match.id, participant.id)} on:click={(event) => navigateOnClick(event, () => onOpenParticipant(participant.id))}>
-          <span class="management-icon">◇</span>
+          {#if match.signatureMode !== 'none'}
+            <span class="management-icon signed-icon" class:is-signed={participant.signed} role="img" title={participant.signed ? labels.signedBadge : labels.unsignedBadge} aria-label={participant.signed ? labels.signedBadge : labels.unsignedBadge}>{participant.signed ? '✓' : '○'}</span>
+          {:else}
+            <span class="management-icon">◇</span>
+          {/if}
           <span class="participant-name"><strong>{participant.fullName || participant.lastName}</strong>{#if !participant.participantListMemberId}<span class="unlisted-tag">{labels.unlistedParticipantsWarning}</span>{/if}{#if participantDetailLabel(participant)}<span class="member-categories"> ({participantDetailLabel(participant)})</span>{/if}</span>
           <strong class="participant-score">{participantTotal(participant.id, totalsByParticipantId)}</strong>
           <span class="arrow">→</span>
@@ -392,6 +408,18 @@
     border-color: #e8755b;
   }
 
+  /* Reuses the plain, unstyled .management-icon slot every list row already reserves - swapping
+     its glyph/color for the signed state, rather than adding a whole new column, is what keeps
+     this free on narrow screens where every extra column steals from the name. */
+  .management-icon.signed-icon {
+    color: var(--muted);
+    font-weight: 700;
+  }
+
+  .management-icon.signed-icon.is-signed {
+    color: var(--green);
+  }
+
   .unlisted-tag {
     margin-left: 8px;
     color: #b84232;
@@ -433,8 +461,12 @@
     }
 
     .match-participant-row {
-      grid-template-columns: 18px minmax(0, 1fr) minmax(4ch, 64px) 44px;
+      grid-template-columns: 18px minmax(0, 1fr) minmax(4ch, 64px);
       gap: 10px;
+    }
+
+    .match-participant-row .arrow {
+      display: none;
     }
 
     .participant-score {
