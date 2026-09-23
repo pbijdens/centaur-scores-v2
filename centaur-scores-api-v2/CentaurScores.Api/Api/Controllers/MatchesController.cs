@@ -441,16 +441,8 @@ public sealed class MatchesController(ApplicationDbContext db, ITenantContext te
         var labels = ExportLabels(language);
         var match = await db.Matches.AsNoTracking().Include(item => item.Participants).ThenInclude(item => item.Scores)
             .Include(item => item.Participants).ThenInclude(item => item.ParticipantListMember)
-            .Include(item => item.Devices)
             .SingleOrDefaultAsync(item => item.Id == id && item.TenantId == TenantId, cancellationToken);
         if (match is null) return NotFound();
-
-        var devicesById = match.Devices.ToDictionary(item => item.Id, item => item);
-        var orderedParticipants = match.Participants
-            .OrderBy(item => item.DeviceId is { } deviceId && devicesById.TryGetValue(deviceId, out var device) ? device.SortOrder : int.MaxValue)
-            .ThenBy(item => item.DeviceOrder ?? int.MaxValue)
-            .ThenBy(item => item.FullName)
-            .ToList();
 
         var keyboard = ParseKeyboardConfiguration(match.KeyboardJson);
         var categoryIds = keyboard.CategoryOrder.Distinct().ToList();
@@ -462,7 +454,7 @@ public sealed class MatchesController(ApplicationDbContext db, ITenantContext te
         var splitSize = match.GroupEnds is > 0 ? match.GroupEnds.Value : 1;
         var splitCount = match.Ends > 0 ? (match.Ends + splitSize - 1) / splitSize : 0;
 
-        var headers = new List<string> { "device", "federation_number", "full_name", "total" };
+        var headers = new List<string> { "federation_number", "full_name", "total" };
         headers.AddRange(keyboard.Keyboard.Select(key => Csv(key.Label)));
         headers.Add("Null");
         headers.AddRange(Enumerable.Range(1, splitCount).Select(index => $"Split{index}"));
@@ -471,11 +463,10 @@ public sealed class MatchesController(ApplicationDbContext db, ITenantContext te
         headers.Add(labels.SignedHeader);
 
         var lines = new List<string> { string.Join(",", headers) };
-        foreach (var participant in orderedParticipants)
+        foreach (var participant in match.Participants)
         {
-            var deviceName = participant.DeviceId is { } deviceId && devicesById.TryGetValue(deviceId, out var device) ? device.Name : "";
             var result = scoring.Calculate(participant, match.ArrowsPerEnd, match.GroupEnds);
-            var values = new List<string> { Csv(deviceName), Csv(participant.FederationNumber), Csv(participant.FullName), result.Total.ToString() };
+            var values = new List<string> { Csv(participant.FederationNumber), Csv(participant.FullName), result.Total.ToString() };
             values.AddRange(keyboard.Keyboard.Select(key => participant.Scores.Count(score => score.KeyId == key.KeyId).ToString()));
             values.Add(Math.Max(match.Ends * match.ArrowsPerEnd - participant.Scores.Count, 0).ToString());
             values.AddRange(Enumerable.Range(1, splitCount).Select(index => result.GroupScores.GetValueOrDefault(index).ToString()));

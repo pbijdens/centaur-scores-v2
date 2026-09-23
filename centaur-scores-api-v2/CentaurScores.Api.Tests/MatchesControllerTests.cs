@@ -72,57 +72,9 @@ public sealed class MatchesControllerTests
 
         Assert.Equal("OPEN.csv", result.FileDownloadName);
         Assert.Equal(
-            "device,federation_number,full_name,total,\"Miss\",\"X\",Null,Split1,Split2,\"Class\",\"Discipline\",lastname,Signed\n" +
-            "\"\",\"123\",\"Robin Archer\",20,1,2,5,10,10,\"Senior\",\"Recurve\",\"Archer\",No",
+            "federation_number,full_name,total,\"Miss\",\"X\",Null,Split1,Split2,\"Class\",\"Discipline\",lastname,Signed\n" +
+            "\"123\",\"Robin Archer\",20,1,2,5,10,10,\"Senior\",\"Recurve\",\"Archer\",No",
             Encoding.UTF8.GetString(result.FileContents));
-    }
-
-    [Fact]
-    public async Task Export_orders_by_device_then_device_order_then_name_and_fills_device_column()
-    {
-        await using var connection = new SqliteConnection("Filename=:memory:");
-        await connection.OpenAsync();
-        var options = new DbContextOptionsBuilder<ApplicationDbContext>().UseSqlite(connection).Options;
-        await using var db = new ApplicationDbContext(options);
-        await db.Database.EnsureCreatedAsync();
-
-        var tenantId = Guid.NewGuid();
-        var matchId = Guid.NewGuid();
-        var firstDeviceId = Guid.NewGuid();
-        var secondDeviceId = Guid.NewGuid();
-        var match = new Match
-        {
-            Id = matchId,
-            TenantId = tenantId,
-            Name = "Open",
-            ShortCode = "OPEN",
-            Devices =
-            [
-                new ScoreDevice { Id = secondDeviceId, TenantId = tenantId, MatchId = matchId, Name = "Lane 2", SortOrder = 1 },
-                new ScoreDevice { Id = firstDeviceId, TenantId = tenantId, MatchId = matchId, Name = "Lane 1", SortOrder = 0 }
-            ],
-            Participants =
-            [
-                new MatchParticipant { Id = Guid.NewGuid(), TenantId = tenantId, MatchId = matchId, DeviceId = secondDeviceId, DeviceOrder = 0, OwnLastName = "Zeta", OwnFullName = "Zeta Archer" },
-                new MatchParticipant { Id = Guid.NewGuid(), TenantId = tenantId, MatchId = matchId, DeviceId = null, OwnLastName = "Nomad", OwnFullName = "Nomad Archer" },
-                new MatchParticipant { Id = Guid.NewGuid(), TenantId = tenantId, MatchId = matchId, DeviceId = firstDeviceId, DeviceOrder = 1, OwnLastName = "Bravo", OwnFullName = "Bravo Archer" },
-                new MatchParticipant { Id = Guid.NewGuid(), TenantId = tenantId, MatchId = matchId, DeviceId = firstDeviceId, DeviceOrder = 0, OwnLastName = "Alpha", OwnFullName = "Alpha Archer" }
-            ]
-        };
-        db.AddRange(new Tenant { Id = tenantId, Name = "Tenant" }, match);
-        await db.SaveChangesAsync();
-        var scoring = new ScoringService();
-        var personalBestContext = new PersonalBestContext(db);
-        var personalBestEngine = new PersonalBestEngine(db);
-        var controller = new MatchesController(db, new TestTenantContext(tenantId), scoring, new LiveScoringService(scoring), new PersonalBestRegistrationService(db, personalBestContext, personalBestEngine), new PersonalBestLiveLookup(db, personalBestContext, personalBestEngine, new MemoryCache(new MemoryCacheOptions())));
-
-        var result = Assert.IsType<FileContentResult>(await controller.Export(matchId, "en", CancellationToken.None));
-
-        var lines = Encoding.UTF8.GetString(result.FileContents).Split('\n');
-        var names = lines.Skip(1).Select(line => line.Split(',')[2]).ToArray();
-        var devices = lines.Skip(1).Select(line => line.Split(',')[0]).ToArray();
-        Assert.Equal(["\"Alpha Archer\"", "\"Bravo Archer\"", "\"Zeta Archer\"", "\"Nomad Archer\""], names);
-        Assert.Equal(["\"Lane 1\"", "\"Lane 1\"", "\"Lane 2\"", "\"\""], devices);
     }
 
     [Fact]
