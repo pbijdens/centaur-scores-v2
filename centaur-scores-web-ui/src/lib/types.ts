@@ -54,6 +54,7 @@ export type MatchParticipant = {
   categories: Record<string, number>
   deviceId?: string | null
   deviceOrder?: number | null
+  deviceLane?: string | null
   scores?: ArrowScore[]
   signed: boolean
   signedAtUtc?: string | null

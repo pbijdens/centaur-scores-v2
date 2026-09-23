@@ -99,6 +99,7 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
         modelBuilder.Entity<MatchParticipant>().Property(item => item.OwnFullName).HasColumnName("full_name");
         modelBuilder.Entity<MatchParticipant>().Property(item => item.OwnFederationNumber).HasColumnName("federation_number");
         modelBuilder.Entity<MatchParticipant>().Property(item => item.OwnCategories).HasColumnName("categories").HasJsonConversion();
+        modelBuilder.Entity<MatchParticipant>().Property(item => item.DeviceLane).HasMaxLength(8);
         // Restrict (rather than SetNull/Cascade): a linked participant no longer holds its own copy of the
         // roster member's data, so deleting a member that's in use would silently blank out historical match
         // and competition results. ParticipantListsController blocks the delete before this constraint would

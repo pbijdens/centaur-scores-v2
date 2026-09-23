@@ -25,7 +25,7 @@ public sealed class MatchBackupHandler : IBackupHandler
             match.KeyboardJson, match.ScoringRulesJson, match.PersonalBestClassifier,
             match.Participants.Select(participant => new MatchParticipantBackup(
                 participant.Id, participant.ParticipantListMemberId, participant.LastName, participant.FullName, participant.FederationNumber,
-                participant.Categories, participant.DeviceId, participant.DeviceOrder,
+                participant.Categories, participant.DeviceId, participant.DeviceOrder, participant.DeviceLane,
                 participant.Scores.Select(score => new ArrowScoreBackup(score.End, score.Arrow, score.KeyId, score.Value)).ToList())).ToList(),
             match.Devices.Select(device => new ScoreDeviceBackup(device.Id, device.Name, device.SortOrder)).ToList(),
             match.LiveScopes.Select(scope => new LiveScoreScopeBackup(scope.Id, scope.Scope, scope.GroupByCategoryIdsJson, scope.IncludeAverage, scope.IncludeGroupScores, scope.IncludeEqualizers, scope.IncludePersonalBest)).ToList()))).ToList();
@@ -69,6 +69,7 @@ public sealed class MatchBackupHandler : IBackupHandler
                     OwnCategories = BackupRemapHelpers.RemapCategoryDictionary(participant.Categories, context),
                     DeviceId = participant.DeviceId is { } deviceId && context.TryRemap(deviceId, out var newDeviceId) ? newDeviceId : null,
                     DeviceOrder = participant.DeviceOrder,
+                    DeviceLane = participant.DeviceLane,
                     Scores = participant.Scores.Select(score => new ArrowScore { Id = Guid.NewGuid(), TenantId = newTenantId, MatchParticipantId = newParticipantId, End = score.End, Arrow = score.Arrow, KeyId = score.KeyId, Value = score.Value }).ToList()
                 };
             }).ToList();

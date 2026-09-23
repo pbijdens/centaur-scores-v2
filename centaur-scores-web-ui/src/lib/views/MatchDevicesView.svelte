@@ -19,6 +19,8 @@
   let deleteError = ''
   let orderError = ''
   let assignmentError = ''
+  let laneError = ''
+  let renameError = ''
 
   $: devices = [...(match.devices ?? [])].sort((a, b) => (a.sortOrder ?? Number.MAX_SAFE_INTEGER) - (b.sortOrder ?? Number.MAX_SAFE_INTEGER) || a.name.localeCompare(b.name))
   $: participants = match.participants ?? []
@@ -119,6 +121,42 @@
     }
   }
 
+  async function updateLane(participantId: string, rawValue: string) {
+    const lane = rawValue.trim() || null
+    const previous = participants.find((participant) => participant.id === participantId)?.deviceLane ?? null
+    if (previous === lane) return
+    laneError = ''
+    participants = participants.map((participant) =>
+      participant.id === participantId ? { ...participant, deviceLane: lane } : participant
+    )
+    try {
+      await api.updateParticipantLane(match.id, participantId, lane)
+      await onChanged()
+    } catch (error) {
+      laneError = labelForError(error, labels, 'laneSaveError')
+    }
+  }
+
+  async function renameDevice(deviceId: string, event: FocusEvent & { currentTarget: HTMLInputElement }) {
+    const input = event.currentTarget
+    const name = input.value.trim()
+    const device = devices.find((item) => item.id === deviceId)
+    if (!device) return
+    if (!name) {
+      input.value = device.name
+      return
+    }
+    if (device.name === name) return
+    renameError = ''
+    try {
+      await api.renameDevice(match.id, deviceId, name)
+      await onChanged()
+    } catch (error) {
+      renameError = labelForError(error, labels, 'deviceCreateError')
+      input.value = device.name
+    }
+  }
+
   async function submitAdd() {
     if (!newDeviceName.trim()) return
     createError = ''
@@ -162,7 +200,16 @@
     <div class="device-block">
       <div class="list-row">
         <span class="management-icon">◇</span>
-        <span><strong>{device.name}</strong><small>{assignedCount(device.id)} {labels.membersLabel.toLowerCase()}</small></span>
+        <span>
+          <input
+            class="device-name-input"
+            type="text"
+            value={device.name}
+            aria-label={labels.deviceNameLabel}
+            on:blur={(event) => renameDevice(device.id, event)}
+          />
+          <small>{assignedCount(device.id)} {labels.membersLabel.toLowerCase()}</small>
+        </span>
         <div class="device-actions">
           <button
             class="icon-button participant-add-button"
@@ -201,6 +248,15 @@
         {:else}
           {#each assignedParticipants(device.id) as participant, participantIndex}
             <div class="list-row participant-row">
+              <input
+                class="lane-input"
+                type="text"
+                maxlength="8"
+                value={participant.deviceLane ?? ''}
+                aria-label={labels.laneLabel}
+                placeholder={labels.laneLabel}
+                on:blur={(event) => updateLane(participant.id, event.currentTarget.value)}
+              />
               <span>
                 <strong>{participantName(participant)}</strong>
                 {#if participantCategoryLabel(participant)}<small>{participantCategoryLabel(participant)}</small>{/if}
@@ -220,8 +276,10 @@
     </div>
   {/each}
 </section>
+{#if renameError}<p class="error">{renameError}</p>{/if}
 {#if deleteError}<p class="error">{deleteError}</p>{/if}
 {#if assignmentError}<p class="error">{assignmentError}</p>{/if}
+{#if laneError}<p class="error">{laneError}</p>{/if}
 {#if orderError}<p class="error">{orderError}</p>{/if}
 
 <style>
@@ -286,6 +344,35 @@
     border-top: 1px solid var(--line);
     margin-top: 8px;
     padding-top: 8px;
+  }
+
+  .device-name-input {
+    display: block;
+    width: 100%;
+    max-width: 260px;
+    padding: 4px 6px;
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--ink);
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  .device-name-input:hover,
+  .device-name-input:focus {
+    border-color: var(--line);
+    background: var(--paper);
+  }
+
+  .lane-input {
+    flex: 0 0 64px;
+    width: 64px;
+    padding: 6px 8px;
+    border: 1px solid var(--line);
+    background: var(--paper);
+    color: var(--ink);
+    font-size: 13px;
+    text-align: center;
   }
 
   @media (max-width: 720px) {

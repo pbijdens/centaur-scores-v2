@@ -190,7 +190,8 @@
 
   function deviceNameFor(participant: MatchParticipant): string {
     if (!participant.deviceId) return '-'
-    return (match.devices ?? []).find((device) => device.id === participant.deviceId)?.name ?? '-'
+    const name = (match.devices ?? []).find((device) => device.id === participant.deviceId)?.name ?? '-'
+    return participant.deviceLane ? `${name} ${participant.deviceLane}` : name
   }
 
   $: printCategories = matchCategories.filter((category) => selectedCategoryIds.has(category.id)).sort((a, b) => a.name.localeCompare(b.name))

@@ -165,6 +165,10 @@ export class ApiClient {
     return this.request(`/api/matches/${matchId}/participants/${participantId}/device`, { method: 'PUT', body: JSON.stringify({ deviceId }) })
   }
 
+  updateParticipantLane(matchId: string, participantId: string, lane: string | null) {
+    return this.request(`/api/matches/${matchId}/participants/${participantId}/lane`, { method: 'PUT', body: JSON.stringify({ lane }) })
+  }
+
   enterScore(matchId: string, participantId: string, body: { end: number; arrow: number; keyId: string; value: number }) {
     return this.request(`/api/matches/${matchId}/participants/${participantId}/scores`, { method: 'POST', body: JSON.stringify(body) })
   }
@@ -187,6 +191,10 @@ export class ApiClient {
 
   addDevice(matchId: string, body: { name: string }): Promise<ScoreDevice> {
     return this.request(`/api/matches/${matchId}/devices`, { method: 'POST', body: JSON.stringify(body) })
+  }
+
+  renameDevice(matchId: string, deviceId: string, name: string): Promise<ScoreDevice> {
+    return this.request(`/api/matches/${matchId}/devices/${deviceId}`, { method: 'PUT', body: JSON.stringify({ name }) })
   }
 
   reorderDevices(matchId: string, deviceIds: string[]) {

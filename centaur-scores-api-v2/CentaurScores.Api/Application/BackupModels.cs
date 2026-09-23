@@ -19,7 +19,7 @@ public sealed record ParticipantListBackup(Guid Id, Guid TenantId, string Name, 
 public sealed record MatchTemplateBackup(Guid Id, Guid TenantId, string Name, Guid? ParticipantListId, bool AllowFreeParticipants, string DeviceSelectionMode, string ConfigurationJson, string? PersonalBestClassifier);
 
 public sealed record ArrowScoreBackup(int End, int Arrow, string KeyId, int Value);
-public sealed record MatchParticipantBackup(Guid Id, Guid? ParticipantListMemberId, string LastName, string FullName, string? FederationNumber, Dictionary<Guid, int> Categories, Guid? DeviceId, int? DeviceOrder, List<ArrowScoreBackup> Scores);
+public sealed record MatchParticipantBackup(Guid Id, Guid? ParticipantListMemberId, string LastName, string FullName, string? FederationNumber, Dictionary<Guid, int> Categories, Guid? DeviceId, int? DeviceOrder, string? DeviceLane, List<ArrowScoreBackup> Scores);
 public sealed record ScoreDeviceBackup(Guid Id, string Name, int SortOrder);
 public sealed record LiveScoreScopeBackup(Guid Id, string Scope, string GroupByCategoryIdsJson, bool IncludeAverage, bool IncludeGroupScores, bool IncludeEqualizers, bool IncludePersonalBest);
 public sealed record MatchBackup(

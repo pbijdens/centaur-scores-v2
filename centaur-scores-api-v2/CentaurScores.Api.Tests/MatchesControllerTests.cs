@@ -72,8 +72,8 @@ public sealed class MatchesControllerTests
 
         Assert.Equal("OPEN.csv", result.FileDownloadName);
         Assert.Equal(
-            "device,federation_number,full_name,total,\"Miss\",\"X\",Null,Split1,Split2,\"Class\",\"Discipline\",lastname,Signed\n" +
-            "\"\",\"123\",\"Robin Archer\",20,1,2,5,10,10,\"Senior\",\"Recurve\",\"Archer\",No",
+            "device,Lane,federation_number,full_name,total,\"Miss\",\"X\",Null,Split1,Split2,\"Class\",\"Discipline\",lastname,Signed\n" +
+            "\"\",\"\",\"123\",\"Robin Archer\",20,1,2,5,10,10,\"Senior\",\"Recurve\",\"Archer\",No",
             Encoding.UTF8.GetString(result.FileContents));
     }
 
@@ -119,10 +119,178 @@ public sealed class MatchesControllerTests
         var result = Assert.IsType<FileContentResult>(await controller.Export(matchId, "en", CancellationToken.None));
 
         var lines = Encoding.UTF8.GetString(result.FileContents).Split('\n');
-        var names = lines.Skip(1).Select(line => line.Split(',')[2]).ToArray();
+        var names = lines.Skip(1).Select(line => line.Split(',')[3]).ToArray();
         var devices = lines.Skip(1).Select(line => line.Split(',')[0]).ToArray();
         Assert.Equal(["\"Alpha Archer\"", "\"Bravo Archer\"", "\"Zeta Archer\"", "\"Nomad Archer\""], names);
         Assert.Equal(["\"Lane 1\"", "\"Lane 1\"", "\"Lane 2\"", "\"\""], devices);
+    }
+
+    [Fact]
+    public async Task Export_sorts_by_lane_annotation_between_device_and_device_order_and_fills_lane_column()
+    {
+        await using var connection = new SqliteConnection("Filename=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>().UseSqlite(connection).Options;
+        await using var db = new ApplicationDbContext(options);
+        await db.Database.EnsureCreatedAsync();
+
+        var tenantId = Guid.NewGuid();
+        var matchId = Guid.NewGuid();
+        var deviceId = Guid.NewGuid();
+        var match = new Match
+        {
+            Id = matchId,
+            TenantId = tenantId,
+            Name = "Open",
+            ShortCode = "OPEN",
+            Devices = [new ScoreDevice { Id = deviceId, TenantId = tenantId, MatchId = matchId, Name = "Lane 1", SortOrder = 0 }],
+            Participants =
+            [
+                new MatchParticipant { Id = Guid.NewGuid(), TenantId = tenantId, MatchId = matchId, DeviceId = deviceId, DeviceOrder = 0, DeviceLane = "2B", OwnLastName = "Bravo", OwnFullName = "Bravo Archer" },
+                new MatchParticipant { Id = Guid.NewGuid(), TenantId = tenantId, MatchId = matchId, DeviceId = deviceId, DeviceOrder = 0, DeviceLane = "1A", OwnLastName = "Alpha", OwnFullName = "Alpha Archer" },
+                new MatchParticipant { Id = Guid.NewGuid(), TenantId = tenantId, MatchId = matchId, DeviceId = deviceId, DeviceOrder = 0, DeviceLane = null, OwnLastName = "Charlie", OwnFullName = "Charlie Archer" }
+            ]
+        };
+        db.AddRange(new Tenant { Id = tenantId, Name = "Tenant" }, match);
+        await db.SaveChangesAsync();
+        var scoring = new ScoringService();
+        var personalBestContext = new PersonalBestContext(db);
+        var personalBestEngine = new PersonalBestEngine(db);
+        var controller = new MatchesController(db, new TestTenantContext(tenantId), scoring, new LiveScoringService(scoring), new PersonalBestRegistrationService(db, personalBestContext, personalBestEngine), new PersonalBestLiveLookup(db, personalBestContext, personalBestEngine, new MemoryCache(new MemoryCacheOptions())));
+
+        var result = Assert.IsType<FileContentResult>(await controller.Export(matchId, "nl", CancellationToken.None));
+
+        var lines = Encoding.UTF8.GetString(result.FileContents).Split('\n');
+        var headerColumns = lines[0].Split(',');
+        Assert.Equal("device", headerColumns[0]);
+        Assert.Equal("Baan", headerColumns[1]);
+        var names = lines.Skip(1).Select(line => line.Split(',')[3]).ToArray();
+        var lanes = lines.Skip(1).Select(line => line.Split(',')[1]).ToArray();
+        Assert.Equal(["\"Charlie Archer\"", "\"Alpha Archer\"", "\"Bravo Archer\""], names);
+        Assert.Equal(["\"\"", "\"1A\"", "\"2B\""], lanes);
+    }
+
+    [Fact]
+    public async Task SetParticipantLane_trims_and_stores_the_annotation_and_rejects_values_over_eight_characters()
+    {
+        await using var connection = new SqliteConnection("Filename=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>().UseSqlite(connection).Options;
+        await using var db = new ApplicationDbContext(options);
+        await db.Database.EnsureCreatedAsync();
+
+        var tenantId = Guid.NewGuid();
+        var matchId = Guid.NewGuid();
+        var participantId = Guid.NewGuid();
+        var match = new Match
+        {
+            Id = matchId,
+            TenantId = tenantId,
+            Name = "Open",
+            Participants = [new MatchParticipant { Id = participantId, TenantId = tenantId, MatchId = matchId, OwnLastName = "Archer", OwnFullName = "Robin Archer" }]
+        };
+        db.AddRange(new Tenant { Id = tenantId, Name = "Tenant" }, match);
+        await db.SaveChangesAsync();
+        var scoring = new ScoringService();
+        var personalBestContext = new PersonalBestContext(db);
+        var personalBestEngine = new PersonalBestEngine(db);
+        var controller = new MatchesController(db, new TestTenantContext(tenantId), scoring, new LiveScoringService(scoring), new PersonalBestRegistrationService(db, personalBestContext, personalBestEngine), new PersonalBestLiveLookup(db, personalBestContext, personalBestEngine, new MemoryCache(new MemoryCacheOptions())));
+
+        var ok = Assert.IsType<OkObjectResult>(await controller.SetParticipantLane(matchId, participantId, new UpdateParticipantLaneRequest("  2A  "), CancellationToken.None));
+        Assert.Equal("2A", Assert.IsType<MatchParticipant>(ok.Value).DeviceLane);
+
+        var tooLong = Assert.IsType<BadRequestObjectResult>(await controller.SetParticipantLane(matchId, participantId, new UpdateParticipantLaneRequest("123456789"), CancellationToken.None));
+        Assert.Equal("LANE_TOO_LONG", Assert.IsType<ApiError>(tooLong.Value).Code);
+
+        Assert.IsType<OkObjectResult>(await controller.SetParticipantLane(matchId, participantId, new UpdateParticipantLaneRequest(""), CancellationToken.None));
+        Assert.Null((await db.MatchParticipants.SingleAsync(item => item.Id == participantId)).DeviceLane);
+    }
+
+    [Fact]
+    public async Task AssignParticipantDevice_clears_the_lane_annotation_when_unassigning()
+    {
+        await using var connection = new SqliteConnection("Filename=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>().UseSqlite(connection).Options;
+        await using var db = new ApplicationDbContext(options);
+        await db.Database.EnsureCreatedAsync();
+
+        var tenantId = Guid.NewGuid();
+        var matchId = Guid.NewGuid();
+        var deviceId = Guid.NewGuid();
+        var participantId = Guid.NewGuid();
+        var match = new Match
+        {
+            Id = matchId,
+            TenantId = tenantId,
+            Name = "Open",
+            Devices = [new ScoreDevice { Id = deviceId, TenantId = tenantId, MatchId = matchId, Name = "Lane 1", SortOrder = 0 }],
+            Participants = [new MatchParticipant { Id = participantId, TenantId = tenantId, MatchId = matchId, DeviceId = deviceId, DeviceOrder = 0, DeviceLane = "1A", OwnLastName = "Archer", OwnFullName = "Robin Archer" }]
+        };
+        db.AddRange(new Tenant { Id = tenantId, Name = "Tenant" }, match);
+        await db.SaveChangesAsync();
+        var scoring = new ScoringService();
+        var personalBestContext = new PersonalBestContext(db);
+        var personalBestEngine = new PersonalBestEngine(db);
+        var controller = new MatchesController(db, new TestTenantContext(tenantId), scoring, new LiveScoringService(scoring), new PersonalBestRegistrationService(db, personalBestContext, personalBestEngine), new PersonalBestLiveLookup(db, personalBestContext, personalBestEngine, new MemoryCache(new MemoryCacheOptions())));
+
+        await controller.AssignParticipantDevice(matchId, participantId, new AssignParticipantDeviceRequest(null), CancellationToken.None);
+
+        Assert.Null((await db.MatchParticipants.SingleAsync(item => item.Id == participantId)).DeviceLane);
+    }
+
+    [Fact]
+    public async Task RenameDevice_updates_the_device_name()
+    {
+        await using var connection = new SqliteConnection("Filename=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>().UseSqlite(connection).Options;
+        await using var db = new ApplicationDbContext(options);
+        await db.Database.EnsureCreatedAsync();
+
+        var tenantId = Guid.NewGuid();
+        var matchId = Guid.NewGuid();
+        var deviceId = Guid.NewGuid();
+        var match = new Match
+        {
+            Id = matchId,
+            TenantId = tenantId,
+            Name = "Open",
+            Devices = [new ScoreDevice { Id = deviceId, TenantId = tenantId, MatchId = matchId, Name = "Lane 1", SortOrder = 0 }]
+        };
+        db.AddRange(new Tenant { Id = tenantId, Name = "Tenant" }, match);
+        await db.SaveChangesAsync();
+        var scoring = new ScoringService();
+        var personalBestContext = new PersonalBestContext(db);
+        var personalBestEngine = new PersonalBestEngine(db);
+        var controller = new MatchesController(db, new TestTenantContext(tenantId), scoring, new LiveScoringService(scoring), new PersonalBestRegistrationService(db, personalBestContext, personalBestEngine), new PersonalBestLiveLookup(db, personalBestContext, personalBestEngine, new MemoryCache(new MemoryCacheOptions())));
+
+        var result = Assert.IsType<OkObjectResult>(await controller.RenameDevice(matchId, deviceId, new CreateDeviceRequest("Target A"), CancellationToken.None));
+
+        Assert.Equal("Target A", Assert.IsType<ScoreDevice>(result.Value).Name);
+        Assert.Equal("Target A", (await db.ScoreDevices.SingleAsync(item => item.Id == deviceId)).Name);
+    }
+
+    [Fact]
+    public async Task RenameDevice_returns_not_found_for_a_device_outside_the_match_or_tenant()
+    {
+        await using var connection = new SqliteConnection("Filename=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>().UseSqlite(connection).Options;
+        await using var db = new ApplicationDbContext(options);
+        await db.Database.EnsureCreatedAsync();
+
+        var tenantId = Guid.NewGuid();
+        var matchId = Guid.NewGuid();
+        var match = new Match { Id = matchId, TenantId = tenantId, Name = "Open" };
+        db.AddRange(new Tenant { Id = tenantId, Name = "Tenant" }, match);
+        await db.SaveChangesAsync();
+        var scoring = new ScoringService();
+        var personalBestContext = new PersonalBestContext(db);
+        var personalBestEngine = new PersonalBestEngine(db);
+        var controller = new MatchesController(db, new TestTenantContext(tenantId), scoring, new LiveScoringService(scoring), new PersonalBestRegistrationService(db, personalBestContext, personalBestEngine), new PersonalBestLiveLookup(db, personalBestContext, personalBestEngine, new MemoryCache(new MemoryCacheOptions())));
+
+        Assert.IsType<NotFoundResult>(await controller.RenameDevice(matchId, Guid.NewGuid(), new CreateDeviceRequest("Target A"), CancellationToken.None));
     }
 
     [Fact]

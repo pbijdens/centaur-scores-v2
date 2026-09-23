@@ -140,6 +140,9 @@ public sealed class MatchParticipant : TenantOwnedEntity
 
     public Guid? DeviceId { get; set; }
     public int? DeviceOrder { get; set; }
+    // Free-form sub-assignment annotation for the device (e.g. "1A", "2B" - Dutch "baanindeling"),
+    // max 8 chars, cleared alongside DeviceId/DeviceOrder when the participant is unassigned.
+    public string? DeviceLane { get; set; }
     public List<ArrowScore> Scores { get; set; } = [];
 
     // Scorecard signing (see documentation/SIGNING-SCORECARDS.md). Once Signed is true, anonymous

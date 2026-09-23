@@ -326,6 +326,17 @@ public sealed class MatchesController(ApplicationDbContext db, ITenantContext te
         return Created($"api/matches/{id}/devices/{device.Id}", device);
     }
 
+    [HttpPut("{id:guid}/devices/{deviceId:guid}")]
+    public async Task<IActionResult> RenameDevice(Guid id, Guid deviceId, CreateDeviceRequest request, CancellationToken cancellationToken)
+    {
+        if (!CanManage) return Forbid();
+        var device = await db.ScoreDevices.SingleOrDefaultAsync(item => item.Id == deviceId && item.MatchId == id && item.TenantId == TenantId, cancellationToken);
+        if (device is null) return NotFound();
+        device.Name = request.Name;
+        await db.SaveChangesAsync(cancellationToken);
+        return Ok(device);
+    }
+
     [HttpPut("{id:guid}/devices/order")]
     public async Task<IActionResult> ReorderDevices(Guid id, ReorderDevicesRequest request, CancellationToken cancellationToken)
     {
@@ -365,6 +376,7 @@ public sealed class MatchesController(ApplicationDbContext db, ITenantContext te
         {
             participant.DeviceId = null;
             participant.DeviceOrder = null;
+            participant.DeviceLane = null;
             await db.SaveChangesAsync(cancellationToken);
             return Ok(participant);
         }
@@ -382,6 +394,19 @@ public sealed class MatchesController(ApplicationDbContext db, ITenantContext te
         {
             participant.DeviceOrder = 0;
         }
+        await db.SaveChangesAsync(cancellationToken);
+        return Ok(participant);
+    }
+
+    [HttpPut("{id:guid}/participants/{participantId:guid}/lane")]
+    public async Task<IActionResult> SetParticipantLane(Guid id, Guid participantId, UpdateParticipantLaneRequest request, CancellationToken cancellationToken)
+    {
+        if (!CanManage) return Forbid();
+        var participant = await db.MatchParticipants.SingleOrDefaultAsync(item => item.Id == participantId && item.MatchId == id && item.TenantId == TenantId, cancellationToken);
+        if (participant is null) return NotFound();
+        var lane = string.IsNullOrWhiteSpace(request.Lane) ? null : request.Lane.Trim();
+        if (lane is { Length: > 8 }) return BadRequest(new ApiError("LANE_TOO_LONG", "Lane must be 8 characters or fewer."));
+        participant.DeviceLane = lane;
         await db.SaveChangesAsync(cancellationToken);
         return Ok(participant);
     }
@@ -448,6 +473,7 @@ public sealed class MatchesController(ApplicationDbContext db, ITenantContext te
         var devicesById = match.Devices.ToDictionary(item => item.Id, item => item);
         var orderedParticipants = match.Participants
             .OrderBy(item => item.DeviceId is { } deviceId && devicesById.TryGetValue(deviceId, out var device) ? device.SortOrder : int.MaxValue)
+            .ThenBy(item => item.DeviceLane ?? "")
             .ThenBy(item => item.DeviceOrder ?? int.MaxValue)
             .ThenBy(item => item.FullName)
             .ToList();
@@ -462,7 +488,7 @@ public sealed class MatchesController(ApplicationDbContext db, ITenantContext te
         var splitSize = match.GroupEnds is > 0 ? match.GroupEnds.Value : 1;
         var splitCount = match.Ends > 0 ? (match.Ends + splitSize - 1) / splitSize : 0;
 
-        var headers = new List<string> { "device", "federation_number", "full_name", "total" };
+        var headers = new List<string> { "device", labels.LaneHeader, "federation_number", "full_name", "total" };
         headers.AddRange(keyboard.Keyboard.Select(key => Csv(key.Label)));
         headers.Add("Null");
         headers.AddRange(Enumerable.Range(1, splitCount).Select(index => $"Split{index}"));
@@ -475,7 +501,7 @@ public sealed class MatchesController(ApplicationDbContext db, ITenantContext te
         {
             var deviceName = participant.DeviceId is { } deviceId && devicesById.TryGetValue(deviceId, out var device) ? device.Name : "";
             var result = scoring.Calculate(participant, match.ArrowsPerEnd, match.GroupEnds);
-            var values = new List<string> { Csv(deviceName), Csv(participant.FederationNumber), Csv(participant.FullName), result.Total.ToString() };
+            var values = new List<string> { Csv(deviceName), Csv(participant.DeviceLane), Csv(participant.FederationNumber), Csv(participant.FullName), result.Total.ToString() };
             values.AddRange(keyboard.Keyboard.Select(key => participant.Scores.Count(score => score.KeyId == key.KeyId).ToString()));
             values.Add(Math.Max(match.Ends * match.ArrowsPerEnd - participant.Scores.Count, 0).ToString());
             values.AddRange(Enumerable.Range(1, splitCount).Select(index => result.GroupScores.GetValueOrDefault(index).ToString()));
@@ -510,10 +536,10 @@ public sealed class MatchesController(ApplicationDbContext db, ITenantContext te
 
     // Same "only the export is concerned with translated text" convention as ParticipantListExcelLabels.
     private static CsvExportLabels ExportLabels(string? language) => string.Equals(language, "nl", StringComparison.OrdinalIgnoreCase)
-        ? new CsvExportLabels("Ondertekend", "Ja", "Nee")
-        : new CsvExportLabels("Signed", "Yes", "No");
+        ? new CsvExportLabels("Ondertekend", "Ja", "Nee", "Baan")
+        : new CsvExportLabels("Signed", "Yes", "No", "Lane");
 
-    private sealed record CsvExportLabels(string SignedHeader, string Yes, string No);
+    private sealed record CsvExportLabels(string SignedHeader, string Yes, string No, string LaneHeader);
 
     private sealed record KeyboardConfiguration(List<Guid> CategoryOrder, List<KeyboardKey> Keyboard);
     private sealed record KeyboardKey(string KeyId, string Label);

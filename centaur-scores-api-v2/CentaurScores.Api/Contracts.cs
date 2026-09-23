@@ -29,6 +29,7 @@ public sealed record EnterScoreRequest(int End, int Arrow, string KeyId, int Val
 public sealed record SignParticipantRequest(string? ArcherSignatureDataUrl, string? MarkerSignatureDataUrl);
 public sealed record CreateDeviceRequest(string Name);
 public sealed record AssignParticipantDeviceRequest(Guid? DeviceId);
+public sealed record UpdateParticipantLaneRequest(string? Lane);
 public sealed record ReorderDevicesRequest(List<Guid> DeviceIds);
 public sealed record ReorderDeviceParticipantsRequest(List<Guid> ParticipantIds);
 public sealed record CreateScopeRequest(string Scope, List<Guid> GroupByCategoryIds, bool IncludeAverage, bool IncludeGroupScores, bool IncludeEqualizers, bool IncludePersonalBest, List<Guid> DisplayCategoryIds);
