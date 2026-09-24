@@ -28,6 +28,20 @@ class ScoresViewmodel extends EventViewModel {
     notify(LoadingEvent(isLoading: false));
   }
 
+  /// Whether the numeric keypad is actually showing for this column. Once
+  /// signed, a participant's card is permanently locked - the keypad must
+  /// never open for them again, regardless of [activeKeyboard]. A signable
+  /// card that's fully filled in doesn't reopen it either, so the Sign
+  /// button (which only shows while the keypad is closed) takes its place -
+  /// see documentation/SIGNING-SCORECARDS.md.
+  bool isKeyboardVisibleFor(
+      ScorekeeperMatch model, ScorekeeperMatchParticipant participant, int index) {
+    if (index != activeKeyboard || participant.signed) return false;
+    final awaitingSignature = model.signatureMode != 'none' &&
+        scoring.firstNullIndex(participant) == null;
+    return !awaitingSignature;
+  }
+
   void hideKeyboard() {
     activeKeyboard = null;
     notifyViewmodelUpdated();
@@ -109,16 +123,6 @@ class ScoresViewmodel extends EventViewModel {
 
       notify(ArrowStateChangedEvent(
           participant: participant, end: editingEnd, arrow: editingArrow!));
-
-      // The card just became fully filled in while already active: the
-      // keyboard is about to collapse in favor of the Sign area (see
-      // ScoreEntryFullPageWidgetState._requiresSignFocus) - scroll/focus to
-      // it the same way activating an already-complete card does.
-      if (model.signatureMode != 'none' &&
-          !participant.signed &&
-          scoring.firstNullIndex(participant) == null) {
-        notifyKeyboardShown();
-      }
     }
   }
 

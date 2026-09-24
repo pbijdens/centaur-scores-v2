@@ -18,16 +18,8 @@ class StyleHelper {
   static double scLine2Height(BuildContext context) => 30 * scale(context);
   static double scFooterHeight(BuildContext context) => 55 * scale(context);
 
-  // The persistent per-participant sign area (see SignArea) is a third,
-  // always-visible row below the keyboard slot when a match requires
-  // signing - added to the overhead budget so preferredCellHeight leaves it
-  // room instead of letting it get squeezed off-screen.
-  static double scSignAreaHeight(BuildContext context) => 48 * scale(context);
-
-  static double scVerticalOverhead(BuildContext context, {bool includeSignArea = false}) =>
-      (175 * scale(context)) +
-      scFooterHeight(context) +
-      (includeSignArea ? scSignAreaHeight(context) : 0);
+  static double scVerticalOverhead(BuildContext context) =>
+      (175 * scale(context)) + scFooterHeight(context);
 
   /// Text/control scale factor, driven by the device's shortest logical-
   /// pixel side so tablets (and other high-resolution/large-screen devices)
@@ -61,9 +53,7 @@ class StyleHelper {
   static double preferredCellHeight(BuildContext context, ScorekeeperMatch model) {
     MediaQueryData q = MediaQuery.of(context);
     int endsToShow = model.ends > 10 ? 12 : model.ends;
-    double result = (q.size.height -
-            scVerticalOverhead(context, includeSignArea: model.signatureMode != 'none')) /
-        endsToShow;
+    double result = (q.size.height - scVerticalOverhead(context)) / endsToShow;
     if (result < 30) {
       result = 30;
     } else if (result > 55) {

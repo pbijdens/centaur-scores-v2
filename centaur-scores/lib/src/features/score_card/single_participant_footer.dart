@@ -1,4 +1,6 @@
 import 'package:centaur_scores/src/features/score_card/scores_viewmodel.dart';
+import 'package:centaur_scores/src/features/score_card/sign_area.dart';
+import 'package:centaur_scores/src/i18n/translations.dart';
 import 'package:centaur_scores/src/style/style_helper.dart';
 import 'package:flutter/material.dart';
 
@@ -22,6 +24,10 @@ class SingeParticipantFooter extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final total = scoring.totalScore(model, participant);
+    final keyboardOpen = viewmodel.isKeyboardVisibleFor(model, participant, index);
+    // Rendered where Next/Close go while the keypad is open, so it's only
+    // offered once the keypad is closed.
+    final showSign = !keyboardOpen && model.signatureMode != 'none' && !participant.signed;
     return Container(
       color: StyleHelper.colorForColumnFooter(index),
       height: StyleHelper.scFooterHeight(context),
@@ -33,12 +39,12 @@ class SingeParticipantFooter extends StatelessWidget {
                 child: Text('Totaal: $total',
                     textAlign: TextAlign.center,
                     style: StyleHelper.scoreFormFooterTextStyle(context))),
-            if (index == viewmodel.activeKeyboard)
+            if (keyboardOpen)
               SizedBox(
                   height: StyleHelper.scFooterHeight(context),
                   width: StyleHelper.scoreCardColumnWidth(context, model),
                   child: Container(color: const Color.fromARGB(128, 0, 0, 0))),
-            if (index == viewmodel.activeKeyboard)
+            if (keyboardOpen)
               Padding(
                   padding: const EdgeInsets.fromLTRB(0, 0, 88, 0),
                   child: Align(
@@ -60,7 +66,7 @@ class SingeParticipantFooter extends StatelessWidget {
                                 ),
                               ),
                               child: const Text("x"))))),
-            if (index == viewmodel.activeKeyboard)
+            if (keyboardOpen)
               Padding(
                   padding: const EdgeInsets.fromLTRB(0, 0, 6, 0),
                   child: Align(
@@ -82,7 +88,25 @@ class SingeParticipantFooter extends StatelessWidget {
                                   borderRadius: BorderRadius.circular(3.0),
                                 ),
                               ),
-                              child: const Text("Volgende")))))
+                              child: const Text("Volgende"))))),
+            if (showSign)
+              Padding(
+                  padding: const EdgeInsets.fromLTRB(0, 0, 6, 0),
+                  child: Align(
+                      alignment: Alignment.centerRight,
+                      child: SizedBox(
+                          height: StyleHelper.scFooterHeight(context) - 10,
+                          child: ElevatedButton(
+                              onPressed: () => startSigning(context, model, participant),
+                              style: ElevatedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(horizontal: 12),
+                                backgroundColor: Colors.white,
+                                foregroundColor: Colors.black,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(3.0),
+                                ),
+                              ),
+                              child: Text(t('sign'))))))
           ])),
     );
   }

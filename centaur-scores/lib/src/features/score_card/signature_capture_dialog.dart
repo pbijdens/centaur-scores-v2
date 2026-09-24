@@ -13,7 +13,8 @@ class SignatureCaptureResult {
 }
 
 /// Full-screen split signature capture: two stacked ink-capture pads (5:1
-/// aspect ratio each, so the stack reads as 5:2), one for the archer and one
+/// aspect ratio each, so the stack reads as 5:2, scaled to fit the screen
+/// without scrolling), one for the archer and one
 /// for the marker, per documentation/SIGNING-SCORECARDS.md. Pops with a
 /// [SignatureCaptureResult] on confirm (both signatures required), or null
 /// on cancel.
@@ -59,6 +60,10 @@ class _SignatureCaptureDialogState extends State<SignatureCaptureDialog> {
 
   @override
   Widget build(BuildContext context) {
+    // Nothing in here may scroll: a scroll view would compete with the pads
+    // for vertical drags, so signing would scroll the page instead of (or as
+    // well as) drawing. Instead the pads are sized to whatever height is
+    // left, which matters most in landscape.
     return Dialog.fullscreen(
       child: SafeArea(
         child: Padding(
@@ -66,33 +71,20 @@ class _SignatureCaptureDialogState extends State<SignatureCaptureDialog> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(t('signatureCaptureTitle'), style: Theme.of(context).textTheme.titleLarge),
-              const SizedBox(height: 4),
-              Text(widget.participantName, style: Theme.of(context).textTheme.bodyMedium),
-              const SizedBox(height: 8),
-              Text(t('signatureCaptureInstructions')),
-              const SizedBox(height: 16),
-              Expanded(
-                child: SingleChildScrollView(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      _padBlock(t('archerSignature'), _archerController),
-                      const SizedBox(height: 20),
-                      _padBlock(t('markerSignature'), _markerController),
-                    ],
-                  ),
-                ),
-              ),
-              if (_error != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: Text(_error!, style: const TextStyle(color: Colors.red)),
-                ),
-              const SizedBox(height: 16),
               Row(
-                mainAxisAlignment: MainAxisAlignment.end,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('${t('signatureCaptureTitle')} - ${widget.participantName}',
+                            style: Theme.of(context).textTheme.titleLarge),
+                        Text(t('signatureCaptureInstructions')),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
                   TextButton(
                     onPressed: _saving ? null : () => Navigator.of(context).pop(),
                     child: Text(t('cancel')),
@@ -104,6 +96,30 @@ class _SignatureCaptureDialogState extends State<SignatureCaptureDialog> {
                   ),
                 ],
               ),
+              if (_error != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(_error!, style: const TextStyle(color: Colors.red)),
+                ),
+              const SizedBox(height: 8),
+              Expanded(
+                child: LayoutBuilder(builder: (context, constraints) {
+                  // Largest 5:1 pad size where both pads plus their label
+                  // rows fit without overflowing.
+                  final byHeight = (constraints.maxHeight - 2 * _labelRowHeight - _padGap) / 2;
+                  final byWidth = constraints.maxWidth / 5;
+                  final padHeight = (byHeight < byWidth ? byHeight : byWidth).clamp(0.0, double.infinity);
+                  final padWidth = padHeight * 5;
+                  return Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      _padBlock(t('archerSignature'), _archerController, padWidth, padHeight),
+                      const SizedBox(height: _padGap),
+                      _padBlock(t('markerSignature'), _markerController, padWidth, padHeight),
+                    ],
+                  );
+                }),
+              ),
             ],
           ),
         ),
@@ -111,23 +127,29 @@ class _SignatureCaptureDialogState extends State<SignatureCaptureDialog> {
     );
   }
 
-  Widget _padBlock(String label, SignaturePadController controller) {
+  static const double _labelRowHeight = 40;
+  static const double _padGap = 12;
+
+  Widget _padBlock(String label, SignaturePadController controller, double width, double height) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
-            TextButton(onPressed: controller.clear, child: Text(t('clearSignature'))),
-          ],
-        ),
-        AspectRatio(
-          aspectRatio: 5 / 1,
-          child: Container(
-            decoration: BoxDecoration(border: Border.all(color: Colors.black45)),
-            child: SignaturePad(controller: controller),
+        SizedBox(
+          width: width,
+          height: _labelRowHeight,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
+              TextButton(onPressed: controller.clear, child: Text(t('clearSignature'))),
+            ],
           ),
+        ),
+        Container(
+          width: width,
+          height: height,
+          decoration: BoxDecoration(border: Border.all(color: Colors.black45)),
+          child: SignaturePad(controller: controller),
         ),
       ],
     );

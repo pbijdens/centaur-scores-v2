@@ -14,7 +14,6 @@ import 'package:flutter/material.dart';
 
 import '../../model/scorekeeper_match.dart';
 import '../../model/scorekeeper_match_participant.dart';
-import '../../scoring/scoring.dart' as scoring;
 
 class ScoreEntryFullPageWidget extends StatefulWidget {
   const ScoreEntryFullPageWidget({super.key});
@@ -35,12 +34,25 @@ class ScoreEntryFullPageWidgetState extends State<ScoreEntryFullPageWidget>
     super.initState();
     _viewModel.subscribe(this);
     _viewModel.load();
+    // ScoresView builds this widget as `const`, so AppShell's rebuild on a
+    // MatchRepository change never reaches it - listen directly, or a local
+    // signature / a server-side change (e.g. a revoked signature picked up
+    // by the poll) only shows after leaving and re-entering this screen.
+    MatchRepository().addListener(_onRepositoryChanged);
+    // Pick up server-side changes right away instead of waiting for the
+    // next 60s poll.
+    MatchRepository().fetchMatchInfo();
   }
 
   @override
   void dispose() {
-    super.dispose();
+    MatchRepository().removeListener(_onRepositoryChanged);
     _viewModel.unsubscribe(this);
+    super.dispose();
+  }
+
+  void _onRepositoryChanged() {
+    if (mounted) setState(() {});
   }
 
   @override
@@ -142,11 +154,7 @@ class ScoreEntryFullPageWidgetState extends State<ScoreEntryFullPageWidget>
                   participant,
                   participants.indexWhere(
                       (e) => e.matchParticipantId == participant.matchParticipantId)),
-              signArea(
-                  currentModel,
-                  participant,
-                  participants.indexWhere(
-                      (e) => e.matchParticipantId == participant.matchParticipantId))
+              SignArea(model: currentModel, participant: participant)
             ]))
         .toList();
   }
@@ -187,12 +195,9 @@ class ScoreEntryFullPageWidgetState extends State<ScoreEntryFullPageWidget>
         .toList();
   }
 
-  // Once signed, a participant's card is permanently locked - the numeric
-  // keypad must never open for them again, regardless of activeKeyboard.
   Widget keyboard(BuildContext context, ScorekeeperMatch model,
       ScorekeeperMatchParticipant participantModel, int participantIndex) {
-    final isActive = participantIndex == _viewModel.activeKeyboard;
-    if (isActive && !participantModel.signed && !_requiresSignFocus(model, participantModel)) {
+    if (_viewModel.isKeyboardVisibleFor(model, participantModel, participantIndex)) {
       return IntrinsicHeight(
           key: _keyboardScrollKey,
           child: ScoreColumnKeyboard(_viewModel, model, participantModel));
@@ -201,30 +206,6 @@ class ScoreEntryFullPageWidgetState extends State<ScoreEntryFullPageWidget>
       width: StyleHelper.scoreCardColumnWidth(context, model),
       height: 0,
       child: Container(color: Colors.transparent),
-    );
-  }
-
-  // A signature-required card that's activated and fully filled in should
-  // scroll/focus to the Sign area instead of reopening the numeric keypad -
-  // see documentation/SIGNING-SCORECARDS.md.
-  bool _requiresSignFocus(ScorekeeperMatch model, ScorekeeperMatchParticipant participant) {
-    return model.signatureMode != 'none' &&
-        !participant.signed &&
-        scoring.firstNullIndex(participant) == null;
-  }
-
-  // Reuses the same GlobalKey/KeyboardShownEvent scroll mechanism as the
-  // numeric keypad above - at any moment only one of {keyboard, sign area}
-  // is ever the "focused" widget for the active column, so it's safe for
-  // both to conditionally claim the same key.
-  Widget signArea(ScorekeeperMatch model, ScorekeeperMatchParticipant participantModel,
-      int participantIndex) {
-    final isActive = participantIndex == _viewModel.activeKeyboard;
-    final shouldFocus = isActive && _requiresSignFocus(model, participantModel);
-    return SignArea(
-      key: shouldFocus ? _keyboardScrollKey : null,
-      model: model,
-      participant: participantModel,
     );
   }
 }

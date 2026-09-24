@@ -102,6 +102,9 @@ class _SignaturePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    // A pointer that starts inside the pad keeps delivering move events
+    // after it leaves the pad's bounds - clip so ink never spills outside.
+    canvas.clipRect(Offset.zero & size);
     final linePaint = Paint()
       ..color = Colors.black
       ..strokeWidth = 2.5

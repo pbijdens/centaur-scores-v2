@@ -10,13 +10,11 @@ import 'package:flutter/material.dart';
 
 import 'signature_capture_dialog.dart';
 
-/// Persistent per-participant sign area, rendered below the score entry
-/// column (see documentation/SIGNING-SCORECARDS.md). Hidden entirely when
-/// the match doesn't require signing; otherwise always present - a "Sign"
-/// button (present even for an incomplete card, since matches can be
-/// stopped early) until signed, then either the recorded signature images
-/// ("signature" mode) or a plain read-only notice ("confirm" mode, which
-/// never captures images).
+/// Per-participant signed-state area, rendered below the score entry column
+/// (see documentation/SIGNING-SCORECARDS.md). Empty until the participant is
+/// signed - the "Sign" button itself lives in [SingeParticipantFooter] - then
+/// either the recorded signature images ("signature" mode) or a plain
+/// read-only notice ("confirm" mode, which never captures images).
 class SignArea extends StatelessWidget {
   final ScorekeeperMatch model;
   final ScorekeeperMatchParticipant participant;
@@ -25,22 +23,14 @@ class SignArea extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (model.signatureMode == 'none') return const SizedBox.shrink();
+    if (model.signatureMode == 'none' || !participant.signed) {
+      return const SizedBox.shrink();
+    }
     final width = StyleHelper.scoreCardColumnWidth(context, model);
     return Container(
       width: width,
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
-      child: participant.signed ? _signedContent(context) : _signButton(context),
-    );
-  }
-
-  Widget _signButton(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      child: ElevatedButton(
-        onPressed: () => _onSignPressed(context),
-        child: Text(t('sign')),
-      ),
+      child: _signedContent(context),
     );
   }
 
@@ -57,7 +47,10 @@ class SignArea extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (archer != null) ...[_signatureThumb(t('archerSignature'), archer), const SizedBox(height: 6)],
+        if (archer != null) ...[
+          _signatureThumb(t('archerSignature'), archer),
+          const SizedBox(height: 6)
+        ],
         if (marker != null) _signatureThumb(t('markerSignature'), marker),
       ],
     );
@@ -71,8 +64,11 @@ class SignArea extends StatelessWidget {
         Text(label, style: const TextStyle(fontSize: 11)),
         if (bytes != null)
           Container(
-            decoration: BoxDecoration(border: Border.all(color: Colors.black26)),
-            child: AspectRatio(aspectRatio: 5 / 1, child: Image.memory(bytes, fit: BoxFit.contain)),
+            decoration:
+                BoxDecoration(border: Border.all(color: Colors.black26)),
+            child: AspectRatio(
+                aspectRatio: 5 / 1,
+                child: Image.memory(bytes, fit: BoxFit.contain)),
           ),
       ],
     );
@@ -87,32 +83,42 @@ class SignArea extends StatelessWidget {
       return null;
     }
   }
+}
 
-  Future<void> _onSignPressed(BuildContext context) async {
-    if (model.signatureMode == 'signature') {
-      final result = await showDialog<SignatureCaptureResult>(
-        context: context,
-        builder: (context) => SignatureCaptureDialog(participantName: participant.name),
-      );
-      if (result == null) return;
-      MatchRepository().recordSignature(participant.matchParticipantId,
-          archerSignatureDataUrl: result.archerDataUrl, markerSignatureDataUrl: result.markerDataUrl);
-      return;
-    }
-
-    final confirmed = await showDialog<bool>(
+/// Starts signing [participant]'s scorecard: a confirmation dialog in
+/// "confirm" mode, or the signature capture dialog in "signature" mode.
+/// Available even for an incomplete card, since matches can be stopped early.
+Future<void> startSigning(BuildContext context, ScorekeeperMatch model,
+    ScorekeeperMatchParticipant participant) async {
+  if (model.signatureMode == 'signature') {
+    final result = await showDialog<SignatureCaptureResult>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text(t('signConfirmTitle')),
-        content: Text(t('signConfirmBody')),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(context).pop(false), child: Text(t('cancel'))),
-          ElevatedButton(onPressed: () => Navigator.of(context).pop(true), child: Text(t('confirmAction'))),
-        ],
-      ),
+      builder: (context) =>
+          SignatureCaptureDialog(participantName: participant.name),
     );
-    if (confirmed == true) {
-      MatchRepository().recordSignature(participant.matchParticipantId);
-    }
+    if (result == null) return;
+    MatchRepository().recordSignature(participant.matchParticipantId,
+        archerSignatureDataUrl: result.archerDataUrl,
+        markerSignatureDataUrl: result.markerDataUrl);
+    return;
+  }
+
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text(t('signConfirmTitle')),
+      content: Text(t('signConfirmBody')),
+      actions: [
+        TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(t('cancel'))),
+        ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(t('confirmAction'))),
+      ],
+    ),
+  );
+  if (confirmed == true) {
+    MatchRepository().recordSignature(participant.matchParticipantId);
   }
 }
