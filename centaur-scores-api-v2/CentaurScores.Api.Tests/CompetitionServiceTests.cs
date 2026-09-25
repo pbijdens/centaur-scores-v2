@@ -131,4 +131,57 @@ public sealed class CompetitionServiceTests
         Assert.Equal(5, group.Entries.Single(item => item.Name == "Early Archer").RuleScores["Total"]);
         Assert.Equal(3, group.Entries.Single(item => item.Name == "Tie Archer").RuleScores["Total"]);
     }
+    [Fact]
+    public void BuildResults_breaks_entries_down_per_rule_with_per_rule_used_flags_and_f1_values()
+    {
+        var round1 = Guid.NewGuid();
+        var round2 = Guid.NewGuid();
+        var round3 = Guid.NewGuid();
+        var idA = Guid.NewGuid();
+        var idB = Guid.NewGuid();
+        MatchParticipant Archer(Guid id, string name, params int[] arrows) => new()
+        {
+            Id = Guid.NewGuid(),
+            ParticipantListMemberId = id,
+            ParticipantListMember = new ParticipantListMember { Id = id, FullName = name },
+            Scores = arrows.Select(value => new ArrowScore { Id = Guid.NewGuid(), KeyId = value.ToString(), Value = value }).ToList()
+        };
+        var match1 = new Match { Id = Guid.NewGuid(), ArrowsPerEnd = 1, ScoringRulesJson = "[]", Participants = [Archer(idA, "A Archer", 10), Archer(idB, "B Archer", 9)] };
+        var match2 = new Match { Id = Guid.NewGuid(), ArrowsPerEnd = 1, ScoringRulesJson = "[]", Participants = [Archer(idA, "A Archer", 5)] };
+        var competition = new Competition
+        {
+            Id = Guid.NewGuid(),
+            Name = "Mixed Cup",
+            // Deliberately listed out of order: rule rounds must follow round Order, not list order.
+            Rounds = [new CompetitionRound { Id = round3, Order = 2, ShortName = "R3" }, new CompetitionRound { Id = round1, Order = 0, ShortName = "R1" }, new CompetitionRound { Id = round2, Order = 1, ShortName = "R2" }],
+            ScoringRules =
+            [
+                new CompetitionScoreRule { Id = Guid.NewGuid(), Name = "Best", RoundIdsJson = JsonSerializer.Serialize(new[] { round3, round2, round1 }), HighestScores = 1, MinimumScores = 0, Aggregation = "total", SortOrder = 0 },
+                new CompetitionScoreRule { Id = Guid.NewGuid(), Name = "Points", RoundIdsJson = JsonSerializer.Serialize(new[] { round1, round2 }), HighestScores = 2, MinimumScores = 0, Aggregation = "f1", SortOrder = 1 }
+            ]
+        };
+
+        var document = new CompetitionService(new ScoringService()).BuildResults(
+            competition, [], new Dictionary<Guid, IReadOnlyList<Match>> { [round1] = [match1], [round2] = [match2], [round3] = [] });
+
+        var a = document.Groups.Single().Entries.Single(item => item.Name == "A Archer");
+        Assert.Equal(["Best", "Points"], a.Rules.Select(rule => rule.Name));
+
+        var best = a.Rules[0];
+        Assert.Equal("total", best.Aggregation);
+        Assert.Equal(10, best.Total);
+        Assert.Equal([round1, round2, round3], best.Rounds.Select(item => item.RoundId));
+        Assert.Equal([10, 5, (int?)null], best.Rounds.Select(item => item.Value));
+        Assert.Equal([true, false, false], best.Rounds.Select(item => item.Used));
+
+        // Same rounds, but the f1 rule shows f1 points and counts both rounds - round2 is used here but not in "Best".
+        var points = a.Rules[1];
+        Assert.Equal([12, 12], points.Rounds.Select(item => item.Value));
+        Assert.Equal([true, true], points.Rounds.Select(item => item.Used));
+        Assert.Equal(24, points.Total);
+
+        var b = document.Groups.Single().Entries.Single(item => item.Name == "B Archer");
+        Assert.Equal([9, (int?)null, null], b.Rules[0].Rounds.Select(item => item.Value));
+        Assert.Equal([10, (int?)null], b.Rules[1].Rounds.Select(item => item.Value));
+    }
 }

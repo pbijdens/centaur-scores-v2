@@ -38,7 +38,7 @@ The API defaults to `http://127.0.0.1:5080`; override with the `VITE_API_BASE_UR
 
 **Auth/session state** lives in `localStorage` under `centaur-token`, `centaur-tenant`, `centaur-language` — read directly in `App.svelte`, not through a store. `centaur-tenant` holds the last tenant the account actively selected (a hint reused on the next login when the account has access to more than one tenant), not a login-form selection — see the tenant-selection entry in MEMORY.md.
 
-**Views without the management chrome**: `LiveScoringView` (narrowcast display), `MatchQrCodesView` (printable QR sheet), and `MatchPrintView` (printable scorecards) render standalone, without `AppHeader` — keep it that way per the spec.
+**Views without the management chrome**: `LiveScoringView` (narrowcast display), `MatchQrCodesView` (printable QR sheet), `MatchPrintView` (printable scorecards), and `CompetitionResultsView` (printable competition results) render standalone, without `AppHeader` — keep it that way per the spec.
 
 ## Conventions
 

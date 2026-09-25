@@ -135,7 +135,7 @@ JWTs are returned by `POST /api/auth/login` and contain the account and active t
 | `DELETE` | `/api/competitions/{id}/rounds/{roundId}/matches/{matchId}` | manager | Unassign a match. |
 | `POST` | `/api/competitions/{id}/scoring-rules` | manager | Add a named highest-scores rule. |
 | `DELETE` | `/api/competitions/{id}/scoring-rules/{ruleId}` | manager | Remove a scoring rule. |
-| `GET` | `/api/competitions/{id}/results` | user | Return aggregated participant results from assigned matches. |
+| `GET` | `/api/competitions/{id}/results` | user | Return aggregated participant results from assigned matches. Each entry carries `roundScores` (flat, per round; `used` is true if any rule counted it), `ruleScores` (rule name → total), and `rules` — per scoring rule in sort order: `{ name, aggregation, total, rounds: [{ roundId, value, used }] }` with one item per round the rule covers (in round order), `value` being what the rule aggregates (raw score, or f1 points for an `f1` rule; `null` when no score) and `used` whether *this* rule counted it. |
 
 ## Personal best
 
