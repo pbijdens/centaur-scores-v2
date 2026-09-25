@@ -60,7 +60,11 @@ public sealed record CreateCompetitionRuleRequest(string Name, List<Guid> RoundI
 public sealed record UpdateCompetitionRuleRequest(string Name, List<Guid> RoundIds, int HighestScores, int MinimumScores, string Aggregation);
 public sealed record ReorderCompetitionRulesRequest(List<Guid> RuleIds);
 public sealed record CompetitionResultScore(int Value, bool Used);
-public sealed record CompetitionResultEntry(string? Position, bool NeedsTieBreaker, string Name, bool Disqualified, int? Total, IReadOnlyDictionary<Guid, CompetitionResultScore> RoundScores, IReadOnlyDictionary<string, int> RuleScores);
+// One scoring rule's contribution to an entry: every round the rule covers (in round order), with the value the rule
+// actually aggregates for that round (raw score, or f1 points for an f1 rule; null when no score) and whether it counted.
+public sealed record CompetitionResultRuleRound(Guid RoundId, int? Value, bool Used);
+public sealed record CompetitionResultRule(string Name, string Aggregation, int Total, IReadOnlyList<CompetitionResultRuleRound> Rounds);
+public sealed record CompetitionResultEntry(string? Position, bool NeedsTieBreaker, string Name, bool Disqualified, int? Total, IReadOnlyDictionary<Guid, CompetitionResultScore> RoundScores, IReadOnlyDictionary<string, int> RuleScores, IReadOnlyList<CompetitionResultRule> Rules);
 public sealed record CompetitionResultGroup(string Name, IReadOnlyList<CompetitionResultEntry> Entries);
 public sealed record CompetitionResultRound(Guid Id, string ShortName, string LongName, int Order);
 public sealed record CompetitionResultsDocument(string CompetitionName, DateOnly StartDate, DateOnly EndDate, IReadOnlyList<CompetitionResultRound> Rounds, IReadOnlyList<CompetitionResultGroup> Groups);

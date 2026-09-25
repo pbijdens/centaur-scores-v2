@@ -4,7 +4,7 @@ using System.Text.Json;
 
 namespace CentaurScores.Api.Application;
 
-public sealed record CompetitionParticipantResult(Guid ParticipantId, string Name, int Total, bool Disqualified, IReadOnlyDictionary<string, int> RuleScores, IReadOnlyDictionary<string, IReadOnlySet<Guid>>? UsedRoundIdsByRule = null);
+public sealed record CompetitionParticipantResult(Guid ParticipantId, string Name, int Total, bool Disqualified, IReadOnlyDictionary<string, int> RuleScores, IReadOnlyDictionary<string, IReadOnlySet<Guid>>? UsedRoundIdsByRule = null, IReadOnlyList<CompetitionResultRule>? Rules = null);
 
 public interface ICompetitionService
 {
@@ -23,11 +23,13 @@ public sealed class CompetitionService(IScoringService scoringService) : ICompet
     public IReadOnlyList<CompetitionParticipantResult> Calculate(Competition competition, IReadOnlyDictionary<Guid, IReadOnlyList<ParticipantResult>> totalResultsByRound, IReadOnlyDictionary<Guid, IReadOnlyList<ParticipantResult>>? f1ResultsByRound = null)
     {
         var namesByParticipant = totalResultsByRound.Values.SelectMany(value => value).GroupBy(item => item.ParticipantId).ToDictionary(group => group.Key, group => group.First().Name);
+        var roundOrder = competition.Rounds.OrderBy(item => item.Order).Select(item => item.Id).ToList();
 
         return namesByParticipant.Keys.Select(participantId =>
         {
             var ruleScores = new Dictionary<string, int>();
             var usedRoundIdsByRule = new Dictionary<string, IReadOnlySet<Guid>>();
+            var rules = new List<CompetitionResultRule>();
             var disqualified = false;
             foreach (var rule in competition.ScoringRules.OrderBy(item => item.SortOrder))
             {
@@ -41,9 +43,15 @@ public sealed class CompetitionService(IScoringService scoringService) : ICompet
                 if (perRound.Count < rule.MinimumScores) disqualified = true;
                 var used = perRound.Take(rule.HighestScores).ToList();
                 ruleScores[rule.Name] = used.Sum(item => item.Total);
-                usedRoundIdsByRule[rule.Name] = used.Select(item => item.RoundId).ToHashSet();
+                var usedRoundIds = used.Select(item => item.RoundId).ToHashSet();
+                usedRoundIdsByRule[rule.Name] = usedRoundIds;
+                var valueByRound = perRound.ToDictionary(item => item.RoundId, item => item.Total);
+                var ruleRounds = roundOrder.Where(roundIds.Contains)
+                    .Select(roundId => new CompetitionResultRuleRound(roundId, valueByRound.TryGetValue(roundId, out var value) ? value : null, usedRoundIds.Contains(roundId)))
+                    .ToList();
+                rules.Add(new CompetitionResultRule(rule.Name, rule.Aggregation, ruleScores[rule.Name], ruleRounds));
             }
-            return new CompetitionParticipantResult(participantId, namesByParticipant[participantId], ruleScores.Values.Sum(), disqualified, ruleScores, usedRoundIdsByRule);
+            return new CompetitionParticipantResult(participantId, namesByParticipant[participantId], ruleScores.Values.Sum(), disqualified, ruleScores, usedRoundIdsByRule, rules);
         }).OrderByDescending(item => item.Disqualified ? int.MinValue : item.Total).ThenByDescending(item => item.Total).ThenBy(item => item.Name).ToList();
     }
 
@@ -205,7 +213,7 @@ public sealed class CompetitionService(IScoringService scoringService) : ICompet
             var used = participant.UsedRoundIdsByRule is null || participant.UsedRoundIdsByRule.Values.Any(set => set.Contains(round.Id));
             roundScores[round.Id] = new CompetitionResultScore(entry.Total, used);
         }
-        return new CompetitionResultEntry(participant.Disqualified ? "-" : position, needsTieBreaker, participant.Name, participant.Disqualified, participant.Total, roundScores, participant.RuleScores);
+        return new CompetitionResultEntry(participant.Disqualified ? "-" : position, needsTieBreaker, participant.Name, participant.Disqualified, participant.Total, roundScores, participant.RuleScores, participant.Rules ?? []);
     }
 
     private static int[] TieBreakKey(Guid participantId, IReadOnlyDictionary<Guid, Dictionary<string, int>> keyCountsByParticipant)

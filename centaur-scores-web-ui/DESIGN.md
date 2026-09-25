@@ -238,6 +238,10 @@ The results can be shown by pressing the "Results" button, which will navigate t
   - Result-rows show all scores for all participants (with an entry in the participants for the tenant) for all rounds
   - Result-rows show the total score for each element in the scoring rules per participant
   - Results are grouped by the categories defined, the groups are presented sorted alphabetically
+  - The printed layout is compact and always two columns, portrait or landscape (full requirements: [../documentation/COMPETITION-RESULT-SCREEN.md](../documentation/COMPETITION-RESULT-SCREEN.md)):
+    - A report header with the tenant logo, competition name, competition start/end dates, and the print date: once at the top in notice-board mode, repeated on every page in PDF mode.
+    - The body is a stream of equally high units: a group header, then its ranked participant rows. A row shows the rank (or `–` when disqualified/unranked) on the left, the total on the right, and in the middle the name (semibold) plus, in small print, one block per scoring rule: `name (rule total): value value …` listing the value the rule aggregated for each of its rounds (raw score, or f1 points for an f1 rule), `–` for no score, strikethrough for a score the rule did not count. Detail text that doesn't fit is truncated with `…`.
+    - The toolbar (never printed) picks the layout mode, kept in the URL query (`?layout=stream|pages&lines=2|3`): **notice board** (`stream`) splits the stream in half, left column = first half and right column = second half, each running down across pages, and a column never ends on a header; **PDF** (`pages`) is classic two-column pages read page by page, where a column ending on a header is tolerated. A checkbox gives every row one extra detail line (3 instead of 2).
   - Results are ordered per group as defined
     - disqualified participants are put in a list-position as defined before; their total score is shown as 'n/a'
     - disqualified participants do not have a position number, it renders as '-'
