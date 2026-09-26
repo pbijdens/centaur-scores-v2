@@ -30,6 +30,8 @@ Run `dotnet build` and `dotnet test CentaurScores.Api.Tests/CentaurScores.Api.Te
 
 **Match CSV export** keeps columns aligned with the ordered `keyboard` and `categoryOrder` arrays in `Match.KeyboardJson`; use `IScoringService` for grouped-end totals. Rows are ordered by device `SortOrder`, then by the participant's `DeviceLane` annotation, then by `DeviceOrder` on that device, then by full name, with unassigned participants (no `DeviceId`) sorted last; the first column is the assigned device's name (empty when unassigned), the second is `DeviceLane` (empty when unset).
 
+**Lane-assignment Excel export** (`GET .../lanes.xlsx`) is built by the pure static `Application/LaneAssignmentExcelExport` (ClosedXML, no DI) from `LaneSheetParticipant` rows the controller prepares; it shares `LoadMatchCategoriesAsync`/`CategoryValueName` with the CSV export so category columns stay in match `categoryOrder`.
+
 **Scorekeeper contract**: implemented in `Application/ScorekeeperService.cs` — keep all participant policy, ordering, projection, and optimistic score conflict logic there, with `PublicScoresController` limited to anonymous routing, active-match checks, logging, and response status mapping. Preserve the public live-score and scorekeeper endpoints described in the specification.
 
 ## Conventions

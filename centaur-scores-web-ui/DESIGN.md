@@ -162,6 +162,8 @@ federation number, full name (or last name if full name not set), (next, one cat
 
 Export is initiated via a button on the match homepage.
 
+The devices page ("Apparaten") has a ⋯ actions menu with "Export lane assignments to Excel": a printable check-in sheet with one bordered block per lane number, one row per lane letter (all blocks equally many letters), columns lane / present (to tick off) / letter / federation number / name / match categories, followed by a block of archers without a (valid) lane.
+
 #### UC10 - Deleting a match
 
 tenant admins can delete matches from the match homepage. This does require confirmation.

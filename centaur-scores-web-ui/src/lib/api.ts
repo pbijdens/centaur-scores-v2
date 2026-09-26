@@ -233,6 +233,14 @@ export class ApiClient {
     return { blob: await response.blob(), filename: filenameMatch?.[1] ?? 'export.csv' }
   }
 
+  async downloadLaneAssignmentExport(matchId: string, language: Language): Promise<{ blob: Blob; filename: string }> {
+    const response = await fetch(`${apiBase}/api/matches/${matchId}/lanes.xlsx?language=${language}`, { headers: this.headers() })
+    if (!response.ok) throw await readApiError(response)
+    const disposition = response.headers.get('content-disposition') ?? ''
+    const filenameMatch = /filename="?([^"]+)"?/.exec(disposition)
+    return { blob: await response.blob(), filename: filenameMatch?.[1] ?? 'lanes.xlsx' }
+  }
+
   fetchProfile(): Promise<Profile> {
     return this.request('/api/auth/me')
   }
