@@ -1,12 +1,14 @@
 <script lang="ts">
   import type { ApiClient } from '../api'
+  import DropdownMenu from '../DropdownMenu.svelte'
   import { labelForError } from '../errors'
   import RowActions from '../RowActions.svelte'
-  import type { Category, Match, MatchParticipant, ScoreDevice } from '../types'
+  import type { Category, Language, Match, MatchParticipant, ScoreDevice } from '../types'
 
   export let api: ApiClient
   export let match: Match
   export let categories: Category[]
+  export let language: Language
   export let labels: Record<string, string>
   export let onBack: () => void
   export let onChanged: () => void | Promise<void>
@@ -21,6 +23,7 @@
   let assignmentError = ''
   let laneError = ''
   let renameError = ''
+  let exportError = ''
 
   $: devices = [...(match.devices ?? [])].sort((a, b) => (a.sortOrder ?? Number.MAX_SAFE_INTEGER) - (b.sortOrder ?? Number.MAX_SAFE_INTEGER) || a.name.localeCompare(b.name))
   $: participants = match.participants ?? []
@@ -157,6 +160,21 @@
     }
   }
 
+  async function exportLaneAssignments() {
+    exportError = ''
+    try {
+      const { blob, filename } = await api.downloadLaneAssignmentExport(match.id, language)
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = filename
+      link.click()
+      URL.revokeObjectURL(url)
+    } catch (error) {
+      exportError = labelForError(error, labels, 'exportLaneAssignmentsError')
+    }
+  }
+
   async function submitAdd() {
     if (!newDeviceName.trim()) return
     createError = ''
@@ -185,8 +203,15 @@
 <button class="back-link" on:click={onBack}>← {match.name}</button>
 <div class="page-intro">
   <div><p class="eyebrow">{labels.eyebrowDevices}</p><h1>{labels.manageDevices}</h1><p class="muted">{labels.devicesHint}</p></div>
-  <button class="primary" on:click={() => (showAddForm = !showAddForm)}>+ {labels.newDevice}</button>
+  <div class="match-header-actions">
+    <button class="primary" on:click={() => (showAddForm = !showAddForm)}>+ {labels.newDevice}</button>
+    <DropdownMenu ariaLabel={labels.deviceActions} buttonClass="actions-trigger" align="right">
+      <svelte:fragment slot="trigger">⋯</svelte:fragment>
+      <button class="menu-item" on:click={exportLaneAssignments}>{labels.exportLaneAssignments}</button>
+    </DropdownMenu>
+  </div>
 </div>
+{#if exportError}<p class="error">{exportError}</p>{/if}
 {#if showAddForm}
   <form class="inline-form" on:submit|preventDefault={submitAdd}>
     <label>{labels.deviceNameLabel}<input bind:value={newDeviceName} /></label>

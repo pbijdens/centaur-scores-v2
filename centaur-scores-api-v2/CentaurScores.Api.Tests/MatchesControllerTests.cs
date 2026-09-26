@@ -1,3 +1,4 @@
+using ClosedXML.Excel;
 using CentaurScores.Api.Application;
 using CentaurScores.Api.Contracts;
 using CentaurScores.Api.Controllers;
@@ -123,6 +124,55 @@ public sealed class MatchesControllerTests
         var devices = lines.Skip(1).Select(line => line.Split(',')[0]).ToArray();
         Assert.Equal(["\"Alpha Archer\"", "\"Bravo Archer\"", "\"Zeta Archer\"", "\"Nomad Archer\""], names);
         Assert.Equal(["\"Lane 1\"", "\"Lane 1\"", "\"Lane 2\"", "\"\""], devices);
+    }
+
+    [Fact]
+    public async Task ExportLanes_uses_match_category_order_and_file_name()
+    {
+        await using var connection = new SqliteConnection("Filename=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>().UseSqlite(connection).Options;
+        await using var db = new ApplicationDbContext(options);
+        await db.Database.EnsureCreatedAsync();
+
+        var tenantId = Guid.NewGuid();
+        var matchId = Guid.NewGuid();
+        var classId = Guid.NewGuid();
+        var disciplineId = Guid.NewGuid();
+        var match = new Match
+        {
+            Id = matchId,
+            TenantId = tenantId,
+            Name = "Open",
+            ShortCode = "OPEN",
+            KeyboardJson = $$"""{"categoryOrder":["{{disciplineId}}","{{classId}}"],"keyboard":[]}""",
+            Participants =
+            [
+                new MatchParticipant { Id = Guid.NewGuid(), TenantId = tenantId, MatchId = matchId, DeviceLane = "1A", OwnLastName = "Archer", OwnFullName = "Amy Archer", OwnFederationNumber = "42", OwnCategories = new Dictionary<Guid, int> { [classId] = 1, [disciplineId] = 2 } }
+            ]
+        };
+        db.AddRange(
+            new Tenant { Id = tenantId, Name = "Tenant" },
+            new Category { Id = classId, TenantId = tenantId, Name = "Klasse", Values = [new CategoryValue { Id = Guid.NewGuid(), TenantId = tenantId, CategoryId = classId, ValueId = 1, Name = "Senior" }] },
+            new Category { Id = disciplineId, TenantId = tenantId, Name = "Discipline", Values = [new CategoryValue { Id = Guid.NewGuid(), TenantId = tenantId, CategoryId = disciplineId, ValueId = 2, Name = "Recurve" }] },
+            match);
+        await db.SaveChangesAsync();
+        var scoring = new ScoringService();
+        var personalBestContext = new PersonalBestContext(db);
+        var personalBestEngine = new PersonalBestEngine(db);
+        var controller = new MatchesController(db, new TestTenantContext(tenantId), scoring, new LiveScoringService(scoring), new PersonalBestRegistrationService(db, personalBestContext, personalBestEngine), new PersonalBestLiveLookup(db, personalBestContext, personalBestEngine, new MemoryCache(new MemoryCacheOptions())));
+
+        var result = Assert.IsType<FileContentResult>(await controller.ExportLanes(matchId, "en", CancellationToken.None));
+
+        Assert.Equal("OPEN-lanes.xlsx", result.FileDownloadName);
+        using var workbook = new XLWorkbook(new MemoryStream(result.FileContents));
+        var sheet = workbook.Worksheet("Lane assignments");
+        Assert.Equal("Discipline", sheet.Cell(1, 6).GetString());
+        Assert.Equal("Klasse", sheet.Cell(1, 7).GetString());
+        Assert.Equal("42", sheet.Cell(3, 4).GetString());
+        Assert.Equal("Amy Archer", sheet.Cell(3, 5).GetString());
+        Assert.Equal("Recurve", sheet.Cell(3, 6).GetString());
+        Assert.Equal("Senior", sheet.Cell(3, 7).GetString());
     }
 
     [Fact]

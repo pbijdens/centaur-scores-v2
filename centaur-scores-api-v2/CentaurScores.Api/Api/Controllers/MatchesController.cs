@@ -479,12 +479,7 @@ public sealed class MatchesController(ApplicationDbContext db, ITenantContext te
             .ToList();
 
         var keyboard = ParseKeyboardConfiguration(match.KeyboardJson);
-        var categoryIds = keyboard.CategoryOrder.Distinct().ToList();
-        var categoriesById = await db.Categories.AsNoTracking()
-            .Include(item => item.Values)
-            .Where(item => item.TenantId == TenantId && categoryIds.Contains(item.Id))
-            .ToDictionaryAsync(item => item.Id, cancellationToken);
-        var categories = categoryIds.Where(categoriesById.ContainsKey).Select(id => categoriesById[id]).ToList();
+        var categories = await LoadMatchCategoriesAsync(keyboard, cancellationToken);
         var splitSize = match.GroupEnds is > 0 ? match.GroupEnds.Value : 1;
         var splitCount = match.Ends > 0 ? (match.Ends + splitSize - 1) / splitSize : 0;
 
@@ -512,6 +507,38 @@ public sealed class MatchesController(ApplicationDbContext db, ITenantContext te
         }
 
         return File(System.Text.Encoding.UTF8.GetBytes(string.Join("\n", lines)), "text/csv", $"{match.ShortCode ?? match.Name}.csv");
+    }
+
+    // Printable check-in sheet grouped by lane number/letter (see LaneAssignmentExcelExport); categories follow the
+    // match's categoryOrder, same as the CSV export.
+    [HttpGet("{id:guid}/lanes.xlsx")]
+    public async Task<IActionResult> ExportLanes(Guid id, [FromQuery] string language = "en", CancellationToken cancellationToken = default)
+    {
+        var match = await db.Matches.AsNoTracking()
+            .Include(item => item.Participants).ThenInclude(item => item.ParticipantListMember)
+            .SingleOrDefaultAsync(item => item.Id == id && item.TenantId == TenantId, cancellationToken);
+        if (match is null) return NotFound();
+
+        var categories = await LoadMatchCategoriesAsync(ParseKeyboardConfiguration(match.KeyboardJson), cancellationToken);
+        var participants = match.Participants
+            .Select(participant => new LaneSheetParticipant(
+                participant.DeviceLane,
+                participant.FederationNumber,
+                participant.FullName,
+                categories.Select(category => CategoryValueName(participant, category)).ToList()))
+            .ToList();
+        var bytes = LaneAssignmentExcelExport.Build(match.Name, categories.Select(category => category.Name).ToList(), participants, language);
+        return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"{match.ShortCode ?? match.Name}-lanes.xlsx");
+    }
+
+    private async Task<List<Category>> LoadMatchCategoriesAsync(KeyboardConfiguration keyboard, CancellationToken cancellationToken)
+    {
+        var categoryIds = keyboard.CategoryOrder.Distinct().ToList();
+        var categoriesById = await db.Categories.AsNoTracking()
+            .Include(item => item.Values)
+            .Where(item => item.TenantId == TenantId && categoryIds.Contains(item.Id))
+            .ToDictionaryAsync(item => item.Id, cancellationToken);
+        return categoryIds.Where(categoriesById.ContainsKey).Select(id => categoriesById[id]).ToList();
     }
 
     private static KeyboardConfiguration ParseKeyboardConfiguration(string json)
