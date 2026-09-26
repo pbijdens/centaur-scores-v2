@@ -335,16 +335,32 @@
     background: #fff;
   }
 
+  /* Mobile browsers (iOS Safari, Android Chrome) resolve 100vh to the viewport as it would be
+     with their address/navigation bars collapsed, so a 100vh page is taller than what's actually
+     visible and the bottom result rows end up hidden behind the toolbar. dvh tracks the currently
+     visible viewport instead; --vh falls back to plain vh on browsers without dvh support. */
   .live-scoring {
+    --vh: 1vh;
     width: 100vw;
-    height: 100vh;
+    height: calc(100 * var(--vh));
+    display: flex;
+    flex-direction: column;
+    padding-bottom: 4px;
+    box-sizing: border-box;
     overflow: hidden;
     background: #fff;
     color: #14210f;
   }
 
+  @supports (height: 1dvh) {
+    .live-scoring {
+      --vh: 1dvh;
+    }
+  }
+
   .live-header {
-    height: 8vh;
+    flex: 0 0 auto;
+    height: calc(8 * var(--vh));
     min-height: 0;
     display: grid;
     grid-template-columns: 1fr minmax(0, 2fr) 1fr;
@@ -356,7 +372,7 @@
 
   .live-header h1 {
     overflow: hidden;
-    font-size: clamp(15px, 2.1vh, 28px);
+    font-size: clamp(15px, calc(2.1 * var(--vh)), 28px);
     line-height: 1;
     text-align: center;
     text-overflow: ellipsis;
@@ -368,12 +384,12 @@
     flex-direction: column;
     justify-content: center;
     align-items: flex-end;
-    gap: .4vh;
+    gap: calc(.4 * var(--vh));
     height: 100%;
   }
 
   .date-progress time {
-    font-size: clamp(11px, 1.5vh, 18px);
+    font-size: clamp(11px, calc(1.5 * var(--vh)), 18px);
     font-weight: 600;
   }
 
@@ -382,12 +398,12 @@
     display: flex;
     align-items: center;
     gap: .7vw;
-    font-size: clamp(11px, 1.7vh, 20px);
+    font-size: clamp(11px, calc(1.7 * var(--vh)), 20px);
   }
 
   .tenant-identity img {
-    width: 4.5vh;
-    height: 4.5vh;
+    width: calc(4.5 * var(--vh));
+    height: calc(4.5 * var(--vh));
     object-fit: contain;
     flex: 0 0 auto;
   }
@@ -399,7 +415,8 @@
   }
 
   .live-results {
-    height: calc(92vh - 4px);
+    flex: 1 1 auto;
+    min-height: 0;
     overflow: hidden;
   }
 
@@ -518,11 +535,11 @@
   }
 
   .no-live-matches {
-    height: 100%;
+    flex: 1 1 auto;
     display: grid;
     place-items: center;
     padding: 24px;
-    font-size: clamp(18px, 2.5vh, 30px);
+    font-size: clamp(18px, calc(2.5 * var(--vh)), 30px);
     text-align: center;
   }
 </style>
