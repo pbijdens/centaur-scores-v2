@@ -16,11 +16,11 @@
 <!-- A div, not <header>: the global header rule in app.scss (the app bar) would add padding, height and stickiness. -->
 <div class="report-header">
   {#if logoUrl}<img class="report-logo" src={logoUrl} alt="" />{/if}
-  <div class="report-title">
-    <h1>{competitionName}</h1>
+  <h1 class="report-title">{competitionName}</h1>
+  <div class="report-dates">
     <p>{formatLocalDate(startDate, language)} – {formatLocalDate(endDate, language)}</p>
+    <p class="report-date">{labels.resultsPrintedOnLabel} {formatLocalDate(today, language)}</p>
   </div>
-  <p class="report-date">{labels.resultsPrintedOnLabel} {formatLocalDate(today, language)}</p>
 </div>
 
 <style>
@@ -43,22 +43,24 @@
   .report-title {
     flex: 1;
     min-width: 0;
+    font-size: 20pt;
+    line-height: 1.1;
+    margin: 0;
   }
 
-  h1 {
-    font-size: 15pt;
-    line-height: 1.15;
-    margin: 0;
+  .report-dates {
+    flex: 0 0 auto;
+    align-self: flex-end;
+    text-align: right;
   }
 
   p {
     margin: 0;
-    font-size: 9pt;
+    font-size: 8pt;
+    white-space: nowrap;
   }
 
   .report-date {
-    align-self: flex-end;
-    white-space: nowrap;
     color: #333;
   }
 </style>
