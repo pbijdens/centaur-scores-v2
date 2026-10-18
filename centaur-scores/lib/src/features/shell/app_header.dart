@@ -173,13 +173,26 @@ class _EnterScoresRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Primary call-to-action of the participant screen: filled with the
+    // theme's primary color (the default ElevatedButton is surface-tinted and
+    // blends into the header), taller, bold, with a forward arrow.
+    final scheme = Theme.of(context).colorScheme;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
       child: SizedBox(
         width: double.infinity,
-        child: ElevatedButton(
+        height: 52,
+        child: FilledButton.icon(
           onPressed: () => AppNavigator().navigate(const ScoreCardScreen()),
-          child: Text(t('enterScoresNow')),
+          style: FilledButton.styleFrom(
+            backgroundColor: scheme.primary,
+            foregroundColor: scheme.onPrimary,
+            elevation: 3,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          icon: const Icon(Icons.edit_note, size: 26),
+          label: Text(t('enterScoresNow')),
         ),
       ),
     );
