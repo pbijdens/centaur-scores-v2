@@ -177,7 +177,6 @@
         name,
         date,
         shortCode: shortCode || null,
-        isOpen: match.isOpen,
         participantListId: participantListId || null,
         deviceSelectionMode,
         signatureMode,

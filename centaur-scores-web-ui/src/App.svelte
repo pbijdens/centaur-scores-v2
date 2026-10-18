@@ -243,7 +243,7 @@
 
   function toggleSelectedMatch() {
     if (!selectedMatch) return
-    api.updateMatch(selectedMatch.id, { ...selectedMatch, isOpen: !selectedMatch.isOpen }).then(() => { refreshSelectedMatch(); loadMatchesList() })
+    api.setMatchOpen(selectedMatch.id, !selectedMatch.isOpen).then(() => { refreshSelectedMatch(); loadMatchesList() })
   }
 
   async function loadMatchesList() {

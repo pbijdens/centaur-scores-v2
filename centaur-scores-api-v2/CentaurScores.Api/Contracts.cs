@@ -23,6 +23,10 @@ public sealed record ImportParticipantListResult(int Created, int Updated, IRead
 public sealed record ParticipantListSummary(Guid Id, Guid TenantId, string Name, bool IsActive, int MemberCount, int ActiveMemberCount);
 public sealed record CreateTemplateRequest(string Name, Guid? ParticipantListId, bool AllowFreeParticipants = true, string DeviceSelectionMode = "list-and-free", string SignatureMode = "none", string ConfigurationJson = "", string? PersonalBestClassifier = null);
 public sealed record CreateMatchRequest(string Name, DateOnly Date, string? ShortCode, bool IsOpen, Guid? ParticipantListId, string DeviceSelectionMode, int Ends, int ArrowsPerEnd, int? GroupEnds, bool AllowFreeParticipants = true, string KeyboardJson = "", string ScoringRulesJson = "[]", string? PersonalBestClassifier = null, string SignatureMode = "none");
+// Metadata-only update: open/closed state is deliberately not part of it (see SetMatchOpenRequest), so a
+// stale edit form can never flip a match's active state or trigger personal-best registration.
+public sealed record UpdateMatchRequest(string Name, DateOnly Date, string? ShortCode, Guid? ParticipantListId, string DeviceSelectionMode, int Ends, int ArrowsPerEnd, int? GroupEnds, bool AllowFreeParticipants = true, string KeyboardJson = "", string ScoringRulesJson = "[]", string? PersonalBestClassifier = null, string SignatureMode = "none");
+public sealed record SetMatchOpenRequest(bool IsOpen);
 public sealed record MatchListItem(Guid Id, Guid TenantId, string Name, DateOnly Date, string? ShortCode, bool IsOpen, Guid? ParticipantListId, string DeviceSelectionMode, string SignatureMode, int Ends, int ArrowsPerEnd, int? GroupEnds, bool AllowFreeParticipants, string KeyboardJson, string ScoringRulesJson, int ParticipantCount, int UnlistedParticipantCount, IReadOnlyList<LiveScoreScope> LiveScopes);
 public sealed record CreateMatchParticipantRequest(Guid? ParticipantListMemberId, string LastName, string FullName, string? FederationNumber, Dictionary<Guid, int> Categories);
 public sealed record EnterScoreRequest(int End, int Arrow, string KeyId, int Value);
