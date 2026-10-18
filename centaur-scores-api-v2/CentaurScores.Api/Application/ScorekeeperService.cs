@@ -36,10 +36,17 @@ public sealed class ScorekeeperService(ApplicationDbContext db, IPersonalBestLiv
         var categories = await CategoriesAsync(context.Match, cancellationToken);
         var parsedKeyboard = ParseKeyboard(context.Match.KeyboardJson);
         var keyboard = parsedKeyboard.Keys;
-        var participants = context.Match.Participants
+        var deviceParticipants = context.Match.Participants
             .Where(item => item.DeviceId == context.Device.Id)
             .OrderBy(item => item.DeviceOrder).ThenBy(item => item.LastName)
-            .Select(item => ToMatchParticipant(item, context.Match, categories, keyboard, parsedKeyboard.DisabledKeyRules))
+            .ToList();
+        // Signature images are only loaded for this device's own signed cards (see MatchParticipantSignature).
+        var signedIds = deviceParticipants.Where(item => item.Signed).Select(item => item.Id).ToList();
+        var signatures = signedIds.Count == 0
+            ? new Dictionary<Guid, MatchParticipantSignature>()
+            : await db.MatchParticipantSignatures.AsNoTracking().Where(item => signedIds.Contains(item.MatchParticipantId)).ToDictionaryAsync(item => item.MatchParticipantId, cancellationToken);
+        var participants = deviceParticipants
+            .Select(item => ToMatchParticipant(item, signatures.GetValueOrDefault(item.Id), context.Match, categories, keyboard, parsedKeyboard.DisabledKeyRules))
             .ToList();
         return new(context.Device.Name, context.Match.Name, context.Match.Ends, context.Match.ArrowsPerEnd, context.Match.GroupEnds,
             categories, context.Match.DeviceSelectionMode != "restricted", context.Match.AllowFreeParticipants, keyboard, participants,
@@ -184,10 +191,7 @@ public sealed class ScorekeeperService(ApplicationDbContext db, IPersonalBestLiv
         if (validationError is not null)
             return validationError;
 
-        participant.Signed = true;
-        participant.SignedAtUtc = DateTime.UtcNow;
-        participant.ArcherSignatureDataUrl = request.ArcherSignatureDataUrl;
-        participant.MarkerSignatureDataUrl = request.MarkerSignatureDataUrl;
+        await ScorecardSigning.SignAsync(db, participant, request.ArcherSignatureDataUrl, request.MarkerSignatureDataUrl, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         return null;
     }
@@ -233,7 +237,7 @@ public sealed class ScorekeeperService(ApplicationDbContext db, IPersonalBestLiv
         }
     }
 
-    private static ScorekeeperMatchParticipant ToMatchParticipant(MatchParticipant item, Match match, IReadOnlyList<ScorekeeperCategory> categories, IReadOnlyList<ScorekeeperKey> keyboard, IReadOnlyList<DisabledKeyRule> disabledKeyRules) => new(item.FederationNumber, item.FullName, Info(item.Categories, categories), CategoryValues(item.Categories, categories), item.Id, item.ParticipantListMemberId, AvailableKeyIds(item.Categories, keyboard, disabledKeyRules), Enumerable.Range(0, match.Ends * match.ArrowsPerEnd).Select(index => item.Scores.SingleOrDefault(score => (score.End - 1) * match.ArrowsPerEnd + score.Arrow - 1 == index)?.KeyId).ToList(), item.Signed, item.SignedAtUtc is { } signedAtUtc ? new DateTimeOffset(signedAtUtc, TimeSpan.Zero) : null, item.ArcherSignatureDataUrl, item.MarkerSignatureDataUrl);
+    private static ScorekeeperMatchParticipant ToMatchParticipant(MatchParticipant item, MatchParticipantSignature? signature, Match match, IReadOnlyList<ScorekeeperCategory> categories, IReadOnlyList<ScorekeeperKey> keyboard, IReadOnlyList<DisabledKeyRule> disabledKeyRules) => new(item.FederationNumber, item.FullName, Info(item.Categories, categories), CategoryValues(item.Categories, categories), item.Id, item.ParticipantListMemberId, AvailableKeyIds(item.Categories, keyboard, disabledKeyRules), Enumerable.Range(0, match.Ends * match.ArrowsPerEnd).Select(index => item.Scores.SingleOrDefault(score => (score.End - 1) * match.ArrowsPerEnd + score.Arrow - 1 == index)?.KeyId).ToList(), item.Signed, item.SignedAtUtc is { } signedAtUtc ? new DateTimeOffset(signedAtUtc, TimeSpan.Zero) : null, signature?.ArcherSignatureDataUrl, signature?.MarkerSignatureDataUrl);
 
     // Keys disabled by any rule whose category/value matches this participant are removed from the
     // available set; null (all keys available) is returned only when no rule matches at all, per the

@@ -19,6 +19,7 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
     public DbSet<Match> Matches => Set<Match>();
     public DbSet<MatchParticipant> MatchParticipants => Set<MatchParticipant>();
     public DbSet<ArrowScore> ArrowScores => Set<ArrowScore>();
+    public DbSet<MatchParticipantSignature> MatchParticipantSignatures => Set<MatchParticipantSignature>();
     public DbSet<ScoreDevice> ScoreDevices => Set<ScoreDevice>();
     public DbSet<LiveScoreScope> LiveScoreScopes => Set<LiveScoreScope>();
     public DbSet<Competition> Competitions => Set<Competition>();
@@ -48,6 +49,7 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
         modelBuilder.Entity<Match>().ToTable("matches").HasKey(item => item.Id);
         modelBuilder.Entity<MatchParticipant>().ToTable("match_participants").HasKey(item => item.Id);
         modelBuilder.Entity<ArrowScore>().ToTable("arrow_scores").HasKey(item => item.Id);
+        modelBuilder.Entity<MatchParticipantSignature>().ToTable("match_participant_signatures").HasKey(item => item.MatchParticipantId);
         modelBuilder.Entity<ScoreDevice>().ToTable("score_devices").HasKey(item => item.Id);
         modelBuilder.Entity<LiveScoreScope>().ToTable("live_score_scopes").HasKey(item => item.Id);
         modelBuilder.Entity<Competition>().ToTable("competitions").HasKey(item => item.Id);
@@ -109,6 +111,8 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
         modelBuilder.Entity<Match>().HasMany(item => item.Devices).WithOne().HasForeignKey(item => item.MatchId).OnDelete(DeleteBehavior.Cascade);
         modelBuilder.Entity<Match>().HasMany(item => item.LiveScopes).WithOne().HasForeignKey(item => item.MatchId).OnDelete(DeleteBehavior.Cascade);
         modelBuilder.Entity<MatchParticipant>().HasMany(item => item.Scores).WithOne().HasForeignKey(item => item.MatchParticipantId).OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<MatchParticipantSignature>().HasOne<MatchParticipant>().WithOne().HasForeignKey<MatchParticipantSignature>(item => item.MatchParticipantId).OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<MatchParticipantSignature>().HasIndex(item => item.TenantId);
         modelBuilder.Entity<Competition>().HasMany(item => item.Rounds).WithOne().HasForeignKey(item => item.CompetitionId).OnDelete(DeleteBehavior.Cascade);
         modelBuilder.Entity<Competition>().HasMany(item => item.ScoringRules).WithOne().HasForeignKey(item => item.CompetitionId).OnDelete(DeleteBehavior.Cascade);
         modelBuilder.Entity<CompetitionRound>().HasMany(item => item.Matches).WithOne().HasForeignKey(item => item.CompetitionRoundId).OnDelete(DeleteBehavior.Cascade);

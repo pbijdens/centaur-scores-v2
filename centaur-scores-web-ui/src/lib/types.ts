@@ -58,9 +58,9 @@ export type MatchParticipant = {
   scores?: ArrowScore[]
   signed: boolean
   signedAtUtc?: string | null
-  archerSignatureDataUrl?: string | null
-  markerSignatureDataUrl?: string | null
 }
+// Signature images live apart from MatchParticipant so participant lists stay small; fetched on demand.
+export type MatchParticipantSignature = { matchParticipantId: string; archerSignatureDataUrl?: string | null; markerSignatureDataUrl?: string | null }
 export type ArrowScore = { id: string; matchParticipantId: string; end: number; arrow: number; keyId: string; value: number }
 export type ScoreDevice = { id: string; matchId: string; name: string; sortOrder?: number }
 export type LiveScoreScope = { id: string; matchId: string; scope: string; groupByCategoryIdsJson: string; includeAverage: boolean; includeGroupScores: boolean; includeEqualizers: boolean; includePersonalBest: boolean; displayCategoryIdsJson: string }

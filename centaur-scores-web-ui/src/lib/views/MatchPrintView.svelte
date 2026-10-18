@@ -2,8 +2,10 @@
   import { formatLocalDate } from '../date'
   import { parseMatchKeyboardConfig } from '../matchConfig'
   import { arrowsShotCount, endTotal, groupRunningTotal, hasGroups, runningTotal, scoreFor } from '../scorecard'
-  import type { Category, Language, Match, MatchParticipant } from '../types'
+  import type { ApiClient } from '../api'
+  import type { Category, Language, Match, MatchParticipant, MatchParticipantSignature } from '../types'
 
+  export let api: ApiClient
   export let match: Match
   export let categories: Category[]
   export let tenantLogoUrl: string | null | undefined
@@ -188,6 +190,29 @@
 
   $: printItems = buildPrintOrder(selectedParticipants, match.devices ?? [])
 
+  // Signature images aren't part of the participant payloads, so they're fetched in bulk when the sheet
+  // opens - only for the selected, signed cards. Ids go in the query string, so they're chunked to keep
+  // each URL well under typical proxy header limits. Printing waits until they've loaded.
+  const signatureChunkSize = 50
+  let signatures = new Map<string, MatchParticipantSignature>()
+  let loadingSignatures = false
+
+  async function openSheet() {
+    step = 'sheet'
+    const ids = selectedParticipants.filter((participant) => participant.signed).map((participant) => participant.id)
+    signatures = new Map()
+    if (ids.length === 0) return
+    loadingSignatures = true
+    try {
+      const chunks = await Promise.all(chunk(ids, signatureChunkSize).map((idChunk) => api.fetchMatchSignatures(match.id, idChunk)))
+      signatures = new Map(chunks.flat().map((signature) => [signature.matchParticipantId, signature]))
+    } catch {
+      // Without images the cards still print, showing the "signed and final" placeholder instead.
+    } finally {
+      loadingSignatures = false
+    }
+  }
+
   function deviceNameFor(participant: MatchParticipant): string {
     if (!participant.deviceId) return '-'
     const name = (match.devices ?? []).find((device) => device.id === participant.deviceId)?.name ?? '-'
@@ -340,12 +365,12 @@
   {#if noParticipantsSelected}<p class="error section-gap">{labels.printNoParticipantsSelected}</p>{/if}
 
   <div class="sticky-actions">
-    <button class="primary" type="button" disabled={noParticipantsSelected} on:click={() => (step = 'sheet')}>{labels.printPreviewButton}</button>
+    <button class="primary" type="button" disabled={noParticipantsSelected} on:click={openSheet}>{labels.printPreviewButton}</button>
   </div>
 {:else}
   <div class="print-toolbar">
     <button type="button" class="text-button" on:click={() => (step = 'select')}>← {labels.printBackToSelection}</button>
-    <button type="button" class="primary" on:click={() => window.print()}>{labels.printButton}</button>
+    <button type="button" class="primary" disabled={loadingSignatures} on:click={() => window.print()}>{labels.printButton}</button>
   </div>
 
   {#snippet printCard(participant: MatchParticipant)}
@@ -416,8 +441,8 @@
 
       <div class="card-signatures">
         <div class="signature-block">
-          {#if participant.archerSignatureDataUrl}
-            <img class="signature-image" src={participant.archerSignatureDataUrl} alt={labels.archerSignatureLabel} />
+          {#if signatures.get(participant.id)?.archerSignatureDataUrl}
+            <img class="signature-image" src={signatures.get(participant.id)?.archerSignatureDataUrl} alt={labels.archerSignatureLabel} />
           {:else if participant.signed}
             <div class="signature-placeholder"><span>{labels.scorecardSignedBanner}</span></div>
           {:else if match.signatureMode === 'none'}
@@ -428,8 +453,8 @@
           <p class="signature-caption">{labels.archerSignatureLabel}</p>
         </div>
         <div class="signature-block">
-          {#if participant.markerSignatureDataUrl}
-            <img class="signature-image" src={participant.markerSignatureDataUrl} alt={labels.markerSignatureLabel} />
+          {#if signatures.get(participant.id)?.markerSignatureDataUrl}
+            <img class="signature-image" src={signatures.get(participant.id)?.markerSignatureDataUrl} alt={labels.markerSignatureLabel} />
           {:else if participant.signed}
             <div class="signature-placeholder"><span>{labels.scorecardSignedBanner}</span></div>
           {:else if match.signatureMode === 'none'}

@@ -149,6 +149,50 @@ public sealed class BackupRestoreServiceTests
     }
 
     [Fact]
+    public async Task Export_then_restore_keeps_signed_state_signature_images_and_signature_mode()
+    {
+        await using var connection = new SqliteConnection("Filename=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>().UseSqlite(connection).Options;
+        await using var db = new ApplicationDbContext(options);
+        await db.Database.EnsureCreatedAsync();
+
+        var sourceTenantId = Guid.NewGuid();
+        var adminTenantId = Guid.NewGuid();
+        var matchId = Guid.NewGuid();
+        var signedId = Guid.NewGuid();
+        var confirmedId = Guid.NewGuid();
+        var signedAtUtc = new DateTime(2026, 9, 20, 12, 0, 0, DateTimeKind.Utc);
+        db.Tenants.AddRange(new Tenant { Id = sourceTenantId, Name = "Archery Club" }, new Tenant { Id = adminTenantId, Name = "HQ" });
+        db.Matches.Add(new Match
+        {
+            Id = matchId,
+            TenantId = sourceTenantId,
+            Name = "Open",
+            SignatureMode = "signature",
+            Participants = [
+                new MatchParticipant { Id = signedId, TenantId = sourceTenantId, MatchId = matchId, OwnLastName = "Archer", OwnFullName = "Robin Archer", Signed = true, SignedAtUtc = signedAtUtc },
+                new MatchParticipant { Id = confirmedId, TenantId = sourceTenantId, MatchId = matchId, OwnLastName = "Scarlet", OwnFullName = "Will Scarlet", Signed = true, SignedAtUtc = signedAtUtc }]
+        });
+        await db.SaveChangesAsync();
+        db.MatchParticipantSignatures.Add(new MatchParticipantSignature { MatchParticipantId = signedId, TenantId = sourceTenantId, ArcherSignatureDataUrl = "archer", MarkerSignatureDataUrl = "marker" });
+        await db.SaveChangesAsync();
+
+        var (zipBytes, _) = await new BackupService(db).CreateBackupAsync(sourceTenantId, includeSubTenants: false, CancellationToken.None);
+        using var zipStream = new MemoryStream(zipBytes);
+        var result = await new RestoreService(db).RestoreAsync(adminTenantId, zipStream, CancellationToken.None);
+
+        var newMatch = await db.Matches.AsNoTracking().Include(item => item.Participants).SingleAsync(item => item.TenantId == result.NewTenantId);
+        Assert.Equal("signature", newMatch.SignatureMode);
+        Assert.All(newMatch.Participants, participant => Assert.True(participant.Signed));
+        Assert.All(newMatch.Participants, participant => Assert.Equal(signedAtUtc, participant.SignedAtUtc));
+        var newSigned = newMatch.Participants.Single(item => item.OwnLastName == "Archer");
+        var signature = await db.MatchParticipantSignatures.AsNoTracking().SingleAsync(item => item.TenantId == result.NewTenantId);
+        Assert.Equal(newSigned.Id, signature.MatchParticipantId);
+        Assert.Equal(("archer", "marker"), (signature.ArcherSignatureDataUrl, signature.MarkerSignatureDataUrl));
+    }
+
+    [Fact]
     public async Task Restore_remaps_category_ids_embedded_in_match_keyboard_json_and_template_configuration_json()
     {
         await using var connection = new SqliteConnection("Filename=:memory:");

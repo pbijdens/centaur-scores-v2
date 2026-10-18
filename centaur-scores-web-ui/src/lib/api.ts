@@ -1,4 +1,4 @@
-import type { Account, Category, Competition, CompetitionResultsDocument, CompetitionRound, CompetitionScoreRule, DefaultScopeSettings, Language, LiveScoringMatch, LiveScoringPage, Match, MatchListItem, MatchParticipant, MatchTemplate, ParticipantList, ParticipantListSummary, PersonalBestAvailableValue, PersonalBestConflictResolution, PersonalBestDiscipline, PersonalBestDisciplineValueRef, PersonalBestExportConfig, PersonalBestExportField, PersonalBestExportMode, PersonalBestDateFormat, PersonalBestImportConfig, PersonalBestImportResult, PersonalBestLogRow, PersonalBestStatus, Profile, RestoreBackupResult, ScopeConflict, ScoreDevice, Tenant } from './types'
+import type { Account, Category, Competition, CompetitionResultsDocument, CompetitionRound, CompetitionScoreRule, DefaultScopeSettings, Language, LiveScoringMatch, LiveScoringPage, Match, MatchListItem, MatchParticipant, MatchParticipantSignature, MatchTemplate, ParticipantList, ParticipantListSummary, PersonalBestAvailableValue, PersonalBestConflictResolution, PersonalBestDiscipline, PersonalBestDisciplineValueRef, PersonalBestExportConfig, PersonalBestExportField, PersonalBestExportMode, PersonalBestDateFormat, PersonalBestImportConfig, PersonalBestImportResult, PersonalBestLogRow, PersonalBestStatus, Profile, RestoreBackupResult, ScopeConflict, ScoreDevice, Tenant } from './types'
 
 export const apiBase = import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:5080'
 
@@ -179,6 +179,16 @@ export class ApiClient {
 
   unsignMatchParticipant(matchId: string, participantId: string): Promise<MatchParticipant> {
     return this.request(`/api/matches/${matchId}/participants/${participantId}/unsign`, { method: 'POST' })
+  }
+
+  // Signature images are not part of the participant payloads; fetch them only where they're rendered.
+  fetchParticipantSignature(matchId: string, participantId: string): Promise<MatchParticipantSignature> {
+    return this.request(`/api/matches/${matchId}/participants/${participantId}/signature`)
+  }
+
+  fetchMatchSignatures(matchId: string, participantIds: string[]): Promise<MatchParticipantSignature[]> {
+    const query = participantIds.map((id) => `participantIds=${encodeURIComponent(id)}`).join('&')
+    return this.request(`/api/matches/${matchId}/signatures?${query}`)
   }
 
   fetchMatchResults(matchId: string) {

@@ -27,6 +27,7 @@ public sealed record MatchListItem(Guid Id, Guid TenantId, string Name, DateOnly
 public sealed record CreateMatchParticipantRequest(Guid? ParticipantListMemberId, string LastName, string FullName, string? FederationNumber, Dictionary<Guid, int> Categories);
 public sealed record EnterScoreRequest(int End, int Arrow, string KeyId, int Value);
 public sealed record SignParticipantRequest(string? ArcherSignatureDataUrl, string? MarkerSignatureDataUrl);
+public sealed record MatchParticipantSignatureResponse(Guid MatchParticipantId, string? ArcherSignatureDataUrl, string? MarkerSignatureDataUrl);
 public sealed record CreateDeviceRequest(string Name);
 public sealed record AssignParticipantDeviceRequest(Guid? DeviceId);
 public sealed record UpdateParticipantLaneRequest(string? Lane);

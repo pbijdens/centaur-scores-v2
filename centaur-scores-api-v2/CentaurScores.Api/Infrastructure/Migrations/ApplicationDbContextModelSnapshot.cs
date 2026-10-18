@@ -463,10 +463,6 @@ namespace CentaurScores.Api.Infrastructure.Migrations
                         .HasColumnType("char(36)")
                         .HasColumnName("id");
 
-                    b.Property<string>("ArcherSignatureDataUrl")
-                        .HasColumnType("longtext")
-                        .HasColumnName("archer_signature_data_url");
-
                     b.Property<Guid?>("DeviceId")
                         .HasColumnType("char(36)")
                         .HasColumnName("device_id");
@@ -479,10 +475,6 @@ namespace CentaurScores.Api.Infrastructure.Migrations
                     b.Property<int?>("DeviceOrder")
                         .HasColumnType("int")
                         .HasColumnName("device_order");
-
-                    b.Property<string>("MarkerSignatureDataUrl")
-                        .HasColumnType("longtext")
-                        .HasColumnName("marker_signature_data_url");
 
                     b.Property<Guid>("MatchId")
                         .HasColumnType("char(36)")
@@ -533,6 +525,33 @@ namespace CentaurScores.Api.Infrastructure.Migrations
                         .HasDatabaseName("ix_match_participants_participant_list_member_id");
 
                     b.ToTable("match_participants", (string)null);
+                });
+
+            modelBuilder.Entity("CentaurScores.Api.Domain.MatchParticipantSignature", b =>
+                {
+                    b.Property<Guid>("MatchParticipantId")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("match_participant_id");
+
+                    b.Property<string>("ArcherSignatureDataUrl")
+                        .HasColumnType("longtext")
+                        .HasColumnName("archer_signature_data_url");
+
+                    b.Property<string>("MarkerSignatureDataUrl")
+                        .HasColumnType("longtext")
+                        .HasColumnName("marker_signature_data_url");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("MatchParticipantId")
+                        .HasName("pk_match_participant_signatures");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_match_participant_signatures_tenant_id");
+
+                    b.ToTable("match_participant_signatures", (string)null);
                 });
 
             modelBuilder.Entity("CentaurScores.Api.Domain.MatchTemplate", b =>
@@ -1181,6 +1200,16 @@ namespace CentaurScores.Api.Infrastructure.Migrations
                         .HasConstraintName("fk_match_participants_participant_list_members_participant_list");
 
                     b.Navigation("ParticipantListMember");
+                });
+
+            modelBuilder.Entity("CentaurScores.Api.Domain.MatchParticipantSignature", b =>
+                {
+                    b.HasOne("CentaurScores.Api.Domain.MatchParticipant", null)
+                        .WithOne()
+                        .HasForeignKey("CentaurScores.Api.Domain.MatchParticipantSignature", "MatchParticipantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_match_participant_signatures_match_participants_match_partic");
                 });
 
             modelBuilder.Entity("CentaurScores.Api.Domain.ParticipantListMember", b =>

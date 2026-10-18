@@ -636,8 +636,79 @@ public sealed class MatchesControllerTests
 
         Assert.True(participant.Signed);
         Assert.NotNull(participant.SignedAtUtc);
-        Assert.Equal("data:image/png;base64,archer", participant.ArcherSignatureDataUrl);
-        Assert.Equal("data:image/png;base64,marker", participant.MarkerSignatureDataUrl);
+        var signature = await db.MatchParticipantSignatures.SingleAsync();
+        Assert.Equal(participantId, signature.MatchParticipantId);
+        Assert.Equal(tenantId, signature.TenantId);
+        Assert.Equal("data:image/png;base64,archer", signature.ArcherSignatureDataUrl);
+        Assert.Equal("data:image/png;base64,marker", signature.MarkerSignatureDataUrl);
+    }
+
+    [Fact]
+    public async Task SignParticipant_without_images_stores_no_signature_row()
+    {
+        await using var connection = new SqliteConnection("Filename=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>().UseSqlite(connection).Options;
+        await using var db = new ApplicationDbContext(options);
+        await db.Database.EnsureCreatedAsync();
+
+        var tenantId = Guid.NewGuid();
+        var matchId = Guid.NewGuid();
+        var participantId = Guid.NewGuid();
+        db.AddRange(
+            new Tenant { Id = tenantId, Name = "Tenant" },
+            new Match { Id = matchId, TenantId = tenantId, Name = "Open", SignatureMode = "confirm", Participants = [new MatchParticipant { Id = participantId, TenantId = tenantId, MatchId = matchId, OwnLastName = "Archer", OwnFullName = "Robin Archer" }] });
+        await db.SaveChangesAsync();
+        var controller = NewController(db, tenantId);
+
+        var result = Assert.IsType<OkObjectResult>(await controller.SignParticipant(matchId, participantId, new SignParticipantRequest(null, null), CancellationToken.None));
+
+        Assert.True(Assert.IsType<MatchParticipant>(result.Value).Signed);
+        Assert.False(await db.MatchParticipantSignatures.AnyAsync());
+    }
+
+    [Fact]
+    public async Task Signature_endpoints_return_only_signatures_of_the_requested_match_and_tenant()
+    {
+        await using var connection = new SqliteConnection("Filename=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>().UseSqlite(connection).Options;
+        await using var db = new ApplicationDbContext(options);
+        await db.Database.EnsureCreatedAsync();
+
+        var tenantId = Guid.NewGuid();
+        var otherTenantId = Guid.NewGuid();
+        var matchId = Guid.NewGuid();
+        var otherMatchId = Guid.NewGuid();
+        var signedId = Guid.NewGuid();
+        var unsignedId = Guid.NewGuid();
+        var otherMatchParticipantId = Guid.NewGuid();
+        var otherTenantParticipantId = Guid.NewGuid();
+        db.AddRange(
+            new Tenant { Id = tenantId, Name = "Tenant" },
+            new Tenant { Id = otherTenantId, Name = "Other" },
+            new Match { Id = matchId, TenantId = tenantId, Name = "Open", SignatureMode = "signature", Participants = [
+                new MatchParticipant { Id = signedId, TenantId = tenantId, MatchId = matchId, Signed = true },
+                new MatchParticipant { Id = unsignedId, TenantId = tenantId, MatchId = matchId }] },
+            new Match { Id = otherMatchId, TenantId = tenantId, Name = "Other match", SignatureMode = "signature", Participants = [new MatchParticipant { Id = otherMatchParticipantId, TenantId = tenantId, MatchId = otherMatchId, Signed = true }] },
+            new Match { Id = Guid.NewGuid(), TenantId = otherTenantId, Name = "Other tenant", SignatureMode = "signature", Participants = [new MatchParticipant { Id = otherTenantParticipantId, TenantId = otherTenantId, Signed = true }] });
+        await db.SaveChangesAsync();
+        db.MatchParticipantSignatures.AddRange(
+            new MatchParticipantSignature { MatchParticipantId = signedId, TenantId = tenantId, ArcherSignatureDataUrl = "archer", MarkerSignatureDataUrl = "marker" },
+            new MatchParticipantSignature { MatchParticipantId = otherMatchParticipantId, TenantId = tenantId, ArcherSignatureDataUrl = "other-match" },
+            new MatchParticipantSignature { MatchParticipantId = otherTenantParticipantId, TenantId = otherTenantId, ArcherSignatureDataUrl = "other-tenant" });
+        await db.SaveChangesAsync();
+        var controller = NewController(db, tenantId);
+
+        var single = Assert.IsType<MatchParticipantSignatureResponse>(Assert.IsType<OkObjectResult>(await controller.ParticipantSignature(matchId, signedId, CancellationToken.None)).Value);
+        Assert.Equal(("archer", "marker"), (single.ArcherSignatureDataUrl, single.MarkerSignatureDataUrl));
+        var empty = Assert.IsType<MatchParticipantSignatureResponse>(Assert.IsType<OkObjectResult>(await controller.ParticipantSignature(matchId, unsignedId, CancellationToken.None)).Value);
+        Assert.Null(empty.ArcherSignatureDataUrl);
+        Assert.IsType<NotFoundResult>(await controller.ParticipantSignature(matchId, otherMatchParticipantId, CancellationToken.None));
+
+        var bulk = Assert.IsAssignableFrom<IEnumerable<MatchParticipantSignatureResponse>>(Assert.IsType<OkObjectResult>(
+            await controller.Signatures(matchId, [signedId, unsignedId, otherMatchParticipantId, otherTenantParticipantId], CancellationToken.None)).Value);
+        Assert.Equal([signedId], bulk.Select(item => item.MatchParticipantId));
     }
 
     [Fact]
@@ -654,7 +725,9 @@ public sealed class MatchesControllerTests
         var participantId = Guid.NewGuid();
         db.AddRange(
             new Tenant { Id = tenantId, Name = "Tenant" },
-            new Match { Id = matchId, TenantId = tenantId, Name = "Open", SignatureMode = "signature", Participants = [new MatchParticipant { Id = participantId, TenantId = tenantId, MatchId = matchId, OwnLastName = "Archer", OwnFullName = "Robin Archer", Signed = true, SignedAtUtc = DateTime.UtcNow, ArcherSignatureDataUrl = "data:image/png;base64,archer", MarkerSignatureDataUrl = "data:image/png;base64,marker" }] });
+            new Match { Id = matchId, TenantId = tenantId, Name = "Open", SignatureMode = "signature", Participants = [new MatchParticipant { Id = participantId, TenantId = tenantId, MatchId = matchId, OwnLastName = "Archer", OwnFullName = "Robin Archer", Signed = true, SignedAtUtc = DateTime.UtcNow }] });
+        await db.SaveChangesAsync();
+        db.MatchParticipantSignatures.Add(new MatchParticipantSignature { MatchParticipantId = participantId, TenantId = tenantId, ArcherSignatureDataUrl = "data:image/png;base64,archer", MarkerSignatureDataUrl = "data:image/png;base64,marker" });
         await db.SaveChangesAsync();
         var controller = NewController(db, tenantId);
 
@@ -663,8 +736,7 @@ public sealed class MatchesControllerTests
 
         Assert.False(participant.Signed);
         Assert.Null(participant.SignedAtUtc);
-        Assert.Null(participant.ArcherSignatureDataUrl);
-        Assert.Null(participant.MarkerSignatureDataUrl);
+        Assert.False(await db.MatchParticipantSignatures.AnyAsync());
     }
 
     [Fact]

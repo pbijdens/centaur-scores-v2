@@ -467,7 +467,7 @@
       <AppHeader username={headerUsername} {language} {view} labels={t} tenantName={$currentTenant?.name} tenantLogoUrl={$currentTenant?.logoUrl} showTenantSwitch={($profile?.authorizedForTenants?.length ?? 0) > 1} onNavigate={navigate} onLanguageChange={setLanguage} onLogout={signOut} />
     {/if}
     <main class="content" class:content-bare={matchPrintStep === 'sheet'}>
-      <MatchPrintView bind:step={matchPrintStep} match={selectedMatch} categories={$categories} tenantLogoUrl={$currentTenant?.logoUrl} {language} labels={t} />
+      <MatchPrintView {api} bind:step={matchPrintStep} match={selectedMatch} categories={$categories} tenantLogoUrl={$currentTenant?.logoUrl} {language} labels={t} />
     </main>
   </div>
 {:else if view === 'match-results-scope' && selectedMatchId && selectedResultsScope}
