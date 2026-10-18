@@ -13,6 +13,12 @@ class ScoresViewmodel extends EventViewModel {
   int editingEnd = -1;
   int? editingArrow = -1;
 
+  /// Set when the user taps a specific arrow cell on a card that is already
+  /// fully filled in (and awaiting signature), to correct a score. Overrides
+  /// the "full card shows Sign instead of the keypad" rule until the keypad
+  /// is closed or Next moves on.
+  bool _correctingCompleteCard = false;
+
   ScoresViewmodel(this._repository);
 
   void notifyViewmodelUpdated() {
@@ -33,23 +39,27 @@ class ScoresViewmodel extends EventViewModel {
   /// never open for them again, regardless of [activeKeyboard]. A signable
   /// card that's fully filled in doesn't reopen it either, so the Sign
   /// button (which only shows while the keypad is closed) takes its place -
-  /// see documentation/SIGNING-SCORECARDS.md.
+  /// see documentation/SIGNING-SCORECARDS.md. Tapping a specific arrow cell
+  /// on such a card still reopens it, so a score can be corrected before
+  /// signing (see [_correctingCompleteCard]).
   bool isKeyboardVisibleFor(
       ScorekeeperMatch model, ScorekeeperMatchParticipant participant, int index) {
     if (index != activeKeyboard || participant.signed) return false;
     final awaitingSignature = model.signatureMode != 'none' &&
         scoring.firstNullIndex(participant) == null;
-    return !awaitingSignature;
+    return !awaitingSignature || _correctingCompleteCard;
   }
 
   void hideKeyboard() {
     activeKeyboard = null;
+    _correctingCompleteCard = false;
     notifyViewmodelUpdated();
     notifyKeyboardShown();
   }
 
   void nextKeyboard(ScorekeeperMatch model, int endNo, int? arrowNumber) {
     if (activeKeyboard == null) return;
+    _correctingCompleteCard = false;
     var participants = model.participants;
     activeKeyboard = activeKeyboard! + 1;
     if (activeKeyboard! >= participants.length) {
@@ -88,6 +98,19 @@ class ScoresViewmodel extends EventViewModel {
     if (activeKeyboard != index) {
       activeKeyboardChanged = true;
       activeKeyboard = index;
+    }
+
+    // Only an explicit tap on an arrow cell of an already-complete card
+    // counts as a correction; normal entry still collapses the keypad when
+    // the last arrow is filled in. Flipping this changes keypad visibility
+    // even if nothing else changed, so it must trigger a rebuild too.
+    final correcting = arrowNumber != null &&
+        index != null &&
+        model.signatureMode != 'none' &&
+        scoring.firstNullIndex(model.participants[index]) == null;
+    if (correcting != _correctingCompleteCard) {
+      activeKeyboardChanged = true;
+      _correctingCompleteCard = correcting;
     }
 
     if (editingEnd >= 0 &&
