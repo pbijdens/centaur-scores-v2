@@ -39,18 +39,16 @@ public sealed class MatchesController(ApplicationDbContext db, ITenantContext te
     public async Task<IActionResult> Get(Guid id, CancellationToken cancellationToken) => await db.Matches.AsNoTracking().Include(item => item.Participants).ThenInclude(item => item.ParticipantListMember).Include(item => item.Devices).Include(item => item.LiveScopes).SingleOrDefaultAsync(item => item.Id == id && item.TenantId == TenantId, cancellationToken) is { } match ? Ok(match) : NotFound();
 
     [HttpPut("{id:guid}")]
-    public async Task<IActionResult> Update(Guid id, CreateMatchRequest request, CancellationToken cancellationToken)
+    public async Task<IActionResult> Update(Guid id, UpdateMatchRequest request, CancellationToken cancellationToken)
     {
         if (!CanManage) return Forbid();
         var match = await db.Matches.SingleOrDefaultAsync(item => item.Id == id && item.TenantId == TenantId, cancellationToken);
         if (match is null) return NotFound();
         if (match.ParticipantListId != request.ParticipantListId && await db.MatchParticipants.AnyAsync(item => item.MatchId == id, cancellationToken))
             return Conflict(new ApiError("PARTICIPANT_LIST_LOCKED", "The source participant list cannot change once the match has participants."));
-        var wasOpen = match.IsOpen;
         match.Name = request.Name;
         match.Date = request.Date;
         match.ShortCode = request.ShortCode;
-        match.IsOpen = request.IsOpen;
         match.ParticipantListId = request.ParticipantListId;
         match.DeviceSelectionMode = request.DeviceSelectionMode;
         match.SignatureMode = string.IsNullOrWhiteSpace(request.SignatureMode) ? "none" : request.SignatureMode;
@@ -62,7 +60,21 @@ public sealed class MatchesController(ApplicationDbContext db, ITenantContext te
         match.ScoringRulesJson = request.ScoringRulesJson;
         match.PersonalBestClassifier = request.PersonalBestClassifier;
         await db.SaveChangesAsync(cancellationToken);
-        if (wasOpen && !match.IsOpen) await personalBestRegistrationService.RegisterOnDeactivationAsync(match, cancellationToken);
+        return Ok(match);
+    }
+
+    // Activating/deactivating is its own action rather than part of the metadata PUT, because closing a
+    // match has a side effect (personal-best registration). Setting the current value is a no-op.
+    [HttpPut("{id:guid}/open")]
+    public async Task<IActionResult> SetOpen(Guid id, SetMatchOpenRequest request, CancellationToken cancellationToken)
+    {
+        if (!CanManage) return Forbid();
+        var match = await db.Matches.SingleOrDefaultAsync(item => item.Id == id && item.TenantId == TenantId, cancellationToken);
+        if (match is null) return NotFound();
+        if (match.IsOpen == request.IsOpen) return Ok(match);
+        match.IsOpen = request.IsOpen;
+        await db.SaveChangesAsync(cancellationToken);
+        if (!match.IsOpen) await personalBestRegistrationService.RegisterOnDeactivationAsync(match, cancellationToken);
         return Ok(match);
     }
 

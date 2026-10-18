@@ -794,12 +794,96 @@ public sealed class MatchesControllerTests
 
     private static LiveScoreScope Scope(Guid tenantId, Guid matchId, string scope) => new() { Id = Guid.NewGuid(), TenantId = tenantId, MatchId = matchId, Scope = scope };
 
-    private static MatchesController NewController(ApplicationDbContext db, Guid tenantId, bool canManage = true)
+    private static MatchesController NewController(ApplicationDbContext db, Guid tenantId, bool canManage = true, IPersonalBestRegistrationService? registration = null)
     {
         var scoring = new ScoringService();
         var personalBestContext = new PersonalBestContext(db);
         var personalBestEngine = new PersonalBestEngine(db);
-        return new MatchesController(db, new TestTenantContext(tenantId, canManage), scoring, new LiveScoringService(scoring), new PersonalBestRegistrationService(db, personalBestContext, personalBestEngine), new PersonalBestLiveLookup(db, personalBestContext, personalBestEngine, new MemoryCache(new MemoryCacheOptions())));
+        return new MatchesController(db, new TestTenantContext(tenantId, canManage), scoring, new LiveScoringService(scoring), registration ?? new PersonalBestRegistrationService(db, personalBestContext, personalBestEngine), new PersonalBestLiveLookup(db, personalBestContext, personalBestEngine, new MemoryCache(new MemoryCacheOptions())));
+    }
+
+    private sealed class RecordingRegistrationService : IPersonalBestRegistrationService
+    {
+        public List<Guid> DeactivatedMatchIds { get; } = [];
+
+        public Task RegisterOnDeactivationAsync(Match match, CancellationToken cancellationToken)
+        {
+            DeactivatedMatchIds.Add(match.Id);
+            return Task.CompletedTask;
+        }
+    }
+
+    [Fact]
+    public async Task Update_changes_metadata_but_never_the_open_state_or_personal_best_registration()
+    {
+        await using var connection = new SqliteConnection("Filename=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>().UseSqlite(connection).Options;
+        await using var db = new ApplicationDbContext(options);
+        await db.Database.EnsureCreatedAsync();
+
+        var tenantId = Guid.NewGuid();
+        var matchId = Guid.NewGuid();
+        db.AddRange(new Tenant { Id = tenantId, Name = "Tenant" }, new Match { Id = matchId, TenantId = tenantId, Name = "Old", IsOpen = true });
+        await db.SaveChangesAsync();
+        var registration = new RecordingRegistrationService();
+        var controller = NewController(db, tenantId, registration: registration);
+
+        var result = Assert.IsType<OkObjectResult>(await controller.Update(matchId, new UpdateMatchRequest("New", new DateOnly(2026, 10, 18), null, null, "list-and-free", 10, 3, null), CancellationToken.None));
+
+        var match = Assert.IsType<Match>(result.Value);
+        Assert.Equal("New", match.Name);
+        Assert.True(match.IsOpen);
+        Assert.Empty(registration.DeactivatedMatchIds);
+    }
+
+    [Fact]
+    public async Task SetOpen_registers_personal_bests_only_on_an_open_to_closed_transition()
+    {
+        await using var connection = new SqliteConnection("Filename=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>().UseSqlite(connection).Options;
+        await using var db = new ApplicationDbContext(options);
+        await db.Database.EnsureCreatedAsync();
+
+        var tenantId = Guid.NewGuid();
+        var matchId = Guid.NewGuid();
+        db.AddRange(new Tenant { Id = tenantId, Name = "Tenant" }, new Match { Id = matchId, TenantId = tenantId, Name = "Open", IsOpen = false });
+        await db.SaveChangesAsync();
+        var registration = new RecordingRegistrationService();
+        var controller = NewController(db, tenantId, registration: registration);
+
+        async Task<bool> SetOpen(bool isOpen) => Assert.IsType<Match>(Assert.IsType<OkObjectResult>(await controller.SetOpen(matchId, new SetMatchOpenRequest(isOpen), CancellationToken.None)).Value).IsOpen;
+
+        Assert.False(await SetOpen(false));
+        Assert.Empty(registration.DeactivatedMatchIds);
+        Assert.True(await SetOpen(true));
+        Assert.True(await SetOpen(true));
+        Assert.Empty(registration.DeactivatedMatchIds);
+        Assert.False(await SetOpen(false));
+        Assert.Equal([matchId], registration.DeactivatedMatchIds);
+        Assert.False(await SetOpen(false));
+        Assert.Equal([matchId], registration.DeactivatedMatchIds);
+    }
+
+    [Fact]
+    public async Task SetOpen_is_forbidden_without_manage_rights_and_not_found_for_another_tenants_match()
+    {
+        await using var connection = new SqliteConnection("Filename=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>().UseSqlite(connection).Options;
+        await using var db = new ApplicationDbContext(options);
+        await db.Database.EnsureCreatedAsync();
+
+        var tenantId = Guid.NewGuid();
+        var otherTenantId = Guid.NewGuid();
+        var matchId = Guid.NewGuid();
+        db.AddRange(new Tenant { Id = tenantId, Name = "Tenant" }, new Tenant { Id = otherTenantId, Name = "Other" }, new Match { Id = matchId, TenantId = tenantId, Name = "Open" });
+        await db.SaveChangesAsync();
+
+        Assert.IsType<ForbidResult>(await NewController(db, tenantId, canManage: false).SetOpen(matchId, new SetMatchOpenRequest(true), CancellationToken.None));
+        Assert.IsType<NotFoundResult>(await NewController(db, otherTenantId).SetOpen(matchId, new SetMatchOpenRequest(true), CancellationToken.None));
+        Assert.False((await db.Matches.AsNoTracking().SingleAsync()).IsOpen);
     }
 
     private static ArrowScore Score(Guid tenantId, Guid participantId, int end, int arrow, string keyId, int value) => new()

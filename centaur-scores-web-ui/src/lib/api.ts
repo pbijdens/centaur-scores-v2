@@ -19,6 +19,9 @@ export type MatchInput = {
   personalBestClassifier?: string | null
 }
 
+// Metadata-only: a match's open state changes solely through setMatchOpen, so a stale form can't flip it.
+export type MatchUpdateInput = Omit<MatchInput, 'isOpen'>
+
 // Carries the API's stable error `code` so callers can map it to a translated message instead of showing server text.
 export class ApiRequestError extends Error {
   code?: string
@@ -133,8 +136,12 @@ export class ApiClient {
     return this.request(`/api/competitions/${competitionId}/results`)
   }
 
-  updateMatch(id: string, body: MatchInput) {
+  updateMatch(id: string, body: MatchUpdateInput) {
     return this.request(`/api/matches/${id}`, { method: 'PUT', body: JSON.stringify(body) })
+  }
+
+  setMatchOpen(id: string, isOpen: boolean): Promise<Match> {
+    return this.request(`/api/matches/${id}/open`, { method: 'PUT', body: JSON.stringify({ isOpen }) })
   }
 
   deleteMatch(id: string) {
