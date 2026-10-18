@@ -230,28 +230,43 @@ public sealed class MatchesController(ApplicationDbContext db, ITenantContext te
         if (participant is null) return NotFound();
         var validationError = SignatureValidation.Validate(request.ArcherSignatureDataUrl, request.MarkerSignatureDataUrl);
         if (validationError is not null) return BadRequest(validationError);
-        participant.Signed = true;
-        participant.SignedAtUtc = DateTime.UtcNow;
-        participant.ArcherSignatureDataUrl = request.ArcherSignatureDataUrl;
-        participant.MarkerSignatureDataUrl = request.MarkerSignatureDataUrl;
+        await ScorecardSigning.SignAsync(db, participant, request.ArcherSignatureDataUrl, request.MarkerSignatureDataUrl, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         return Ok(participant);
     }
 
-    // Withdrawing a signature is a full reset, not just a flag flip - the stored images are cleared too,
-    // so a subsequent re-sign never risks showing a stale image if it were re-signed without new ones.
     [HttpPost("{id:guid}/participants/{participantId:guid}/unsign")]
     public async Task<IActionResult> UnsignParticipant(Guid id, Guid participantId, CancellationToken cancellationToken)
     {
         if (!CanManage) return Forbid();
         var participant = await db.MatchParticipants.SingleOrDefaultAsync(item => item.Id == participantId && item.MatchId == id && item.TenantId == TenantId, cancellationToken);
         if (participant is null) return NotFound();
-        participant.Signed = false;
-        participant.SignedAtUtc = null;
-        participant.ArcherSignatureDataUrl = null;
-        participant.MarkerSignatureDataUrl = null;
+        await ScorecardSigning.UnsignAsync(db, participant, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         return Ok(participant);
+    }
+
+    // Signature images are not part of the participant payloads (see MatchParticipantSignature); the
+    // single-scorecard views fetch them here, only for a signed card.
+    [HttpGet("{id:guid}/participants/{participantId:guid}/signature")]
+    public async Task<IActionResult> ParticipantSignature(Guid id, Guid participantId, CancellationToken cancellationToken)
+    {
+        if (!await db.MatchParticipants.AnyAsync(item => item.Id == participantId && item.MatchId == id && item.TenantId == TenantId, cancellationToken)) return NotFound();
+        var signature = await db.MatchParticipantSignatures.AsNoTracking().SingleOrDefaultAsync(item => item.MatchParticipantId == participantId && item.TenantId == TenantId, cancellationToken);
+        return Ok(new MatchParticipantSignatureResponse(participantId, signature?.ArcherSignatureDataUrl, signature?.MarkerSignatureDataUrl));
+    }
+
+    // Bulk variant for printing scorecards. Only participants that belong to this match (and tenant) are
+    // returned, and only those that actually have a stored signature.
+    [HttpGet("{id:guid}/signatures")]
+    public async Task<IActionResult> Signatures(Guid id, [FromQuery] List<Guid> participantIds, CancellationToken cancellationToken)
+    {
+        var signatures = await db.MatchParticipantSignatures.AsNoTracking()
+            .Where(signature => signature.TenantId == TenantId && participantIds.Contains(signature.MatchParticipantId)
+                && db.MatchParticipants.Any(participant => participant.Id == signature.MatchParticipantId && participant.MatchId == id && participant.TenantId == TenantId))
+            .Select(signature => new MatchParticipantSignatureResponse(signature.MatchParticipantId, signature.ArcherSignatureDataUrl, signature.MarkerSignatureDataUrl))
+            .ToListAsync(cancellationToken);
+        return Ok(signatures);
     }
 
     [HttpPost("{id:guid}/participants/{participantId:guid}/scores")]

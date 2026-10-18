@@ -147,10 +147,20 @@ public sealed class MatchParticipant : TenantOwnedEntity
 
     // Scorecard signing (see documentation/SIGNING-SCORECARDS.md). Once Signed is true, anonymous
     // scorekeeper devices must refuse further edits; only a manager can edit via the full API or
-    // withdraw the signature. Signature images are base64 data-URL strings, mirroring how Tenant.LogoUrl
-    // stores an image, not a binary blob column - they stay null for "confirm" mode signatures.
+    // withdraw the signature. The signature images live in MatchParticipantSignature, not here.
     public bool Signed { get; set; }
     public DateTime? SignedAtUtc { get; set; }
+}
+
+// Signature images for a signed scorecard, kept out of match_participants on purpose: they're large
+// base64 data-URL strings (mirroring how Tenant.LogoUrl stores an image), and every participant query -
+// especially ones joined with arrow_scores - would otherwise drag them along. There is deliberately no
+// navigation property on MatchParticipant; only code that actually renders a signature queries this.
+// No row exists for "confirm" mode signatures.
+public sealed class MatchParticipantSignature
+{
+    public Guid MatchParticipantId { get; init; }
+    public Guid TenantId { get; init; }
     public string? ArcherSignatureDataUrl { get; set; }
     public string? MarkerSignatureDataUrl { get; set; }
 }

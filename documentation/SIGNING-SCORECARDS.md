@@ -113,3 +113,10 @@ Signatures can be stored in the database as a black and white low resolution dra
 os f a single signature is 5:1 and even at 300dpi the image would be less than 64KB, but I would guess 
 that 72 dpi is sufficient and the image can be stored compressed in any format and should probably fit
 in a database column.
+
+**Implementation note:** the images are stored as base64 data URLs in a separate
+`match_participant_signatures` table (one row per signed card that has images; none for "confirm"
+mode), while the `signed`/`signed_at_utc` flags stay on `match_participants`. Keeping the images
+out of `match_participants` means participant lists, results and joins with `arrow_scores` never
+carry them; they are loaded only for a single scorecard, the scorekeeper device view model (that
+device's cards only), the print view, and backups.

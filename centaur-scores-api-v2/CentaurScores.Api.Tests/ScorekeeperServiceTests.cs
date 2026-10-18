@@ -263,6 +263,51 @@ public sealed class ScorekeeperServiceTests
         var participant = await db.MatchParticipants.AsNoTracking().SingleAsync(item => item.Id == participantId);
         Assert.True(participant.Signed);
         Assert.NotNull(participant.SignedAtUtc);
+        Assert.False(await db.MatchParticipantSignatures.AnyAsync());
+    }
+
+    [Fact]
+    public async Task Signature_images_are_stored_separately_and_returned_only_for_the_calling_devices_participants()
+    {
+        await using var connection = new SqliteConnection("Filename=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>().UseSqlite(connection).Options;
+        await using var db = new ApplicationDbContext(options);
+        await db.Database.EnsureCreatedAsync();
+
+        var tenantId = Guid.NewGuid();
+        var matchId = Guid.NewGuid();
+        var deviceId = Guid.NewGuid();
+        var otherDeviceId = Guid.NewGuid();
+        var participantId = Guid.NewGuid();
+        var otherParticipantId = Guid.NewGuid();
+        db.AddRange(
+            new Tenant { Id = tenantId, Name = "Tenant" },
+            new Match
+            {
+                Id = matchId,
+                TenantId = tenantId,
+                SignatureMode = "signature",
+                Devices = [new ScoreDevice { Id = deviceId, TenantId = tenantId, MatchId = matchId, Name = "Device" }, new ScoreDevice { Id = otherDeviceId, TenantId = tenantId, MatchId = matchId, Name = "Other" }],
+                Participants = [
+                    new MatchParticipant { Id = participantId, TenantId = tenantId, MatchId = matchId, DeviceId = deviceId, OwnFullName = "Robin Archer", OwnLastName = "Archer" },
+                    new MatchParticipant { Id = otherParticipantId, TenantId = tenantId, MatchId = matchId, DeviceId = otherDeviceId, OwnFullName = "Will Scarlet", OwnLastName = "Scarlet", Signed = true }]
+            });
+        await db.SaveChangesAsync();
+        db.MatchParticipantSignatures.Add(new MatchParticipantSignature { MatchParticipantId = otherParticipantId, TenantId = tenantId, ArcherSignatureDataUrl = "other-archer" });
+        await db.SaveChangesAsync();
+
+        var service = new ScorekeeperService(db, new PersonalBestLiveLookup(db, new PersonalBestContext(db), new PersonalBestEngine(db), new MemoryCache(new MemoryCacheOptions())));
+        var context = await service.FindAsync(tenantId, matchId, deviceId, CancellationToken.None);
+        Assert.Null(await service.SignParticipantAsync(context!, participantId, new SignParticipantRequest("archer", "marker"), CancellationToken.None));
+
+        var stored = await db.MatchParticipantSignatures.AsNoTracking().SingleAsync(item => item.MatchParticipantId == participantId);
+        Assert.Equal(("archer", "marker"), (stored.ArcherSignatureDataUrl, stored.MarkerSignatureDataUrl));
+
+        var match = await service.GetMatchAsync((await service.FindAsync(tenantId, matchId, deviceId, CancellationToken.None))!, CancellationToken.None);
+        var returned = Assert.Single(match.Participants);
+        Assert.Equal(participantId, returned.MatchParticipantId);
+        Assert.Equal(("archer", "marker"), (returned.ArcherSignatureDataUrl, returned.MarkerSignatureDataUrl));
     }
 
     [Fact]

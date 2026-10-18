@@ -18,6 +18,11 @@ public sealed class MatchBackupHandler : IBackupHandler
             .Include(item => item.LiveScopes)
             .Where(item => tenantIds.Contains(item.TenantId))
             .ToListAsync(cancellationToken);
+        // Separate query on purpose: signature images are large, and joining them into the match graph
+        // above is what once blew up MariaDB's temp tables (see MatchParticipantSignature).
+        var signatures = await db.MatchParticipantSignatures.AsNoTracking()
+            .Where(item => tenantIds.Contains(item.TenantId))
+            .ToDictionaryAsync(item => item.MatchParticipantId, cancellationToken);
 
         return matches.Select(match => (match.Id, (object)new MatchBackup(
             match.Id, match.TenantId, match.Name, match.Date, match.ShortCode, match.IsOpen, match.ParticipantListId,
@@ -26,9 +31,12 @@ public sealed class MatchBackupHandler : IBackupHandler
             match.Participants.Select(participant => new MatchParticipantBackup(
                 participant.Id, participant.ParticipantListMemberId, participant.LastName, participant.FullName, participant.FederationNumber,
                 participant.Categories, participant.DeviceId, participant.DeviceOrder, participant.DeviceLane,
-                participant.Scores.Select(score => new ArrowScoreBackup(score.End, score.Arrow, score.KeyId, score.Value)).ToList())).ToList(),
+                participant.Scores.Select(score => new ArrowScoreBackup(score.End, score.Arrow, score.KeyId, score.Value)).ToList(),
+                participant.Signed, participant.SignedAtUtc,
+                signatures.GetValueOrDefault(participant.Id)?.ArcherSignatureDataUrl, signatures.GetValueOrDefault(participant.Id)?.MarkerSignatureDataUrl)).ToList(),
             match.Devices.Select(device => new ScoreDeviceBackup(device.Id, device.Name, device.SortOrder)).ToList(),
-            match.LiveScopes.Select(scope => new LiveScoreScopeBackup(scope.Id, scope.Scope, scope.GroupByCategoryIdsJson, scope.IncludeAverage, scope.IncludeGroupScores, scope.IncludeEqualizers, scope.IncludePersonalBest)).ToList()))).ToList();
+            match.LiveScopes.Select(scope => new LiveScoreScopeBackup(scope.Id, scope.Scope, scope.GroupByCategoryIdsJson, scope.IncludeAverage, scope.IncludeGroupScores, scope.IncludeEqualizers, scope.IncludePersonalBest)).ToList(),
+            match.SignatureMode))).ToList();
     }
 
     public async Task<BackupImportOutcome> ImportAsync(BackupImportContext context, CancellationToken cancellationToken)
@@ -36,6 +44,7 @@ public sealed class MatchBackupHandler : IBackupHandler
         var entries = context.ReadEntries<MatchBackup>(FolderName);
         var warnings = new List<string>();
         var matches = new List<Match>();
+        var signatures = new List<MatchParticipantSignature>();
 
         foreach (var entry in entries)
         {
@@ -70,9 +79,15 @@ public sealed class MatchBackupHandler : IBackupHandler
                     DeviceId = participant.DeviceId is { } deviceId && context.TryRemap(deviceId, out var newDeviceId) ? newDeviceId : null,
                     DeviceOrder = participant.DeviceOrder,
                     DeviceLane = participant.DeviceLane,
-                    Scores = participant.Scores.Select(score => new ArrowScore { Id = Guid.NewGuid(), TenantId = newTenantId, MatchParticipantId = newParticipantId, End = score.End, Arrow = score.Arrow, KeyId = score.KeyId, Value = score.Value }).ToList()
+                    Scores = participant.Scores.Select(score => new ArrowScore { Id = Guid.NewGuid(), TenantId = newTenantId, MatchParticipantId = newParticipantId, End = score.End, Arrow = score.Arrow, KeyId = score.KeyId, Value = score.Value }).ToList(),
+                    Signed = participant.Signed,
+                    SignedAtUtc = participant.SignedAtUtc
                 };
             }).ToList();
+
+            signatures.AddRange(entry.Participants
+                .Where(participant => (participant.ArcherSignatureDataUrl is not null || participant.MarkerSignatureDataUrl is not null) && context.IdMap.ContainsKey(participant.Id))
+                .Select(participant => new MatchParticipantSignature { MatchParticipantId = context.IdMap[participant.Id], TenantId = newTenantId, ArcherSignatureDataUrl = participant.ArcherSignatureDataUrl, MarkerSignatureDataUrl = participant.MarkerSignatureDataUrl }));
 
             var liveScopes = entry.LiveScopes.Select(scope => new LiveScoreScope
             {
@@ -104,6 +119,7 @@ public sealed class MatchBackupHandler : IBackupHandler
                 KeyboardJson = BackupRemapHelpers.RemapKeyboardConfigJson(entry.KeyboardJson, context),
                 ScoringRulesJson = entry.ScoringRulesJson,
                 PersonalBestClassifier = entry.PersonalBestClassifier,
+                SignatureMode = entry.SignatureMode,
                 Participants = participants,
                 Devices = devices,
                 LiveScopes = liveScopes
@@ -111,6 +127,7 @@ public sealed class MatchBackupHandler : IBackupHandler
         }
 
         context.Db.Matches.AddRange(matches);
+        context.Db.MatchParticipantSignatures.AddRange(signatures);
         await context.Db.SaveChangesAsync(cancellationToken);
         return new BackupImportOutcome(matches.Count, warnings);
     }

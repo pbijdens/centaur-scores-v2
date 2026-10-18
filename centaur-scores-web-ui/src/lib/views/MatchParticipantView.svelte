@@ -5,6 +5,7 @@
   import { labelForError } from '../errors'
   import { parseMatchKeyboardConfig } from '../matchConfig'
   import ParticipantScorecard from '../ParticipantScorecard.svelte'
+  import ParticipantSignatures from '../ParticipantSignatures.svelte'
   import { arrowsShotCount, groupTotals, hasGroups, totalScore } from '../scorecard'
   import { matchParticipantEditPath, matchParticipantReplacePath, matchParticipantScorePath, navigateOnClick, participantMemberPath } from '../router'
   import type { Category, KeyboardKey, Match, MatchParticipant, ParticipantList } from '../types'
@@ -138,7 +139,7 @@
         ? await api.unsignMatchParticipant(match.id, participant.id)
         : await api.signMatchParticipant(match.id, participant.id, {})
       // Optimistic local update, per spec: no full reload needed for the toggle to reflect.
-      participant = { ...participant, signed: updated.signed, signedAtUtc: updated.signedAtUtc, archerSignatureDataUrl: updated.archerSignatureDataUrl, markerSignatureDataUrl: updated.markerSignatureDataUrl }
+      participant = { ...participant, signed: updated.signed, signedAtUtc: updated.signedAtUtc }
       await onChanged()
     } catch (error) {
       signToggleError = labelForError(error, labels, 'signToggleError')
@@ -244,16 +245,7 @@
     <div class="scorecard-preview">
       <ParticipantScorecard {match} scores={participant.scores} keyboard={keyboardConfig.keyboard} interactive={false} />
     </div>
-    {#if participant.signed && (participant.archerSignatureDataUrl || participant.markerSignatureDataUrl)}
-      <div class="signature-images">
-        {#if participant.archerSignatureDataUrl}
-          <div class="signature-block"><span class="muted">{labels.archerSignatureLabel}</span><img src={participant.archerSignatureDataUrl} alt={labels.archerSignatureLabel} /></div>
-        {/if}
-        {#if participant.markerSignatureDataUrl}
-          <div class="signature-block"><span class="muted">{labels.markerSignatureLabel}</span><img src={participant.markerSignatureDataUrl} alt={labels.markerSignatureLabel} /></div>
-        {/if}
-      </div>
-    {/if}
+    <ParticipantSignatures {api} matchId={match.id} participantId={participant.id} signed={participant.signed} {labels} />
   {/if}
 </section>
 

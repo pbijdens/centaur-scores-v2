@@ -19,14 +19,18 @@ public sealed record ParticipantListBackup(Guid Id, Guid TenantId, string Name, 
 public sealed record MatchTemplateBackup(Guid Id, Guid TenantId, string Name, Guid? ParticipantListId, bool AllowFreeParticipants, string DeviceSelectionMode, string ConfigurationJson, string? PersonalBestClassifier);
 
 public sealed record ArrowScoreBackup(int End, int Arrow, string KeyId, int Value);
-public sealed record MatchParticipantBackup(Guid Id, Guid? ParticipantListMemberId, string LastName, string FullName, string? FederationNumber, Dictionary<Guid, int> Categories, Guid? DeviceId, int? DeviceOrder, string? DeviceLane, List<ArrowScoreBackup> Scores);
+// The signing fields are trailing optionals so backups made before they existed still deserialize
+// (their scorecards simply come back unsigned).
+public sealed record MatchParticipantBackup(Guid Id, Guid? ParticipantListMemberId, string LastName, string FullName, string? FederationNumber, Dictionary<Guid, int> Categories, Guid? DeviceId, int? DeviceOrder, string? DeviceLane, List<ArrowScoreBackup> Scores,
+    bool Signed = false, DateTime? SignedAtUtc = null, string? ArcherSignatureDataUrl = null, string? MarkerSignatureDataUrl = null);
 public sealed record ScoreDeviceBackup(Guid Id, string Name, int SortOrder);
 public sealed record LiveScoreScopeBackup(Guid Id, string Scope, string GroupByCategoryIdsJson, bool IncludeAverage, bool IncludeGroupScores, bool IncludeEqualizers, bool IncludePersonalBest);
 public sealed record MatchBackup(
     Guid Id, Guid TenantId, string Name, DateOnly Date, string? ShortCode, bool IsOpen, Guid? ParticipantListId,
     string DeviceSelectionMode, int Ends, int ArrowsPerEnd, int? GroupEnds, bool AllowFreeParticipants,
     string KeyboardJson, string ScoringRulesJson, string? PersonalBestClassifier,
-    List<MatchParticipantBackup> Participants, List<ScoreDeviceBackup> Devices, List<LiveScoreScopeBackup> LiveScopes);
+    List<MatchParticipantBackup> Participants, List<ScoreDeviceBackup> Devices, List<LiveScoreScopeBackup> LiveScopes,
+    string SignatureMode = "none");
 
 public sealed record CompetitionRoundMatchBackup(Guid MatchId);
 public sealed record CompetitionRoundBackup(Guid Id, int Order, string ShortName, string LongName, List<CompetitionRoundMatchBackup> Matches);
