@@ -45,7 +45,7 @@ As a user I can see and manage tenant data from the tenant home screen. On the t
    1. Clicking a match will take me to the Match's home screen
    2. There is a "deactivate all" button that will toggle all these matches to inactive
 2. A clickable list of "Upcoming matches"
-   1. A list, sorted on date, with matches configured for today and the next few weeks
+   1. A list, sorted on date, with matches configured for today and the next few weeks - the first planned matches in the same order as the matches list (open matches are already in the list above)
    2. Clicking a match will take me to the Match's home screen
    3. There is a "see all" button that will take a user to a screen with a clickable list of all past, present and future matches for the tenant
 3. A clickable list of active competitions
@@ -160,9 +160,9 @@ The results function is a dropdown button, with a dropdown value per configured 
 Matches can be exported to CSV, where each row contains:
 federation number, full name (or last name if full name not set), (next, one category value per column), score group 1, ..., score group n, total, equalizer 1, equalizer 2, ...
 
-Export is initiated via a button on the match homepage.
+Export is initiated from the "Import/Export" group of the match's ⋯ menu ("Export as CSV"); that group is available on the match homepage and on every page below it.
 
-The devices page ("Apparaten") has a ⋯ actions menu with "Export lane assignments to Excel": a printable check-in sheet with one bordered block per lane number, one row per lane letter (all blocks equally many letters), columns lane / present (to tick off) / letter / federation number / name / match categories, followed by a block of archers without a (valid) lane.
+The same "Import/Export" group holds "Export lane assignments to Excel" (the devices page is titled "Devices and lanes" / "Apparaten en baanindeling"): a printable check-in sheet with one bordered block per lane number, one row per lane letter (all blocks equally many letters), columns lane / present (to tick off) / letter / federation number / name / match categories, followed by a block of archers without a (valid) lane.
 
 #### UC10 - Deleting a match
 

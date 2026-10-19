@@ -1118,6 +1118,10 @@ namespace CentaurScores.Api.Infrastructure.Migrations
                         .HasColumnType("tinyint(1)")
                         .HasColumnName("personal_best_enabled");
 
+                    b.Property<string>("ScorekeeperBaseUrl")
+                        .HasColumnType("longtext")
+                        .HasColumnName("scorekeeper_base_url");
+
                     b.HasKey("Id")
                         .HasName("pk_tenants");
 

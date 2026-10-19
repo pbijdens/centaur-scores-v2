@@ -69,6 +69,10 @@ export async function refreshTemplates(api: ApiClient) {
   templates.set(await api.fetchTemplates())
 }
 
+export async function refreshCurrentTenant(api: ApiClient) {
+  currentTenant.set(await api.fetchCurrentTenant())
+}
+
 export async function refreshDefaultScopeSettings(api: ApiClient) {
   defaultScopeSettings.set(await api.fetchDefaultScopeSettings())
 }

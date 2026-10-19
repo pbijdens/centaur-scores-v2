@@ -1,4 +1,5 @@
 <script lang="ts">
+  import PageHeader from '../PageHeader.svelte'
   import type { ApiClient } from '../api'
   import { labelForError } from '../errors'
   import type { Profile } from '../types'
@@ -50,10 +51,7 @@
   }
 </script>
 
-<button class="back-link" on:click={onBack}>← {labels.home}</button>
-<div class="page-intro">
-  <div><p class="eyebrow">{labels.eyebrowAccount}</p><h1>{labels.profile}</h1></div>
-</div>
+<PageHeader eyebrow={labels.eyebrowAccount} title={labels.profile} backLabel={labels.home} {onBack} />
 <div class="profile-grid">
   <section class="panel">
     <h2>{labels.profileDetails}</h2>

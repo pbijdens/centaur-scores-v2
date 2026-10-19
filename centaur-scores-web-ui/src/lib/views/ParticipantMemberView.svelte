@@ -1,6 +1,6 @@
 <script lang="ts">
+  import PageHeader from '../PageHeader.svelte'
   import type { ApiClient } from '../api'
-  import DropdownMenu from '../DropdownMenu.svelte'
   import { labelForError } from '../errors'
   import { deriveLastName } from '../participantName'
   import type { Category, ParticipantListMember } from '../types'
@@ -80,18 +80,7 @@
   }
 </script>
 
-<button class="back-link" on:click={onBack}>← {labels.membersLabel}</button>
-<div class="page-intro">
-  <div><p class="eyebrow">{labels.eyebrowParticipant}</p><h1>{member ? (member.fullName || member.lastName) : labels.newMember}</h1></div>
-  {#if member}
-    <div class="match-header-actions">
-      <DropdownMenu ariaLabel={labels.matchActions} buttonClass="actions-trigger" align="right">
-        <svelte:fragment slot="trigger">⋯</svelte:fragment>
-        <button class="menu-item menu-item-danger" on:click={remove}>{labels.deleteMember}</button>
-      </DropdownMenu>
-    </div>
-  {/if}
-</div>
+<PageHeader eyebrow={labels.participants} title={member ? (member.fullName || member.lastName) : labels.newMember} backLabel={labels.membersLabel} {onBack} actions={member ? [{ label: labels.deleteMember, danger: true, onClick: remove }] : []} menuLabel={labels.matchActions} />
 {#if deleteError}<p class="error">{deleteError}</p>{/if}
 <section class="panel">
   <form on:submit|preventDefault={save}>

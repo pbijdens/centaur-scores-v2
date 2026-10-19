@@ -1,15 +1,19 @@
 <script lang="ts">
   import type { ApiClient } from '../api'
+  import MatchPageHeader from '../MatchPageHeader.svelte'
+  import type { MatchHeaderHandlers } from '../pageActions'
   import { labelForError } from '../errors'
   import { parseMatchKeyboardConfig } from '../matchConfig'
   import { deriveLastName } from '../participantName'
-  import type { Category, Match, MatchParticipant } from '../types'
+  import type { Category, Language, Match, MatchParticipant } from '../types'
 
   export let api: ApiClient
   export let match: Match
   export let participant: MatchParticipant
   export let categories: Category[]
+  export let language: Language
   export let labels: Record<string, string>
+  export let headerHandlers: MatchHeaderHandlers
   export let onBack: () => void
   export let onSaved: () => void
 
@@ -43,11 +47,7 @@
   }
 </script>
 
-<button class="back-link" on:click={onBack}>← {participant.fullName || participant.lastName}</button>
-<div class="page-intro">
-  <div><p class="eyebrow">{labels.eyebrowEditParticipant}</p><h1>{labels.editParticipantDetails}</h1></div>
-</div>
-
+<MatchPageHeader {api} {match} {language} {labels} handlers={headerHandlers} title={labels.editParticipantDetails} subtitle={participant.fullName || participant.lastName} backLabel={participant.fullName || participant.lastName} {onBack} />
 <section class="panel">
   <form class="inline-form" on:submit|preventDefault={save}>
     <label>{labels.fullNameLabel}<input bind:value={fullName} autocomplete="off" /></label>

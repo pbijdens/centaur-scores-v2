@@ -1,4 +1,5 @@
 <script lang="ts">
+  import PageHeader from '../PageHeader.svelte'
   import type { ApiClient } from '../api'
   import { labelForError } from '../errors'
   import type { Account } from '../types'
@@ -46,11 +47,8 @@
   }
 </script>
 
-<button class="back-link" on:click={onBack}>← {labels.accounts}</button>
+<PageHeader eyebrow={labels.accounts} title={account?.username ?? ''} backLabel={labels.accounts} {onBack} />
 {#if account}
-  <div class="page-intro">
-    <div><p class="eyebrow">{labels.eyebrowAccounts}</p><h1>{account.username}</h1></div>
-  </div>
   <section class="panel">
     <form id="account-edit-form" on:submit|preventDefault={save}>
       <label>{labels.usernameLabel}<input bind:value={username} /></label>

@@ -1,6 +1,6 @@
 export type View = 'home' | 'matches' | 'match' | 'match-metadata' | 'match-devices' | 'match-qr' | 'match-print' | 'match-results-scope' | 'match-participant' | 'match-participant-edit' | 'match-participant-replace' | 'match-participant-scores' | 'match-add-participants' | 'competitions' | 'competition' | 'competition-results' | 'participants' | 'participant-list' | 'participant' | 'categories' | 'category' | 'templates' | 'template' | 'accounts' | 'account' | 'profile' | 'tenants' | 'tenant' | 'tenant-settings' | 'select-tenant' | 'narrowcast' | 'personal-best' | 'personal-best-classifiers' | 'personal-best-disciplines' | 'personal-best-export-config' | 'personal-best-import-config' | 'personal-best-log' | 'backup-restore'
 export type Language = 'en' | 'nl'
-export type Tenant = { id: string; name: string; logoUrl?: string | null; defaultNarrowcastScope?: string | null }
+export type Tenant = { id: string; name: string; logoUrl?: string | null; defaultNarrowcastScope?: string | null; scorekeeperBaseUrl?: string | null }
 export type DefaultScopeSettings = { tenantValue: string | null; effectiveValue: string }
 export type ScopeConflict = { tenantId: string; tenantName: string; scope: string; matchCount: number }
 export type Match = {
@@ -79,7 +79,7 @@ export type CompetitionResultEntry = { position: string | null; needsTieBreaker:
 export type CompetitionResultGroup = { name: string; entries: CompetitionResultEntry[] }
 export type CompetitionResultRound = { id: string; shortName: string; longName: string; order: number }
 export type CompetitionResultsDocument = { competitionName: string; startDate: string; endDate: string; rounds: CompetitionResultRound[]; groups: CompetitionResultGroup[] }
-export type TenantAccess = { tenantId: string; tenantName: string; logoUrl?: string | null; authorization: string }
+export type TenantAccess = { tenantId: string; tenantName: string; logoUrl?: string | null; authorization: string; parentTenantId?: string | null; parentTenantName?: string | null }
 export type Profile = { id: string; username: string; displayName?: string | null; email?: string | null; authorization: string; authorizedForTenants: TenantAccess[] }
 export type Account = { id: string; username: string; displayName?: string | null; email?: string | null; authorization: string }
 export type CategoryValue = { categoryId: string; valueId: number; name: string }

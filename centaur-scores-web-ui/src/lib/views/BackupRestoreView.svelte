@@ -1,4 +1,5 @@
 <script lang="ts">
+  import PageHeader from '../PageHeader.svelte'
   import type { ApiClient } from '../api'
   import { labelForError } from '../errors'
   import type { RestoreBackupResult } from '../types'
@@ -57,14 +58,7 @@
   }
 </script>
 
-<button class="back-link" on:click={onBack}>← {labels.home}</button>
-<div class="page-intro">
-  <div>
-    <p class="eyebrow">{labels.eyebrowBackupRestore}</p>
-    <h1>{labels.backupRestore}</h1>
-    <p class="muted">{labels.backupRestoreHint}</p>
-  </div>
-</div>
+<PageHeader eyebrow={labels.backupRestore} title={labels.backupRestore} subtitle={labels.backupRestoreHint} backLabel={labels.home} {onBack} />
 
 <div class="pb-tile-grid">
   <div class="pb-tile">

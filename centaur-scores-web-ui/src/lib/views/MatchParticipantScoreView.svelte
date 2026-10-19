@@ -1,15 +1,19 @@
 <script lang="ts">
   import type { ApiClient } from '../api'
+  import MatchPageHeader from '../MatchPageHeader.svelte'
+  import type { MatchHeaderHandlers } from '../pageActions'
   import { parseMatchKeyboardConfig } from '../matchConfig'
   import ParticipantScorecard from '../ParticipantScorecard.svelte'
   import ParticipantSignatures from '../ParticipantSignatures.svelte'
-  import type { ArrowScore, Match, MatchParticipant } from '../types'
+  import type { ArrowScore, Language, Match, MatchParticipant } from '../types'
 
   export let api: ApiClient
   export let match: Match
   export let participant: MatchParticipant
   export let canManage: boolean
+  export let language: Language
   export let labels: Record<string, string>
+  export let headerHandlers: MatchHeaderHandlers
   export let onBack: () => void
 
   // The API only supports upserting an arrow to a real key/value - there is no "clear this arrow"
@@ -81,14 +85,10 @@
 
 <svelte:window on:keydown={onKeydown} />
 
-<button class="back-link" on:click={onBack}>← {participant.fullName || participant.lastName}</button>
-<div class="page-intro">
-  <div><p class="eyebrow">{labels.eyebrowParticipantScores}</p><h1>{labels.viewEditScores}</h1></div>
-  <div class="score-actions">
-    <button type="button" class="text-button" disabled={!canUndo || !canEditScores} title={labels.undo} aria-label={labels.undo} on:click={undo}>↶ {labels.undo}</button>
-    <button type="button" class="text-button" disabled={!canRedo || !canEditScores} title={labels.redo} aria-label={labels.redo} on:click={redo}>↷ {labels.redo}</button>
-  </div>
-</div>
+<MatchPageHeader {api} {match} {language} {labels} handlers={headerHandlers} title={labels.viewEditScores} subtitle={participant.fullName || participant.lastName} backLabel={participant.fullName || participant.lastName} {onBack} pageActions={[
+  { label: labels.undo, headerLabel: `↶ ${labels.undo}`, header: 'text', disabled: !canUndo || !canEditScores, onClick: undo },
+  { label: labels.redo, headerLabel: `↷ ${labels.redo}`, header: 'text', disabled: !canRedo || !canEditScores, onClick: redo }
+]} />
 {#if match.signatureMode !== 'none'}
   <div class="panel signature-status-banner" class:is-signed={participant.signed}>
     {participant.signed ? labels.scorecardSignedBanner : labels.scorecardNotSignedBanner}
@@ -104,9 +104,3 @@
   <ParticipantSignatures {api} matchId={match.id} participantId={participant.id} signed={participant.signed} {labels} />
 </section>
 
-<style>
-  .score-actions {
-    display: flex;
-    gap: 8px;
-  }
-</style>

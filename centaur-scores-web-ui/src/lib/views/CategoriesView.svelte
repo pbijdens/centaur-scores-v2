@@ -1,4 +1,5 @@
 <script lang="ts">
+  import PageHeader from '../PageHeader.svelte'
   import type { ApiClient } from '../api'
   import { labelForError } from '../errors'
   import { categoryPath, navigateOnClick } from '../router'
@@ -29,11 +30,7 @@
   }
 </script>
 
-<button class="back-link" on:click={onBack}>← {labels.home}</button>
-<div class="page-intro">
-  <div><p class="eyebrow">{labels.eyebrowCategories}</p><h1>{labels.categories}</h1><p class="muted">{labels.categoriesHint}</p></div>
-  <button class="primary" on:click={() => (showAddForm = !showAddForm)}>+ {labels.newCategory}</button>
-</div>
+<PageHeader eyebrow={labels.categories} title={labels.categories} subtitle={labels.categoriesHint} backLabel={labels.home} {onBack} actions={[{ label: `+ ${labels.newCategory}`, header: 'primary', onClick: () => (showAddForm = !showAddForm) }]} />
 {#if showAddForm}
   <form class="inline-form" on:submit|preventDefault={submitAdd}>
     <label>{labels.categoryNameLabel}<input bind:value={newCategoryName} /></label>

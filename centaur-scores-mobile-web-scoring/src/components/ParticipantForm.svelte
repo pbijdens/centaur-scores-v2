@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from 'svelte';
   import { t } from '../lib/i18n';
   import type { ParticipantCategoryValue, ScoreKeeperCategory } from '../lib/types';
 
@@ -22,10 +23,14 @@
     onCancel,
   }: Props = $props();
 
-  let federationNumber = $state(initialFederationNumber ?? '');
-  let name = $state(initialName);
+  // The form is seeded once from the initial props and then owns its values,
+  // so later prop changes deliberately don't overwrite what the user typed.
+  let federationNumber = $state(untrack(() => initialFederationNumber ?? ''));
+  let name = $state(untrack(() => initialName));
   let selected = $state<Record<string, string>>(
-    Object.fromEntries(categories.map((c) => [c.id, initialCategoryValues.find((v) => v.id === c.id)?.value ?? ''])),
+    untrack(() =>
+      Object.fromEntries(categories.map((c) => [c.id, initialCategoryValues.find((v) => v.id === c.id)?.value ?? ''])),
+    ),
   );
 
   const isValid = $derived(name.trim().length > 0 && categories.every((c) => !!selected[c.id]));

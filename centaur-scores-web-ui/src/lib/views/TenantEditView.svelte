@@ -1,6 +1,6 @@
 <script lang="ts">
+  import PageHeader from '../PageHeader.svelte'
   import type { ApiClient } from '../api'
-  import DropdownMenu from '../DropdownMenu.svelte'
   import { readLogoFile, validateLogoFile } from '../tenantLogo'
   import type { Tenant } from '../types'
 
@@ -62,17 +62,8 @@
   }
 </script>
 
-<button class="back-link" on:click={onBack}>← {labels.tenants}</button>
+<PageHeader eyebrow={labels.tenants} title={tenant?.name ?? ''} backLabel={labels.tenants} {onBack} actions={tenant ? [{ label: labels.deleteTenant, danger: true, onClick: remove }] : []} menuLabel={labels.matchActions} />
 {#if tenant}
-  <div class="page-intro">
-    <div><p class="eyebrow">{labels.eyebrowSubTenant}</p><h1>{tenant.name}</h1></div>
-    <div class="match-header-actions">
-      <DropdownMenu ariaLabel={labels.matchActions} buttonClass="actions-trigger" align="right">
-        <svelte:fragment slot="trigger">⋯</svelte:fragment>
-        <button class="menu-item menu-item-danger" on:click={remove}>{labels.deleteTenant}</button>
-      </DropdownMenu>
-    </div>
-  </div>
   {#if deleteError}<p class="error">{deleteError}</p>{/if}
   <section class="panel">
     <form id="tenant-edit-form" on:submit|preventDefault={save}>

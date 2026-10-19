@@ -1,6 +1,6 @@
 <script lang="ts">
+  import PageHeader from '../PageHeader.svelte'
   import type { ApiClient } from '../api'
-  import DropdownMenu from '../DropdownMenu.svelte'
   import { labelForError } from '../errors'
   import type { Category } from '../types'
 
@@ -88,18 +88,7 @@
   }
 </script>
 
-<button class="back-link" on:click={onBack}>← {labels.categories}</button>
-<div class="page-intro">
-  <div><p class="eyebrow">{labels.eyebrowCategoryDetail}</p><h1>{category.name}</h1></div>
-  {#if !category.isUsed}
-    <div class="match-header-actions">
-      <DropdownMenu ariaLabel={labels.matchActions} buttonClass="actions-trigger" align="right">
-        <svelte:fragment slot="trigger">⋯</svelte:fragment>
-        <button class="menu-item menu-item-danger" on:click={remove}>{labels.deleteCategory}</button>
-      </DropdownMenu>
-    </div>
-  {/if}
-</div>
+<PageHeader eyebrow={labels.categories} title={category.name} backLabel={labels.categories} {onBack} actions={category.isUsed ? [] : [{ label: labels.deleteCategory, danger: true, onClick: remove }]} menuLabel={labels.matchActions} />
 {#if category.isUsed}<p class="muted">{labels.categoryUsedHint}</p>{/if}
 {#if deleteError}<p class="error">{deleteError}</p>{/if}
 <section class="panel">

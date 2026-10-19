@@ -1,6 +1,7 @@
 <script lang="ts">
+  import PageHeader from '../PageHeader.svelte'
+  import type { PageAction } from '../pageActions'
   import type { ApiClient } from '../api'
-  import DropdownMenu from '../DropdownMenu.svelte'
   import { labelForError } from '../errors'
   import type { PersonalBestImportConflict, PersonalBestImportResult, PersonalBestStatus } from '../types'
 
@@ -104,27 +105,22 @@
       exportError = labelForError(error, labels, 'personalBestExportError')
     }
   }
+  function navigationItem(label: string, path: string): PageAction {
+    return { label, href: path, onClick: () => onNavigate(path) }
+  }
+
+  $: personalBestActions = status?.enabled
+    ? [
+        navigationItem(labels.classifiersLabel, '/personal-best/classifiers'),
+        navigationItem(labels.disciplinesLabel, '/personal-best/disciplines'),
+        navigationItem(labels.exportConfigurationLabel, '/personal-best/export-configuration'),
+        navigationItem(labels.importConfigurationLabel, '/personal-best/import-configuration'),
+        { label: labels.disablePersonalBest, danger: true, separatorBefore: true, onClick: disable }
+      ] satisfies PageAction[]
+    : [{ label: labels.enablePersonalBest, onClick: enable }] satisfies PageAction[]
 </script>
 
-<button class="back-link" on:click={onBack}>← {labels.home}</button>
-<div class="page-intro">
-  <div><p class="eyebrow">{labels.eyebrowPersonalBest}</p><h1>{labels.personalBest}</h1></div>
-  <div class="match-header-actions">
-    <DropdownMenu ariaLabel={labels.matchActions} buttonClass="actions-trigger" align="right">
-      <svelte:fragment slot="trigger">⋯</svelte:fragment>
-      {#if status?.enabled}
-        <button class="menu-item" on:click={() => onNavigate('/personal-best/classifiers')}>{labels.classifiersLabel}</button>
-        <button class="menu-item" on:click={() => onNavigate('/personal-best/disciplines')}>{labels.disciplinesLabel}</button>
-        <button class="menu-item" on:click={() => onNavigate('/personal-best/export-configuration')}>{labels.exportConfigurationLabel}</button>
-        <button class="menu-item" on:click={() => onNavigate('/personal-best/import-configuration')}>{labels.importConfigurationLabel}</button>
-        <hr class="menu-separator" />
-        <button class="menu-item menu-item-danger" on:click={disable}>{labels.disablePersonalBest}</button>
-      {:else}
-        <button class="menu-item" on:click={enable}>{labels.enablePersonalBest}</button>
-      {/if}
-    </DropdownMenu>
-  </div>
-</div>
+<PageHeader eyebrow={labels.personalBest} title={labels.personalBest} backLabel={labels.home} {onBack} actions={personalBestActions} menuLabel={labels.matchActions} />
 {#if actionError}<p class="error">{actionError}</p>{/if}
 
 {#if !status?.enabled}

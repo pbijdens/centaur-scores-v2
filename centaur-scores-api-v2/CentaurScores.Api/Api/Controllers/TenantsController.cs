@@ -50,6 +50,23 @@ public sealed class TenantsController(ApplicationDbContext db, ITenantContext te
         return Ok(new DefaultScopeSettings(tenant.DefaultNarrowcastScope, effective));
     }
 
+    [HttpPut("current/scorekeeper-url")]
+    public async Task<IActionResult> UpdateCurrentScorekeeperBaseUrl(UpdateScorekeeperBaseUrlRequest request, CancellationToken cancellationToken)
+    {
+        if (!CanManage) return Forbid();
+        var value = string.IsNullOrWhiteSpace(request.ScorekeeperBaseUrl) ? null : request.ScorekeeperBaseUrl.Trim();
+        // Only absolute http(s) URLs make sense here: the value becomes the base of every device pairing link.
+        if (value is not null && !(Uri.TryCreate(value, UriKind.Absolute, out var uri) && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps)))
+        {
+            return BadRequest(new ApiError("INVALID_SCOREKEEPER_URL", "Scorekeeper base URL must be an absolute http(s) URL."));
+        }
+        var tenant = await db.Tenants.SingleOrDefaultAsync(item => item.Id == TenantId, cancellationToken);
+        if (tenant is null) return NotFound();
+        tenant.ScorekeeperBaseUrl = value;
+        await db.SaveChangesAsync(cancellationToken);
+        return Ok(tenant);
+    }
+
     [HttpPut("current")]
     public async Task<IActionResult> Update(CreateTenantRequest request, CancellationToken cancellationToken)
     {

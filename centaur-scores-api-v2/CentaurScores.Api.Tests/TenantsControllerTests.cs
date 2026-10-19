@@ -56,6 +56,56 @@ public sealed class TenantsControllerTests
     }
 
     [Fact]
+    public async Task UpdateCurrentScorekeeperBaseUrl_lets_a_manager_set_and_clear_their_own_tenants_value()
+    {
+        await using var connection = new SqliteConnection("Filename=:memory:");
+        await connection.OpenAsync();
+        await using var db = await NewDbAsync(connection);
+        var tenant = new Tenant { Id = Guid.NewGuid(), Name = "Mine" };
+        db.Tenants.Add(tenant);
+        await db.SaveChangesAsync();
+        var controller = new TenantsController(db, new TestTenantContext(tenant.Id, canManage: true, isAdministrator: false), new NarrowcastScopeContext(db), new TenantDeletionService(db));
+
+        var setResult = Assert.IsType<OkObjectResult>(await controller.UpdateCurrentScorekeeperBaseUrl(new UpdateScorekeeperBaseUrlRequest("  https://scores.example.com/scores/  "), CancellationToken.None));
+        Assert.Equal("https://scores.example.com/scores/", Assert.IsType<Tenant>(setResult.Value).ScorekeeperBaseUrl);
+
+        var clearResult = Assert.IsType<OkObjectResult>(await controller.UpdateCurrentScorekeeperBaseUrl(new UpdateScorekeeperBaseUrlRequest("   "), CancellationToken.None));
+        Assert.Null(Assert.IsType<Tenant>(clearResult.Value).ScorekeeperBaseUrl);
+    }
+
+    [Theory]
+    [InlineData("scores.example.com/scores")]
+    [InlineData("/scores")]
+    [InlineData("ftp://scores.example.com/")]
+    public async Task UpdateCurrentScorekeeperBaseUrl_rejects_anything_but_an_absolute_http_url(string value)
+    {
+        await using var connection = new SqliteConnection("Filename=:memory:");
+        await connection.OpenAsync();
+        await using var db = await NewDbAsync(connection);
+        var tenant = new Tenant { Id = Guid.NewGuid(), Name = "Mine" };
+        db.Tenants.Add(tenant);
+        await db.SaveChangesAsync();
+        var controller = new TenantsController(db, new TestTenantContext(tenant.Id, canManage: true, isAdministrator: false), new NarrowcastScopeContext(db), new TenantDeletionService(db));
+
+        var result = Assert.IsType<BadRequestObjectResult>(await controller.UpdateCurrentScorekeeperBaseUrl(new UpdateScorekeeperBaseUrlRequest(value), CancellationToken.None));
+        Assert.Equal("INVALID_SCOREKEEPER_URL", Assert.IsType<ApiError>(result.Value).Code);
+    }
+
+    [Fact]
+    public async Task UpdateCurrentScorekeeperBaseUrl_is_forbidden_without_manage_rights()
+    {
+        await using var connection = new SqliteConnection("Filename=:memory:");
+        await connection.OpenAsync();
+        await using var db = await NewDbAsync(connection);
+        var tenant = new Tenant { Id = Guid.NewGuid(), Name = "Mine" };
+        db.Tenants.Add(tenant);
+        await db.SaveChangesAsync();
+        var controller = new TenantsController(db, new TestTenantContext(tenant.Id, canManage: false, isAdministrator: false), new NarrowcastScopeContext(db), new TenantDeletionService(db));
+
+        Assert.IsType<ForbidResult>(await controller.UpdateCurrentScorekeeperBaseUrl(new UpdateScorekeeperBaseUrlRequest("https://scores.example.com/"), CancellationToken.None));
+    }
+
+    [Fact]
     public async Task Create_stores_the_default_narrowcast_scope_override_for_a_new_sub_tenant()
     {
         await using var connection = new SqliteConnection("Filename=:memory:");

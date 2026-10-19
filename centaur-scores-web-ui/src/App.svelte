@@ -23,11 +23,13 @@
     refreshParticipantLists as fetchParticipantListsList,
     refreshPersonalBestStatus as fetchPersonalBestStatus,
     refreshTemplates as fetchTemplatesList,
-    refreshDefaultScopeSettings as fetchDefaultScopeSettings
+    refreshDefaultScopeSettings as fetchDefaultScopeSettings,
+    refreshCurrentTenant as fetchCurrentTenant
   } from './lib/data'
   import { labelForError } from './lib/errors'
   import { translationsFor } from './lib/i18n'
-  import { accountPath, categoryPath, competitionPath, matchAddParticipantsPath, matchDevicesPath, matchEditPath, matchParticipantEditPath, matchParticipantPath, matchParticipantReplacePath, matchParticipantScorePath, matchPath, matchPrintPath, navigateTo, participantListPath, participantMemberPath, resolveRoute, templatePath, tenantPath } from './lib/router'
+  import { accountPath, categoryPath, competitionPath, matchAddParticipantsPath, matchParticipantEditPath, matchParticipantPath, matchParticipantReplacePath, matchParticipantScorePath, matchPath, navigateTo, participantListPath, participantMemberPath, resolveRoute, templatePath, tenantPath } from './lib/router'
+  import type { MatchHeaderHandlers } from './lib/pageActions'
   import { isSessionWatchActive } from './lib/sessionWatch'
   import type { Account, Category, Competition, Language, Match, MatchTemplate, ParticipantList, ParticipantListMember, ParticipantListSummary, TenantAccess, Tenant, View } from './lib/types'
   import AccountEditView from './lib/views/AccountEditView.svelte'
@@ -138,6 +140,14 @@
   $: document.title = loggedIn && $currentTenant?.name ? `CentaurScores - ${$currentTenant.name}` : 'CentaurScores'
 
   const api = new ApiClient(() => token, signOut)
+
+  // Match-level header actions, shared by the match page and every page below it (MatchPageHeader).
+  const matchHeaderHandlers: MatchHeaderHandlers = {
+    onToggleOpen: () => toggleSelectedMatch(),
+    onDeleted: () => onMatchDeleted(),
+    onCopied: (copy) => { loadMatchesList(); openMatch(copy) },
+    onNavigate: (path) => navigate(path)
+  }
 
   function resolveTenantSelection(authorizedForTenants: TenantAccess[]): string {
     if (authorizedForTenants.length === 1) return authorizedForTenants[0].tenantId
@@ -457,17 +467,17 @@
 {#if view === 'narrowcast' && narrowcastScope}
   <LiveScoringView scope={narrowcastScope} />
 {:else if view === 'match-qr' && selectedMatch}
-  <MatchQrCodesView match={selectedMatch} tenantId={tenant} {language} labels={t} />
+  <MatchQrCodesView match={selectedMatch} tenantId={tenant} scorekeeperBaseUrl={$currentTenant?.scorekeeperBaseUrl} {language} labels={t} />
 {:else if view === 'match-print' && selectedMatch}
   <!-- MatchPrintView is rendered from this single spot (not duplicated per step) so switching between
        its 'select' and 'sheet' steps only toggles the surrounding chrome - it never destroys/recreates
        the component, which would silently reset the organizer's participant selection mid-workflow. -->
   <div class="app-shell" class:app-shell-bare={matchPrintStep === 'sheet'}>
     {#if matchPrintStep !== 'sheet'}
-      <AppHeader username={headerUsername} {language} {view} labels={t} tenantName={$currentTenant?.name} tenantLogoUrl={$currentTenant?.logoUrl} showTenantSwitch={($profile?.authorizedForTenants?.length ?? 0) > 1} onNavigate={navigate} onLanguageChange={setLanguage} onLogout={signOut} />
+      <AppHeader username={headerUsername} {language} {view} labels={t} tenantName={$currentTenant?.name} tenantLogoUrl={$currentTenant?.logoUrl} showTenantSwitch={($profile?.authorizedForTenants?.length ?? 0) > 1} moreLinks={homeQuickLinks} onNavigate={navigate} onLanguageChange={setLanguage} onLogout={signOut} />
     {/if}
     <main class="content" class:content-bare={matchPrintStep === 'sheet'}>
-      <MatchPrintView {api} bind:step={matchPrintStep} match={selectedMatch} categories={$categories} tenantLogoUrl={$currentTenant?.logoUrl} {language} labels={t} />
+      <MatchPrintView {api} bind:step={matchPrintStep} match={selectedMatch} categories={$categories} tenantLogoUrl={$currentTenant?.logoUrl} {language} labels={t} headerHandlers={matchHeaderHandlers} />
     </main>
   </div>
 {:else if view === 'match-results-scope' && selectedMatchId && selectedResultsScope}
@@ -482,7 +492,7 @@
   <p class="loading">{t.loadingTenantData}</p>
 {:else}
   <div class="app-shell">
-    <AppHeader username={headerUsername} {language} {view} labels={t} tenantName={$currentTenant?.name} tenantLogoUrl={$currentTenant?.logoUrl} showTenantSwitch={($profile?.authorizedForTenants?.length ?? 0) > 1} onNavigate={navigate} onLanguageChange={setLanguage} onLogout={signOut} />
+    <AppHeader username={headerUsername} {language} {view} labels={t} tenantName={$currentTenant?.name} tenantLogoUrl={$currentTenant?.logoUrl} showTenantSwitch={($profile?.authorizedForTenants?.length ?? 0) > 1} moreLinks={homeQuickLinks} onNavigate={navigate} onLanguageChange={setLanguage} onLogout={signOut} />
     <main class="content">
       {#if view === 'home'}
         <HomeView matches={$matches} competitions={$competitions} {language} labels={t} quickLinks={homeQuickLinks} onOpenMatch={openMatch} onNavigate={navigate} onDeactivateAll={deactivateAllMatches} />
@@ -490,16 +500,16 @@
         <MatchesView {api} matches={$matches} templates={$templates} defaultNarrowcastScope={effectiveDefaultNarrowcastScope} {language} labels={t} onOpenMatch={openMatch} onChanged={loadMatchesList} />
       {:else if view === 'match' && selectedMatch}
         {@const currentMatch = selectedMatch}
-        <MatchDetailView {api} match={currentMatch} categories={$categories} {language} labels={t} onBack={() => navigate('/matches')} onToggleOpen={toggleSelectedMatch} onDeleted={onMatchDeleted} onEditMetadata={() => navigate(matchEditPath(currentMatch.id))} onManageDevices={() => navigate(matchDevicesPath(currentMatch.id))} onPrintScorecards={() => navigate(matchPrintPath(currentMatch.id))} onAddParticipants={() => navigate(matchAddParticipantsPath(currentMatch.id))} onOpenParticipant={openParticipant} onCopied={(copy) => { loadMatchesList(); openMatch(copy) }} />
+        <MatchDetailView {api} match={currentMatch} categories={$categories} {language} labels={t} headerHandlers={matchHeaderHandlers} onBack={() => navigate('/matches')} onAddParticipants={() => navigate(matchAddParticipantsPath(currentMatch.id))} onOpenParticipant={openParticipant} />
       {:else if view === 'match-add-participants' && selectedMatch}
         {@const currentMatch = selectedMatch}
-        <MatchAddParticipantsView {api} match={currentMatch} categories={$categories} sourceList={matchSourceList} labels={t} onBack={() => navigate(`/matches/${currentMatch.id}`)} onChanged={refreshSelectedMatch} />
+        <MatchAddParticipantsView {api} match={currentMatch} categories={$categories} sourceList={matchSourceList} {language} labels={t} headerHandlers={matchHeaderHandlers} onBack={() => navigate(`/matches/${currentMatch.id}`)} onChanged={refreshSelectedMatch} />
       {:else if view === 'match-metadata' && selectedMatch}
         {@const currentMatch = selectedMatch}
-        <MatchMetadataEditView {api} match={currentMatch} categories={$categories} participantLists={$participantLists} labels={t} onBack={() => navigate(`/matches/${currentMatch.id}`)} onSaved={refreshSelectedMatch} onDeleted={onMatchDeleted} />
+        <MatchMetadataEditView {api} match={currentMatch} categories={$categories} participantLists={$participantLists} {language} labels={t} headerHandlers={matchHeaderHandlers} onBack={() => navigate(`/matches/${currentMatch.id}`)} onSaved={refreshSelectedMatch} />
       {:else if view === 'match-devices' && selectedMatch}
         {@const currentMatch = selectedMatch}
-        <MatchDevicesView {api} match={currentMatch} categories={$categories} {language} labels={t} onBack={() => navigate(`/matches/${currentMatch.id}`)} onChanged={refreshSelectedMatch} />
+        <MatchDevicesView {api} match={currentMatch} categories={$categories} {language} labels={t} headerHandlers={matchHeaderHandlers} onBack={() => navigate(`/matches/${currentMatch.id}`)} onChanged={refreshSelectedMatch} />
       {:else if view === 'match-participant' && selectedMatch && selectedParticipant}
         {@const currentMatch = selectedMatch}
         {@const currentParticipant = selectedParticipant}
@@ -510,7 +520,9 @@
           categories={$categories}
           sourceList={matchSourceList}
           {canManage}
+          {language}
           labels={t}
+          headerHandlers={matchHeaderHandlers}
           onBack={returnToSelectedMatch}
           onChanged={refreshSelectedMatch}
           onRemoved={() => navigate(`/matches/${currentMatch.id}`)}
@@ -523,20 +535,20 @@
       {:else if view === 'match-participant-edit' && selectedMatch && selectedParticipant}
         {@const currentMatch = selectedMatch}
         {@const currentParticipant = selectedParticipant}
-        <MatchParticipantEditView {api} match={currentMatch} participant={currentParticipant} categories={$categories} labels={t} onBack={() => navigate(matchParticipantPath(currentMatch.id, currentParticipant.id))} onSaved={() => navigate(matchParticipantPath(currentMatch.id, currentParticipant.id))} />
+        <MatchParticipantEditView {api} match={currentMatch} participant={currentParticipant} categories={$categories} {language} labels={t} headerHandlers={matchHeaderHandlers} onBack={() => navigate(matchParticipantPath(currentMatch.id, currentParticipant.id))} onSaved={() => navigate(matchParticipantPath(currentMatch.id, currentParticipant.id))} />
       {:else if view === 'match-participant-replace' && selectedMatch && selectedParticipant}
         {@const currentMatch = selectedMatch}
         {@const currentParticipant = selectedParticipant}
-        <MatchParticipantReplaceView {api} match={currentMatch} participant={currentParticipant} categories={$categories} sourceList={matchSourceList} labels={t} onBack={() => navigate(matchParticipantPath(currentMatch.id, currentParticipant.id))} onSaved={() => navigate(matchParticipantPath(currentMatch.id, currentParticipant.id))} />
+        <MatchParticipantReplaceView {api} match={currentMatch} participant={currentParticipant} categories={$categories} sourceList={matchSourceList} {language} labels={t} headerHandlers={matchHeaderHandlers} onBack={() => navigate(matchParticipantPath(currentMatch.id, currentParticipant.id))} onSaved={() => navigate(matchParticipantPath(currentMatch.id, currentParticipant.id))} />
       {:else if view === 'match-participant-scores' && selectedMatch && selectedParticipant}
         {@const currentMatch = selectedMatch}
         {@const currentParticipant = selectedParticipant}
-        <MatchParticipantScoreView {api} match={currentMatch} participant={currentParticipant} {canManage} labels={t} onBack={() => navigate(matchParticipantPath(currentMatch.id, currentParticipant.id))} />
+        <MatchParticipantScoreView {api} match={currentMatch} participant={currentParticipant} {canManage} {language} labels={t} headerHandlers={matchHeaderHandlers} onBack={() => navigate(matchParticipantPath(currentMatch.id, currentParticipant.id))} />
       {:else if view === 'competitions'}
         <CompetitionsView {api} competitions={$competitions} {language} labels={t} onOpenCompetition={openCompetition} onChanged={loadCompetitionsList} />
       {:else if view === 'competition' && selectedCompetition}
         {@const currentCompetition = selectedCompetition}
-        <CompetitionDetailView {api} competition={currentCompetition} categories={$categories} matches={$matches} {language} labels={t} onBack={() => navigate('/competitions')} onChanged={onCompetitionChanged} onDeleted={onCompetitionDeleted} onViewResults={() => window.open(`/competitions/${currentCompetition.id}/results`, '_blank')} onCopied={(copy) => { loadCompetitionsList(); openCompetition(copy) }} />
+        <CompetitionDetailView {api} competition={currentCompetition} categories={$categories} matches={$matches} {language} labels={t} onBack={() => navigate('/competitions')} onChanged={onCompetitionChanged} onDeleted={onCompetitionDeleted} onCopied={(copy) => { loadCompetitionsList(); openCompetition(copy) }} />
       {:else if view === 'profile'}
         <ProfileView {api} labels={t} onBack={() => navigate('/')} />
       {:else if view === 'select-tenant'}
@@ -566,7 +578,7 @@
       {:else if view === 'template' && selectedTemplate}
         <TemplateEditView {api} template={selectedTemplate} categories={$categories} participantLists={$participantLists} labels={t} onBack={() => navigate('/templates')} onSaved={refreshTemplates} onDeleted={onTemplateDeleted} />
       {:else if view === 'tenant-settings' && canManage}
-        <TenantSettingsView {api} labels={t} onBack={() => navigate('/')} onSaved={() => fetchDefaultScopeSettings(api)} />
+        <TenantSettingsView {api} labels={t} onBack={() => navigate('/')} onSaved={() => Promise.all([fetchDefaultScopeSettings(api), fetchCurrentTenant(api)])} />
       {:else if view === 'personal-best'}
         <PersonalBestView {api} status={$personalBestStatus} labels={t} onBack={() => navigate('/')} onNavigate={navigate} onChanged={refreshPersonalBestStatus} />
       {:else if view === 'personal-best-classifiers'}

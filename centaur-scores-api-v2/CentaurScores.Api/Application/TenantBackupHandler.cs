@@ -11,7 +11,7 @@ public sealed class TenantBackupHandler : IBackupHandler
     public async Task<IReadOnlyList<(Guid, object)>> ExportAsync(ApplicationDbContext db, IReadOnlyList<Guid> tenantIds, CancellationToken cancellationToken)
     {
         var tenants = await db.Tenants.AsNoTracking().Where(item => tenantIds.Contains(item.Id)).ToListAsync(cancellationToken);
-        return tenants.Select(item => (item.Id, (object)new TenantBackup(item.Id, item.Name, item.LogoUrl, item.ParentTenantId, item.PersonalBestEnabled))).ToList();
+        return tenants.Select(item => (item.Id, (object)new TenantBackup(item.Id, item.Name, item.LogoUrl, item.ParentTenantId, item.PersonalBestEnabled, item.ScorekeeperBaseUrl))).ToList();
     }
 
     public async Task<BackupImportOutcome> ImportAsync(BackupImportContext context, CancellationToken cancellationToken)
@@ -21,7 +21,7 @@ public sealed class TenantBackupHandler : IBackupHandler
 
         // Mint every tenant's new id first, so the second pass can resolve any tenant's ParentTenantId
         // regardless of which order the tenants happen to appear in the archive.
-        var newTenants = entries.Select(entry => new Tenant { Id = context.Mint(entry.Id), Name = entry.Name, LogoUrl = entry.LogoUrl, PersonalBestEnabled = entry.PersonalBestEnabled }).ToList();
+        var newTenants = entries.Select(entry => new Tenant { Id = context.Mint(entry.Id), Name = entry.Name, LogoUrl = entry.LogoUrl, PersonalBestEnabled = entry.PersonalBestEnabled, ScorekeeperBaseUrl = entry.ScorekeeperBaseUrl }).ToList();
 
         for (var index = 0; index < entries.Count; index++)
         {

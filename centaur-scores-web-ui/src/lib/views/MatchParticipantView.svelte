@@ -1,14 +1,15 @@
 <script lang="ts">
   import { tick } from 'svelte'
   import type { ApiClient } from '../api'
-  import DropdownMenu from '../DropdownMenu.svelte'
   import { labelForError } from '../errors'
   import { parseMatchKeyboardConfig } from '../matchConfig'
+  import MatchPageHeader from '../MatchPageHeader.svelte'
+  import type { MatchHeaderHandlers, PageAction } from '../pageActions'
   import ParticipantScorecard from '../ParticipantScorecard.svelte'
   import ParticipantSignatures from '../ParticipantSignatures.svelte'
   import { arrowsShotCount, groupTotals, hasGroups, totalScore } from '../scorecard'
   import { matchParticipantEditPath, matchParticipantReplacePath, matchParticipantScorePath, navigateOnClick, participantMemberPath } from '../router'
-  import type { Category, KeyboardKey, Match, MatchParticipant, ParticipantList } from '../types'
+  import type { Category, KeyboardKey, Language, Match, MatchParticipant, ParticipantList } from '../types'
 
   export let api: ApiClient
   export let match: Match
@@ -16,7 +17,9 @@
   export let categories: Category[]
   export let sourceList: ParticipantList | null
   export let canManage: boolean
+  export let language: Language
   export let labels: Record<string, string>
+  export let headerHandlers: MatchHeaderHandlers
   export let onBack: () => void
   export let onChanged: () => void | Promise<void>
   export let onRemoved: () => void
@@ -51,6 +54,20 @@
   $: currentGroupTotals = showGroupTotals ? groupTotals(match, participant.scores) : []
   $: editSharedDetailsHref = sourceList && participant.participantListMemberId ? participantMemberPath(sourceList.id, participant.participantListMemberId) : ''
   $: canEditScores = !participant.signed || canManage
+  $: participantActions = [
+    ...(participant.participantListMemberId
+      ? [
+          ...(editSharedDetailsHref ? [{ label: labels.editSharedDetails, href: editSharedDetailsHref, onClick: onEditSharedDetails }] : []),
+          { label: labels.changeParticipant, href: matchParticipantReplacePath(match.id, participant.id), onClick: onChangeParticipant }
+        ]
+      : [
+          { label: labels.editUnlistedParticipantDetails, href: matchParticipantEditPath(match.id, participant.id), onClick: onEditDetails },
+          ...(sourceList ? [{ label: labels.linkParticipant, href: matchParticipantReplacePath(match.id, participant.id), onClick: onChangeParticipant }] : [])
+        ]),
+    { label: canEditScores ? labels.viewEditScores : labels.viewScores, href: matchParticipantScorePath(match.id, participant.id), onClick: onViewScores },
+    ...(canEditScores ? [{ label: labels.replaceScores, onClick: toggleQuickSet }] : []),
+    { label: labels.removeParticipant, danger: true, onClick: remove }
+  ] satisfies PageAction[]
 
   function categoryLabel(): string {
     return matchCategories
@@ -175,29 +192,7 @@
   }
 </script>
 
-<button class="back-link" on:click={onBack}>← {labels.matches}</button>
-<div class="page-intro">
-  <div><p class="eyebrow">{labels.eyebrowParticipantDetail}</p><h1>{participant.fullName || participant.lastName}</h1>{#if categoryLabel()}<p class="muted">{categoryLabel()}</p>{/if}</div>
-  <div class="match-header-actions">
-    <DropdownMenu ariaLabel={labels.matchActions} buttonClass="actions-trigger" align="right">
-      <svelte:fragment slot="trigger">⋯</svelte:fragment>
-      {#if participant.participantListMemberId}
-        {#if editSharedDetailsHref}
-          <a class="menu-item" href={editSharedDetailsHref} on:click={(event) => navigateOnClick(event, onEditSharedDetails)}>{labels.editSharedDetails}</a>
-        {/if}
-        <a class="menu-item" href={matchParticipantReplacePath(match.id, participant.id)} on:click={(event) => navigateOnClick(event, onChangeParticipant)}>{labels.changeParticipant}</a>
-      {:else}
-        <a class="menu-item" href={matchParticipantEditPath(match.id, participant.id)} on:click={(event) => navigateOnClick(event, onEditDetails)}>{labels.editUnlistedParticipantDetails}</a>
-        {#if sourceList}
-          <a class="menu-item" href={matchParticipantReplacePath(match.id, participant.id)} on:click={(event) => navigateOnClick(event, onChangeParticipant)}>{labels.linkParticipant}</a>
-        {/if}
-      {/if}
-      <a class="menu-item" href={matchParticipantScorePath(match.id, participant.id)} on:click={(event) => navigateOnClick(event, onViewScores)}>{canEditScores ? labels.viewEditScores : labels.viewScores}</a>
-      {#if canEditScores}<button class="menu-item" on:click={toggleQuickSet}>{labels.replaceScores}</button>{/if}
-      <button class="menu-item menu-item-danger" on:click={remove}>{labels.removeParticipant}</button>
-    </DropdownMenu>
-  </div>
-</div>
+<MatchPageHeader {api} {match} {language} {labels} handlers={headerHandlers} title={participant.fullName || participant.lastName} subtitle={categoryLabel()} backLabel={match.name} {onBack} pageActions={participantActions} />
 {#if removeError}<p class="error">{removeError}</p>{/if}
 {#if match.signatureMode !== 'none'}
   <div class="panel signature-status-banner" class:is-signed={participant.signed}>

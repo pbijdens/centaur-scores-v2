@@ -22,6 +22,9 @@ public sealed class Tenant
     public Guid? ParentTenantId { get; set; }
     public bool PersonalBestEnabled { get; set; }
     public string? DefaultNarrowcastScope { get; set; }
+    // Optional absolute base URL of the scorekeeper web app (e.g. https://scores.example.com/scores/). When set,
+    // the web UI builds device QR/pairing links against it instead of its own origin's /scores path.
+    public string? ScorekeeperBaseUrl { get; set; }
 }
 
 public sealed class Account : TenantOwnedEntity

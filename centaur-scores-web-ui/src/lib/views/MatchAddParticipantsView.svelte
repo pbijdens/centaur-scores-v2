@@ -1,16 +1,20 @@
 <script lang="ts">
   import type { ApiClient } from '../api'
+  import MatchPageHeader from '../MatchPageHeader.svelte'
+  import type { MatchHeaderHandlers } from '../pageActions'
   import { labelForError } from '../errors'
   import { parseMatchKeyboardConfig } from '../matchConfig'
   import { deriveLastName } from '../participantName'
   import ParticipantSelectionTable from '../ParticipantSelectionTable.svelte'
-  import type { Category, Match, ParticipantList } from '../types'
+  import type { Category, Language, Match, ParticipantList } from '../types'
 
   export let api: ApiClient
   export let match: Match
   export let categories: Category[]
   export let sourceList: ParticipantList | null
+  export let language: Language
   export let labels: Record<string, string>
+  export let headerHandlers: MatchHeaderHandlers
   export let onBack: () => void
   export let onChanged: () => void
 
@@ -80,15 +84,7 @@
   }
 </script>
 
-<button class="back-link" on:click={onBack}>← {match.name}</button>
-<div class="page-intro">
-  <div>
-    <p class="eyebrow">{labels.eyebrowAddParticipants}</p>
-    <h1>{labels.addParticipant}</h1>
-    {#if sourceList}<p class="muted">{sourceList.name}</p>{/if}
-  </div>
-</div>
-
+<MatchPageHeader {api} {match} {language} {labels} handlers={headerHandlers} title={labels.addParticipant} subtitle={sourceList?.name} backLabel={match.name} {onBack} />
 <section class="panel section-gap">
   {#if sourceList}
     {#if match.allowFreeParticipants}

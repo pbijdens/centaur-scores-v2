@@ -2,6 +2,8 @@
   import type { ApiClient } from '../api'
   import { labelForError } from '../errors'
   import { defaultMatchKeyboardJson, defaultMatchScoringRulesJson } from '../matchConfig'
+  import { localToday, partitionMatches } from '../matchOrdering'
+  import PageHeader from '../PageHeader.svelte'
   import { matchPath, navigateOnClick } from '../router'
   import { parseTemplateConfiguration } from '../templateConfig'
   import type { Language, MatchListItem, MatchTemplate } from '../types'
@@ -23,16 +25,9 @@
   let newTemplateId = ''
   let createError = ''
 
-  function localToday(): string {
-    const now = new Date()
-    return new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 10)
-  }
-
   $: today = localToday()
   $: named = matches.filter((match) => match.name.toLowerCase().includes(filter.toLowerCase()))
-  $: openMatches = named.filter((match) => match.isOpen)
-  $: upcomingMatches = named.filter((match) => !match.isOpen && match.date >= today).sort((a, b) => a.date.localeCompare(b.date))
-  $: pastMatches = named.filter((match) => !match.isOpen && match.date < today).sort((a, b) => b.date.localeCompare(a.date))
+  $: ({ open: openMatches, upcoming: upcomingMatches, past: pastMatches } = partitionMatches(named, today))
   $: showUpcoming = filterMode !== 'past'
   $: showPast = filterMode !== 'future'
 
@@ -109,10 +104,7 @@
   }
 </script>
 
-<div class="page-intro">
-  <div><p class="eyebrow">{labels.eyebrowTenantData}</p><h1>{labels.matches}</h1><p class="muted">{labels.matchesDescription}</p></div>
-  <button class="primary" on:click={() => (showAddForm = !showAddForm)}>+ {labels.newMatch}</button>
-</div>
+<PageHeader eyebrow={labels.matches} title={labels.matches} subtitle={labels.matchesDescription} actions={[{ label: `+ ${labels.newMatch}`, header: 'primary', onClick: () => (showAddForm = !showAddForm) }]} />
 {#if showAddForm}
   <form class="inline-form" on:submit|preventDefault={submitAdd}>
     <label>{labels.matchNameLabel}<input bind:value={newMatchName} /></label>

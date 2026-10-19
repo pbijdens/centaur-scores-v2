@@ -1,5 +1,6 @@
 <script lang="ts">
   import DropdownMenu from './DropdownMenu.svelte'
+  import { navSectionFor, type NavLink } from './navigation'
   import { navigateOnClick } from './router'
   import type { Language, View } from './types'
 
@@ -10,9 +11,14 @@
   export let tenantName: string | null | undefined = undefined
   export let tenantLogoUrl: string | null | undefined = undefined
   export let showTenantSwitch: boolean = false
+  // The overview's quick-link tiles, repeated under the "More" menu.
+  export let moreLinks: NavLink[] = []
   export let onNavigate: (path: string) => void
   export let onLanguageChange: (value: string) => void
   export let onLogout: () => void
+
+  $: section = navSectionFor(view)
+  $: moreActive = moreLinks.some((item) => item.path === section)
 </script>
 
 <header>
@@ -24,11 +30,32 @@
     {/if}
     <span><strong>{tenantName ?? labels.defaultTenantName}</strong><small>{labels.rootTenantLabel}</small></span>
   </a>
-  <nav>
-    <a class:active={view === 'home'} href="/" on:click={(event) => navigateOnClick(event, () => onNavigate('/'))}>{labels.home}</a>
-    <a class:active={view === 'matches' || view === 'match'} href="/matches" on:click={(event) => navigateOnClick(event, () => onNavigate('/matches'))}>{labels.matches}</a>
-    <a class:active={view === 'competitions'} href="/competitions" on:click={(event) => navigateOnClick(event, () => onNavigate('/competitions'))}>{labels.competitions}</a>
-  </nav>
+  <div class="nav-bar">
+    <nav>
+      <a class:active={section === 'home'} href="/" on:click={(event) => navigateOnClick(event, () => onNavigate('/'))}>{labels.home}</a>
+      <a class:active={section === 'matches'} href="/matches" on:click={(event) => navigateOnClick(event, () => onNavigate('/matches'))}>{labels.matches}</a>
+      <a class:active={section === 'competitions'} href="/competitions" on:click={(event) => navigateOnClick(event, () => onNavigate('/competitions'))}>{labels.competitions}</a>
+    </nav>
+    {#if moreLinks.length > 0 || showTenantSwitch}
+      <!-- Outside <nav> on purpose: nav scrolls horizontally and is masked, which would clip this dropdown. -->
+      <div class="nav-more" class:active={moreActive}>
+        <DropdownMenu ariaLabel={labels.navMore} buttonClass="nav-more-trigger" align="left">
+          <svelte:fragment slot="trigger">{labels.navMore} <span aria-hidden="true">›</span></svelte:fragment>
+          {#each moreLinks as item}
+            <a class="menu-item nav-more-item" class:active={section === item.path} href={`/${item.path}`} on:click={(event) => navigateOnClick(event, () => onNavigate(`/${item.path}`))}>
+              <span aria-hidden="true">{item.icon}</span>{item.title}
+            </a>
+          {/each}
+          {#if showTenantSwitch}
+            {#if moreLinks.length > 0}<hr class="menu-separator" />{/if}
+            <a class="menu-item nav-more-item" class:active={view === 'select-tenant'} href="/select-tenant" on:click={(event) => navigateOnClick(event, () => onNavigate('/select-tenant'))}>
+              <span aria-hidden="true">⇄</span>{labels.switchTenant}
+            </a>
+          {/if}
+        </DropdownMenu>
+      </div>
+    {/if}
+  </div>
   <div class="user-menu">
     <DropdownMenu ariaLabel={labels.profile} buttonClass="menu-trigger profile-button" align="right">
       <svelte:fragment slot="trigger">
