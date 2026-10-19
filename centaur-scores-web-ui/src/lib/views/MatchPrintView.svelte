@@ -1,7 +1,7 @@
 <script lang="ts">
   import { formatLocalDate } from '../date'
   import { parseMatchKeyboardConfig } from '../matchConfig'
-  import { arrowsShotCount, endTotal, groupRunningTotal, hasGroups, runningTotal, scoreFor } from '../scorecard'
+  import { arrowsShotCount, endTotal, groupEndRanges, groupRunningTotal, hasGroups, runningTotal, scoreFor } from '../scorecard'
   import type { ApiClient } from '../api'
   import MatchPageHeader from '../MatchPageHeader.svelte'
   import type { MatchHeaderHandlers } from '../pageActions'
@@ -34,7 +34,7 @@
   // resetting to "everything selected, standard layout, no extra line". Deliberately excludes the
   // participant selection (who's present can differ each time) and lives in localStorage (not the API)
   // since it's a per-browser convenience, not match data other organizers or devices need to see.
-  type PrintDraft = { categoryIds: string[]; printLayout: PrintLayout; freeText: string }
+  type PrintDraft = { categoryIds: string[]; printLayout: PrintLayout; freeText: string; splitByGroup: boolean }
 
   function printDraftKey(matchId: string): string {
     return `centaur-print-config-${matchId}`
@@ -46,7 +46,7 @@
       if (!raw) return null
       const parsed = JSON.parse(raw)
       if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.categoryIds)) return null
-      return { categoryIds: parsed.categoryIds, printLayout: parsed.printLayout === 'fourColumn' ? 'fourColumn' : 'standard', freeText: typeof parsed.freeText === 'string' ? parsed.freeText : '' }
+      return { categoryIds: parsed.categoryIds, printLayout: parsed.printLayout === 'fourColumn' ? 'fourColumn' : 'standard', freeText: typeof parsed.freeText === 'string' ? parsed.freeText : '', splitByGroup: parsed.splitByGroup === true }
     } catch {
       return null
     }
@@ -67,6 +67,7 @@
     const draft = loadPrintDraft(match.id)
     printLayout = draft?.printLayout ?? 'standard'
     freeText = draft?.freeText ?? ''
+    splitByGroup = draft?.splitByGroup ?? false
     pendingDraftCategoryIds = draft?.categoryIds ?? null
     categorySelectionInitialized = false
   }
@@ -92,6 +93,8 @@
   let selectedCategoryIds = new Set<string>()
   let selectedParticipantIds = new Set<string>()
   let freeText = ''
+  // Only offered (and only honoured) when the match actually splits into multiple groups of ends.
+  let splitByGroup = false
   let categorySelectionInitialized = false
   let participantSelectionInitialized = false
   // Ready once either the match's keyboard config references no categories at all (nothing to wait
@@ -116,7 +119,7 @@
   // happened - guarding on categorySelectionInitialized avoids overwriting a saved draft with the
   // transient empty Set that selectedCategoryIds starts as before seeding runs.
   $: if (categorySelectionInitialized) {
-    savePrintDraft(match.id, { categoryIds: Array.from(selectedCategoryIds), printLayout, freeText })
+    savePrintDraft(match.id, { categoryIds: Array.from(selectedCategoryIds), printLayout, freeText, splitByGroup })
   }
 
   $: allParticipantsSelected = participants.length > 0 && selectedParticipantIds.size === participants.length
@@ -143,12 +146,17 @@
 
   $: selectedParticipants = participants.filter((participant) => selectedParticipantIds.has(participant.id))
 
+  // A single printed card: one participant over a range of ends. Normally that's the whole match; with
+  // splitByGroup each participant gets one card per group of ends instead.
+  type PrintCard = { participant: MatchParticipant; firstEnd: number; lastEnd: number }
+
   // Scorecards are grouped by device (in the order devices are defined on the match), members within a
   // device ordered by their deviceOrder; participants without a device are grouped last, alphabetically.
-  // Between groups, null placeholders pad the preceding group up to a multiple of 4 so a device's cards
-  // always start on a fresh page in both the standard (nth-of-type(4n) page-break) and four-column
-  // (chunk-of-4-per-sheet) layouts - see printItems/printPages below.
-  function buildPrintOrder(participantsToOrder: MatchParticipant[], devices: NonNullable<Match['devices']>): (MatchParticipant | null)[] {
+  // With splitByGroup, each device group is repeated once per group of ends (all of a device's cards for
+  // ends 1-10, then all of them for 11-20, ...). Between blocks, null placeholders pad the preceding block
+  // up to a multiple of 4 so each block always starts on a fresh page in both the standard
+  // (nth-of-type(4n) page-break) and four-column (chunk-of-4-per-sheet) layouts - see printPages below.
+  function buildPrintOrder(participantsToOrder: MatchParticipant[], devices: NonNullable<Match['devices']>, endRanges: [number, number][]): (PrintCard | null)[] {
     const byDevice = new Map<string, MatchParticipant[]>()
     const unassigned: MatchParticipant[] = []
     for (const participant of participantsToOrder) {
@@ -179,19 +187,24 @@
       groups.push([...unassigned].sort((a, b) => (a.fullName || a.lastName).localeCompare(b.fullName || b.lastName)))
     }
 
-    const result: (MatchParticipant | null)[] = []
-    groups.forEach((group, index) => {
-      result.push(...group)
-      const isLastGroup = index === groups.length - 1
+    const blocks: PrintCard[][] = groups.flatMap((group) => endRanges.map(([firstEnd, lastEnd]) => group.map((participant) => ({ participant, firstEnd, lastEnd }))))
+    const result: (PrintCard | null)[] = []
+    blocks.forEach((block, index) => {
+      result.push(...block)
+      const isLastBlock = index === blocks.length - 1
       const remainder = result.length % 4
-      if (!isLastGroup && remainder !== 0) {
+      if (!isLastBlock && remainder !== 0) {
         for (let i = 0; i < 4 - remainder; i++) result.push(null)
       }
     })
     return result
   }
 
-  $: printItems = buildPrintOrder(selectedParticipants, match.devices ?? [])
+  $: splitCards = groups && splitByGroup
+  $: endRanges = splitCards ? groupEndRanges(match) : ([[1, match.ends]] as [number, number][])
+  $: printItems = buildPrintOrder(selectedParticipants, match.devices ?? [], endRanges)
+  // Rows a single card's table needs: its ends, plus the "running total" carry-in row on later split cards.
+  $: rowsPerCard = Math.max(...endRanges.map(([firstEnd, lastEnd]) => lastEnd - firstEnd + 1 + (firstEnd > 1 ? 1 : 0)))
 
   // Signature images aren't part of the participant payloads, so they're fetched in bulk when the sheet
   // opens - only for the selected, signed cards. Ids go in the query string, so they're chunked to keep
@@ -228,7 +241,7 @@
   // full page height (see .four-column-layout .score-table), but the browser's table row auto-stretch
   // algorithm ignores `max-height` set on individual cells/rows - only a max-height on the <table> itself
   // is respected as a clamp. This caps end-rows at ~1cm each regardless of how much space is available.
-  $: scoreTableMaxHeightMm = match.ends * 10 + 6
+  $: scoreTableMaxHeightMm = rowsPerCard * 10 + 6
 
   // A portrait four-column card is only ~140.5mm tall (see the orientation:portrait CSS below) and the
   // chrome around the table (header, participant line, categories, total line, two stacked signature
@@ -249,7 +262,7 @@
   const FOUR_COLUMN_CHROME_HEIGHT_MM = 78
   const FOUR_COLUMN_TABLE_HEADER_ROW_MM = 2
   const MM_TO_PX = 96 / 25.4
-  $: fourColumnRowHeightMm = Math.min(10, (FOUR_COLUMN_PORTRAIT_CARD_HEIGHT_MM - FOUR_COLUMN_CHROME_HEIGHT_MM - FOUR_COLUMN_TABLE_HEADER_ROW_MM) / match.ends)
+  $: fourColumnRowHeightMm = Math.min(10, (FOUR_COLUMN_PORTRAIT_CARD_HEIGHT_MM - FOUR_COLUMN_CHROME_HEIGHT_MM - FOUR_COLUMN_TABLE_HEADER_ROW_MM) / rowsPerCard)
   $: fourColumnFontSizePx = Math.min(11, fourColumnRowHeightMm * MM_TO_PX * 0.85)
   $: scoreCellStyle = printLayout === 'fourColumn' ? `height: ${fourColumnRowHeightMm}mm; font-size: ${fourColumnFontSizePx}px` : undefined
   // The end-number cell (row 1, 2, 3...) isn't a .score-cell, but it's a sibling in the same <tr> and
@@ -270,6 +283,10 @@
     return printCategories
       .map((category) => ({ name: category.name, value: categoryValueFor(participant, category) }))
       .filter((line): line is { name: string; value: string } => !!line.value)
+  }
+
+  function hasScoreBetween(scores: MatchParticipant['scores'], firstEnd: number, lastEnd: number): boolean {
+    return (scores ?? []).some((score) => score.end >= firstEnd && score.end <= lastEnd)
   }
 
   function endHasAnyScore(scores: MatchParticipant['scores'], end: number): boolean {
@@ -340,6 +357,12 @@
       </label>
     </div>
     {#if printLayout === 'fourColumn'}<p class="muted layout-hint">{labels.printLayoutFourColumnHint}</p>{/if}
+    {#if groups}
+      <label class="checkbox-label split-option">
+        <input type="checkbox" bind:checked={splitByGroup} />
+        {labels.printSplitByGroupLabel.replace('{groupEnds}', String(match.groupEnds))}
+      </label>
+    {/if}
   </section>
 
   <section class="panel section-gap">
@@ -373,7 +396,8 @@
     <button type="button" class="primary" disabled={loadingSignatures} on:click={() => window.print()}>{labels.printButton}</button>
   </div>
 
-  {#snippet printCard(participant: MatchParticipant)}
+  {#snippet printCard(card: PrintCard)}
+    {@const participant = card.participant}
     {@const lines = participantCategoryLines(participant)}
     <div class="print-card">
       <div class="card-header">
@@ -411,8 +435,16 @@
           </tr>
         </thead>
         <tbody>
-          {#each Array(match.ends) as _, index}
-            {@const end = index + 1}
+          {#if card.firstEnd > 1}
+            <tr>
+              <td class="borderless" style={endNumberStyle}></td>
+              <td class="borderless running-total-label" colspan={match.arrowsPerEnd + 1}>{labels.printRunningTotalLabel}</td>
+              <td class="score-cell" style={scoreCellStyle}>{hasScoreBetween(participant.scores, 1, card.firstEnd - 1) ? runningTotal(participant.scores, card.firstEnd - 1) : ''}</td>
+              {#if showTensNines}<td class="borderless" colspan="2"></td>{/if}
+            </tr>
+          {/if}
+          {#each Array(card.lastEnd - card.firstEnd + 1) as _, index}
+            {@const end = card.firstEnd + index}
             {@const hasScore = endHasAnyScore(participant.scores, end)}
             <tr>
               <td class="borderless end-number" style={endNumberStyle}>{end}</td>
@@ -420,7 +452,7 @@
                 <td class="score-cell" style={scoreCellStyle}>{hasScore ? keyLabelFor(participant.scores, end, arrowIndex + 1) : ''}</td>
               {/each}
               <td class="score-cell" style={scoreCellStyle}>{hasScore ? endTotal(participant.scores, end) : ''}</td>
-              <td class="score-cell" style={scoreCellStyle}>{hasScore ? (groups ? groupRunningTotal(match, participant.scores, end) : runningTotal(participant.scores, end)) : ''}</td>
+              <td class="score-cell" style={scoreCellStyle}>{hasScore ? (groups && !splitCards ? groupRunningTotal(match, participant.scores, end) : runningTotal(participant.scores, end)) : ''}</td>
               {#if showTensNines && tenKey && nineKey}
                 <td class="score-cell" style={scoreCellStyle}>{hasScore ? countKeyInEnd(participant.scores, end, tenKey.keyId) : ''}</td>
                 <td class="score-cell" style={scoreCellStyle}>{hasScore ? countKeyInEnd(participant.scores, end, nineKey.keyId) : ''}</td>
@@ -432,8 +464,8 @@
 
       <div class="card-total-line">
         <span>{labels.printTotalLabel}:</span>
-        {#if arrowsShotCount(participant.scores) > 1}
-          <strong>{runningTotal(participant.scores, match.ends)}</strong>
+        {#if splitCards ? hasScoreBetween(participant.scores, card.firstEnd, card.lastEnd) : arrowsShotCount(participant.scores) > 1}
+          <strong>{runningTotal(participant.scores, card.lastEnd)}</strong>
         {:else}
           <span class="fill-line"></span>
         {/if}
@@ -471,7 +503,7 @@
 
   <div class="print-page" class:standard-layout={printLayout === 'standard'} class:four-column-layout={printLayout === 'fourColumn'}>
     {#if printLayout === 'standard'}
-      {#each printItems as item, index (item ? item.id : `placeholder-${index}`)}
+      {#each printItems as item, index (item ? `${item.participant.id}-${item.firstEnd}` : `placeholder-${index}`)}
         {#if item}
           {@render printCard(item)}
         {:else}
@@ -483,7 +515,7 @@
         <div class="print-sheet">
           {#each chunk(pageItems, 2) as halfRowItems, halfIndex (halfIndex)}
             <div class="print-half-row">
-              {#each halfRowItems as item, itemIndex (item ? item.id : `placeholder-${pageIndex}-${halfIndex}-${itemIndex}`)}
+              {#each halfRowItems as item, itemIndex (item ? `${item.participant.id}-${item.firstEnd}` : `placeholder-${pageIndex}-${halfIndex}-${itemIndex}`)}
                 {#if item}
                   {@render printCard(item)}
                 {:else}
@@ -526,6 +558,18 @@
   .layout-hint {
     margin-top: 8px;
     font-size: 13px;
+  }
+
+  .split-option {
+    margin-top: 12px;
+  }
+
+  .running-total-label {
+    text-align: right;
+    font-size: 8px;
+    font-weight: 700;
+    padding: 0 4px 0 0;
+    white-space: nowrap;
   }
 
   .participants-header {
