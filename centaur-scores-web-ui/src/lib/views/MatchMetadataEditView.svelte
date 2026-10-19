@@ -1,20 +1,22 @@
 <script lang="ts">
   import type { ApiClient } from '../api'
-  import DropdownMenu from '../DropdownMenu.svelte'
   import { labelForError } from '../errors'
   import { parseMatchKeyboardConfig, parseMatchScoringRules } from '../matchConfig'
+  import MatchPageHeader from '../MatchPageHeader.svelte'
+  import type { MatchHeaderHandlers } from '../pageActions'
   import RowActions from '../RowActions.svelte'
   import { deviceSelectionModes, keyboardColors, signatureModes } from '../templateConfig'
-  import type { Category, LiveScopeConfig, Match, ParticipantListSummary } from '../types'
+  import type { Category, Language, LiveScopeConfig, Match, ParticipantListSummary } from '../types'
 
   export let api: ApiClient
   export let match: Match
   export let categories: Category[]
   export let participantLists: ParticipantListSummary[]
+  export let language: Language
   export let labels: Record<string, string>
+  export let headerHandlers: MatchHeaderHandlers
   export let onBack: () => void
   export let onSaved: () => void
-  export let onDeleted: () => void
 
   let name = match.name
   let date = match.date.slice(0, 10)
@@ -38,7 +40,6 @@
     includePersonalBest: scope.includePersonalBest,
     displayCategoryIds: parseGroupByCategoryIds(scope.displayCategoryIdsJson)
   }))
-  let deleteError = ''
   let personalBestClassifier = match.personalBestClassifier ?? ''
   let personalBestClassifiers: string[] = []
 
@@ -206,31 +207,9 @@
       alert(labelForError(error, labels, 'matchSaveError'))
     }
   }
-
-  async function remove() {
-    deleteError = ''
-    const message = labels.deleteMatchConfirm.replace('{name}', name)
-    if (!confirm(message)) return
-    try {
-      await api.deleteMatch(match.id)
-      onDeleted()
-    } catch (error) {
-      deleteError = labelForError(error, labels, 'matchDeleteError')
-    }
-  }
 </script>
 
-<button class="back-link" on:click={onBack}>← {match.name}</button>
-<div class="page-intro">
-  <div><p class="eyebrow">{labels.eyebrowMatchMetadata}</p><h1>{match.name}</h1></div>
-  <div class="match-header-actions">
-    <DropdownMenu ariaLabel={labels.matchActions} buttonClass="actions-trigger" align="right">
-      <svelte:fragment slot="trigger">⋯</svelte:fragment>
-      <button class="menu-item menu-item-danger" on:click={remove}>{labels.deleteMatch}</button>
-    </DropdownMenu>
-  </div>
-</div>
-{#if deleteError}<p class="error">{deleteError}</p>{/if}
+<MatchPageHeader {api} {match} {language} {labels} handlers={headerHandlers} current="metadata" title={labels.editMetadata} subtitle={match.name} backLabel={match.name} {onBack} />
 
 <section class="panel">
   <label>{labels.matchNameLabel}<input bind:value={name} /></label>

@@ -3,6 +3,8 @@
   import { parseMatchKeyboardConfig } from '../matchConfig'
   import { arrowsShotCount, endTotal, groupRunningTotal, hasGroups, runningTotal, scoreFor } from '../scorecard'
   import type { ApiClient } from '../api'
+  import MatchPageHeader from '../MatchPageHeader.svelte'
+  import type { MatchHeaderHandlers } from '../pageActions'
   import type { Category, Language, Match, MatchParticipant, MatchParticipantSignature } from '../types'
 
   export let api: ApiClient
@@ -11,6 +13,7 @@
   export let tenantLogoUrl: string | null | undefined
   export let language: Language
   export let labels: Record<string, string>
+  export let headerHandlers: MatchHeaderHandlers
 
   // Bindable: App.svelte reads this to decide whether to show the normal site chrome (the 'select'
   // configuration screen) or render full-width/standalone (the 'sheet' step, meant for printing).
@@ -305,10 +308,7 @@
 </svelte:head>
 
 {#if step === 'select'}
-  <button class="back-link" type="button" on:click={() => history.back()}>← {match.name}</button>
-  <div class="page-intro">
-    <div><p class="eyebrow">{labels.eyebrowPrintScorecards}</p><h1>{labels.printSelectionTitle}</h1></div>
-  </div>
+  <MatchPageHeader {api} {match} {language} {labels} handlers={headerHandlers} current="print" title={labels.printSelectionTitle} subtitle={match.name} backLabel={match.name} onBack={() => history.back()} />
 
   <section class="panel">
     <h2>{labels.printCategoriesLabel}</h2>

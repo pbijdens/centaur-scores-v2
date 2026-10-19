@@ -99,6 +99,7 @@ img.brand-mark {
   color: var(--green);
   font: 700 11px 'Space Grotesk';
   letter-spacing: 1.5px;
+  text-transform: uppercase;
   margin: 0 0 10px;
 }
 
@@ -273,15 +274,73 @@ header {
   margin-top: 3px;
 }
 
+// Holds the scrolling <nav> plus the "More" dropdown, which must sit outside <nav> so the nav's
+// overflow/mask doesn't clip its panel.
+.nav-bar {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  height: 100%;
+  flex: 1 1 auto;
+  min-width: 24px;
+}
+
+.nav-more {
+  position: relative;
+  display: flex;
+  flex: 0 0 auto;
+}
+
+.nav-more .dropdown-menu {
+  height: 100%;
+}
+
+.nav-more-trigger {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  padding: 4px 0;
+  white-space: nowrap;
+}
+
+.nav-more.active .nav-more-trigger {
+  position: relative;
+  color: var(--ink);
+  font-weight: 700;
+}
+
+// The underline hangs off the trigger (not .nav-more) so .nav-more can drop its positioning on
+// narrow screens, letting the panel anchor to the full-width header instead.
+.nav-more.active .nav-more-trigger:after {
+  content: '';
+  height: 3px;
+  background: var(--accent);
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+}
+
+// Doubled class so this beats the generic .menu-item { display: block } declared further down.
+.menu-item.nav-more-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 nav {
   display: flex;
   gap: 20px;
   height: 100%;
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   min-width: 24px;
   overflow-x: auto;
   scrollbar-width: none;
   -ms-overflow-style: none;
+  // The fade only covers this padding, so the last item stays fully visible unless the links
+  // actually overflow and scroll underneath it.
+  padding-right: 20px;
   mask-image: linear-gradient(to right, black calc(100% - 20px), transparent);
   -webkit-mask-image: linear-gradient(to right, black calc(100% - 20px), transparent);
 }
@@ -394,6 +453,21 @@ nav a.active:after {
   font-weight: 700;
 }
 
+.menu-item:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+
+.menu-group-toggle {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.menu-subitem {
+  padding-left: 28px;
+}
+
 .menu-item-danger {
   color: $color-danger-text;
 }
@@ -450,8 +524,30 @@ nav a.active:after {
 .match-header-actions {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 10px;
+  flex: 0 1 auto;
+}
+
+.icon-action-button {
+  display: grid;
+  place-items: center;
   flex: 0 0 auto;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 20px;
+  line-height: 1;
+  padding: 0;
+}
+
+.icon-action-button:hover,
+.icon-action-button:focus-visible {
+  border-color: var(--green);
+  color: var(--green);
 }
 
 .actions-trigger {
@@ -470,12 +566,6 @@ nav a.active:after {
 .actions-trigger[aria-expanded="true"] {
   border-color: var(--green);
   color: var(--green);
-}
-
-.results-trigger {
-  font-size: 14px;
-  font-weight: 700;
-  padding: 12px 20px;
 }
 
 .content {
@@ -930,12 +1020,32 @@ nav a.active:after {
     margin-left: auto;
   }
 
-  nav {
+  .nav-bar {
     order: 3;
     flex-basis: 100%;
     width: 100%;
+  }
+
+  nav {
+    flex: 0 1 auto;
     gap: 18px;
-    padding-right: 16px;
+  }
+
+  // Full-width "More" panel: with .nav-more and the dropdown wrapper unpositioned, the panel
+  // anchors to the sticky header and spans it edge to edge, just below it.
+  .nav-bar .nav-more,
+  .nav-bar .nav-more .dropdown-menu {
+    position: static;
+  }
+
+  header .nav-bar .nav-more .dropdown-panel {
+    top: 100%;
+    left: 0;
+    right: 0;
+    min-width: 0;
+    max-width: none;
+    border-left: 0;
+    border-right: 0;
   }
 
   .profile-button .name {

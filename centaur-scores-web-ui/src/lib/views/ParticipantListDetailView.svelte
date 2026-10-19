@@ -1,6 +1,7 @@
 <script lang="ts">
+  import PageHeader from '../PageHeader.svelte'
+  import type { PageAction } from '../pageActions'
   import type { ApiClient } from '../api'
-  import DropdownMenu from '../DropdownMenu.svelte'
   import { labelForError } from '../errors'
   import { memberCategoryLabel, memberDetailLabel, memberDisplayLabel } from '../participantName'
   import { navigateOnClick, participantMemberPath } from '../router'
@@ -139,25 +140,20 @@
       deleteError = labelForError(error, labels, 'listDeleteError')
     }
   }
+  $: listActions = [
+    { label: `+ ${labels.newMember}`, header: 'primary', onClick: onAddMember },
+    { label: labels.editListSettings, separatorBefore: true, onClick: () => (showSettings = !showSettings) },
+    ...(canManage
+      ? [
+          { label: labels.exportParticipantList, onClick: exportList },
+          { label: labels.importParticipantList, disabled: importing, onClick: () => fileInput.click() },
+          { label: labels.deleteParticipantList, danger: true, separatorBefore: true, onClick: remove }
+        ]
+      : [])
+  ] satisfies PageAction[]
 </script>
 
-<button class="back-link" on:click={onBack}>← {labels.participants}</button>
-<div class="page-intro">
-  <div><p class="eyebrow">{labels.eyebrowParticipantListDetail}</p><h1>{list.name}</h1></div>
-  <div class="match-header-actions">
-    <button class="primary" on:click={onAddMember}>+ {labels.newMember}</button>
-    <DropdownMenu ariaLabel={labels.listActions} buttonClass="actions-trigger" align="right">
-      <svelte:fragment slot="trigger">⋯</svelte:fragment>
-      <button class="menu-item" class:active={showSettings} on:click={() => (showSettings = !showSettings)}>{labels.editListSettings}</button>
-      {#if canManage}
-        <button class="menu-item" on:click={exportList}>{labels.exportParticipantList}</button>
-        <button class="menu-item" disabled={importing} on:click={() => fileInput.click()}>{labels.importParticipantList}</button>
-        <hr class="menu-separator" />
-        <button class="menu-item menu-item-danger" on:click={remove}>{labels.deleteParticipantList}</button>
-      {/if}
-    </DropdownMenu>
-  </div>
-</div>
+<PageHeader eyebrow={labels.participants} title={list.name} backLabel={labels.participants} {onBack} actions={listActions} menuLabel={labels.listActions} />
 <input type="file" accept=".xlsx" bind:this={fileInput} on:change={importFile} hidden />
 {#if deleteError}<p class="error">{deleteError}</p>{/if}
 {#if showSettings}

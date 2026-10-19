@@ -1,4 +1,5 @@
 <script lang="ts">
+  import PageHeader from '../PageHeader.svelte'
   import type { ApiClient } from '../api'
   import { labelForError } from '../errors'
   import type { PersonalBestAvailableValue } from '../types'
@@ -77,10 +78,7 @@
   }
 </script>
 
-<button class="back-link" on:click={onBack}>← {labels.personalBest}</button>
-<div class="page-intro">
-  <div><p class="eyebrow">{labels.eyebrowPersonalBestConfig}</p><h1>{labels.disciplinesLabel}</h1></div>
-</div>
+<PageHeader eyebrow={labels.personalBest} title={labels.disciplinesLabel} backLabel={labels.personalBest} {onBack} />
 
 <section class="panel">
   <p class="muted">{labels.disciplinesHint}</p>

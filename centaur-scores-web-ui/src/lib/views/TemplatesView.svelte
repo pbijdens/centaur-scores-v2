@@ -1,4 +1,5 @@
 <script lang="ts">
+  import PageHeader from '../PageHeader.svelte'
   import type { ApiClient } from '../api'
   import { labelForError } from '../errors'
   import { navigateOnClick, templatePath } from '../router'
@@ -45,11 +46,7 @@
   }
 </script>
 
-<button class="back-link" on:click={onBack}>← {labels.home}</button>
-<div class="page-intro">
-  <div><p class="eyebrow">{labels.eyebrowTemplates}</p><h1>{labels.templates}</h1><p class="muted">{labels.templatesHint}</p></div>
-  <button class="primary" on:click={() => (showAddForm = !showAddForm)}>+ {labels.newTemplate}</button>
-</div>
+<PageHeader eyebrow={labels.templates} title={labels.templates} subtitle={labels.templatesHint} backLabel={labels.home} {onBack} actions={[{ label: `+ ${labels.newTemplate}`, header: 'primary', onClick: () => (showAddForm = !showAddForm) }]} />
 {#if showAddForm}
   <form class="inline-form" on:submit|preventDefault={submitAdd}>
     <label>{labels.templateNameLabel}<input bind:value={newTemplateName} /></label>

@@ -1,6 +1,6 @@
 <script lang="ts">
+  import PageHeader from '../PageHeader.svelte'
   import type { ApiClient } from '../api'
-  import DropdownMenu from '../DropdownMenu.svelte'
   import { labelForError } from '../errors'
   import RowActions from '../RowActions.svelte'
   import { keyboardColors, deviceSelectionModes, signatureModes, parseTemplateConfiguration } from '../templateConfig'
@@ -195,16 +195,7 @@
   }
 </script>
 
-<button class="back-link" on:click={onBack}>← {labels.templates}</button>
-<div class="page-intro">
-  <div><p class="eyebrow">{labels.eyebrowTemplateDetail}</p><h1>{template.name}</h1></div>
-  <div class="match-header-actions">
-    <DropdownMenu ariaLabel={labels.matchActions} buttonClass="actions-trigger" align="right">
-      <svelte:fragment slot="trigger">⋯</svelte:fragment>
-      <button class="menu-item menu-item-danger" on:click={remove}>{labels.deleteTemplate}</button>
-    </DropdownMenu>
-  </div>
-</div>
+<PageHeader eyebrow={labels.templates} title={template.name} backLabel={labels.templates} {onBack} actions={[{ label: labels.deleteTemplate, danger: true, onClick: remove }]} menuLabel={labels.matchActions} />
 {#if deleteError}<p class="error">{deleteError}</p>{/if}
 
 <section class="panel">

@@ -1,5 +1,7 @@
 <script lang="ts">
   import { formatLocalDate } from '../date'
+  import { localToday, partitionMatches } from '../matchOrdering'
+  import PageHeader from '../PageHeader.svelte'
   import { competitionPath, matchPath, narrowcastPath, navigateOnClick } from '../router'
   import type { Competition, Language, MatchListItem } from '../types'
 
@@ -12,12 +14,9 @@
   export let onNavigate: (path: string) => void
   export let onDeactivateAll: () => void
 
-  function localToday(): string {
-    const now = new Date()
-    return new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 10)
-  }
-
   $: today = localToday()
+  // Same ordering as the matches list; open matches already have their own panel above.
+  $: upcomingMatches = partitionMatches(matches, today).upcoming.slice(0, 3)
   $: narrowcastScopes = [...new Set(
     matches
       .filter((match) => match.isOpen || match.date >= today)
@@ -25,10 +24,7 @@
   )].sort((a, b) => a.localeCompare(b))
 </script>
 
-<div class="page-intro">
-  <div><p class="eyebrow">{labels.eyebrowTenantHome}</p><h1>{labels.home}</h1><p class="muted">{labels.manage}</p></div>
-  <a class="primary" href="/matches" on:click={(event) => navigateOnClick(event, () => onNavigate('/matches'))}>{labels.matches}</a>
-</div>
+<PageHeader eyebrow={labels.home} title={labels.home} subtitle={labels.manage} actions={[{ label: labels.matches, header: 'primary', href: '/matches', onClick: () => onNavigate('/matches') }]} />
 <div class="dashboard-grid">
   <section class="panel">
     <div class="panel-heading">
@@ -48,7 +44,7 @@
       <div><p class="eyebrow">{labels.eyebrowNext}</p><h2>{labels.upcoming}</h2></div>
       <a class="text-button" href="/matches" on:click={(event) => navigateOnClick(event, () => onNavigate('/matches'))}>{labels.seeAll}</a>
     </div>
-    {#each matches.filter((match) => !match.isOpen).slice(0, 3) as match}
+    {#each upcomingMatches as match}
       <a class="match-row" href={matchPath(match.id)} on:click={(event) => navigateOnClick(event, () => onOpenMatch(match))}>
         <span class="date-block"><b>{match.date.slice(8, 10)}</b><small>{match.date.slice(5, 7)}</small></span>
         <span><strong>{match.name}</strong><small>{formatLocalDate(match.date, language)}</small></span>

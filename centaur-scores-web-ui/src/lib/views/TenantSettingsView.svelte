@@ -1,4 +1,5 @@
 <script lang="ts">
+  import PageHeader from '../PageHeader.svelte'
   import type { ApiClient } from '../api'
   import { labelForError } from '../errors'
   import type { DefaultScopeSettings } from '../types'
@@ -37,10 +38,7 @@
   }
 </script>
 
-<button class="back-link" on:click={onBack}>← {labels.home}</button>
-<div class="page-intro">
-  <div><p class="eyebrow">{labels.eyebrowTenantSettings}</p><h1>{labels.tenantSettings}</h1></div>
-</div>
+<PageHeader eyebrow={labels.tenantSettings} title={labels.tenantSettings} backLabel={labels.home} {onBack} />
 {#if settings}
   <section class="panel">
     <form id="tenant-settings-form" on:submit|preventDefault={save}>

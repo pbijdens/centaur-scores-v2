@@ -1,8 +1,10 @@
 <script lang="ts">
   import type { ApiClient } from '../api'
   import { formatLocalDate } from '../date'
-  import DropdownMenu from '../DropdownMenu.svelte'
   import { labelForError } from '../errors'
+  import type { PageAction } from '../pageActions'
+  import PageHeader from '../PageHeader.svelte'
+  import { competitionResultsPath } from '../router'
   import RowActions from '../RowActions.svelte'
   import type { Category, Competition, CompetitionRound, CompetitionScoreRule, Language, MatchListItem } from '../types'
 
@@ -15,7 +17,6 @@
   export let onBack: () => void
   export let onChanged: () => void | Promise<void>
   export let onDeleted: () => void
-  export let onViewResults: () => void
   export let onCopied: (competition: Competition) => void
 
   let name = competition.name
@@ -59,6 +60,11 @@
     ...groupByCategoryIds.map((id) => categories.find((category) => category.id === id)).filter((category): category is Category => !!category),
     ...categories.filter((category) => !groupByCategoryIds.includes(category.id))
   ]
+  $: headerActions = [
+    { label: labels.viewResults, header: 'primary', href: competitionResultsPath(competition.id), newTab: true },
+    { label: labels.saveCopy, separatorBefore: true, onClick: copyCompetition },
+    { label: labels.deleteCompetition, danger: true, separatorBefore: true, onClick: deleteCompetition }
+  ] satisfies PageAction[]
   $: eligibleMatches = matches.filter((match) => match.date >= startDate && match.date <= endDate)
 
   function toggleGroupCategory(categoryId: string) {
@@ -292,19 +298,7 @@
   }
 </script>
 
-<button class="back-link" on:click={onBack}>← {labels.competitions}</button>
-<div class="page-intro">
-  <div><p class="eyebrow">{labels.eyebrowCompetitionDetail}</p><h1>{competition.name}</h1></div>
-  <div class="match-header-actions">
-    <button class="primary" on:click={onViewResults}>{labels.viewResults}</button>
-    <DropdownMenu ariaLabel={labels.matchActions} buttonClass="actions-trigger" align="right">
-      <svelte:fragment slot="trigger">⋯</svelte:fragment>
-      <button class="menu-item" on:click={copyCompetition}>{labels.saveCopy}</button>
-      <hr class="menu-separator" />
-      <button class="menu-item menu-item-danger" on:click={deleteCompetition}>{labels.deleteCompetition}</button>
-    </DropdownMenu>
-  </div>
-</div>
+<PageHeader eyebrow={labels.competitions} title={competition.name} subtitle={`${formatLocalDate(competition.startDate, language)} – ${formatLocalDate(competition.endDate, language)}`} backLabel={labels.competitions} {onBack} actions={headerActions} menuLabel={labels.matchActions} />
 {#if copyError}<p class="error">{copyError}</p>{/if}
 {#if deleteError}<p class="error">{deleteError}</p>{/if}
 

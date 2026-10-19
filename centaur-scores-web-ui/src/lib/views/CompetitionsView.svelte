@@ -1,4 +1,5 @@
 <script lang="ts">
+  import PageHeader from '../PageHeader.svelte'
   import type { ApiClient } from '../api'
   import { formatLocalDate } from '../date'
   import { labelForError } from '../errors'
@@ -50,10 +51,7 @@
   }
 </script>
 
-<div class="page-intro">
-  <div><p class="eyebrow">{labels.eyebrowTenantData}</p><h1>{labels.competitions}</h1><p class="muted">{labels.competitionsDescription}</p></div>
-  <button class="primary" on:click={() => (showAddForm = !showAddForm)}>+ {labels.newCompetition}</button>
-</div>
+<PageHeader eyebrow={labels.competitions} title={labels.competitions} subtitle={labels.competitionsDescription} actions={[{ label: `+ ${labels.newCompetition}`, header: 'primary', onClick: () => (showAddForm = !showAddForm) }]} />
 {#if showAddForm}
   <form class="inline-form" on:submit|preventDefault={submitAdd}>
     <label>{labels.competitionNameLabel}<input bind:value={newName} /></label>

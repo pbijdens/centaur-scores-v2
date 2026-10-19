@@ -62,6 +62,7 @@ public sealed class AuthService(ApplicationDbContext db, IConfiguration configur
         var homeTenant = allTenants.SingleOrDefault(item => item.Id == account.TenantId);
         if (homeTenant is null) return [];
         var childrenByParent = allTenants.Where(item => item.ParentTenantId is not null).ToLookup(item => item.ParentTenantId!.Value);
+        var namesById = allTenants.ToDictionary(item => item.Id, item => item.Name);
         var result = new List<TenantAccessView>();
         var visited = new HashSet<Guid>();
         var queue = new Queue<Tenant>();
@@ -70,7 +71,10 @@ public sealed class AuthService(ApplicationDbContext db, IConfiguration configur
         {
             var current = queue.Dequeue();
             if (!visited.Add(current.Id)) continue;
-            result.Add(new TenantAccessView(current.Id, current.Name, current.LogoUrl, account.Authorization.ToString()));
+            // The parent's name is included even for the home tenant (whose parent lies outside the account's
+            // access) so the tenant switcher can show where each tenant sits in the hierarchy.
+            var parentName = current.ParentTenantId is { } parentId ? namesById.GetValueOrDefault(parentId) : null;
+            result.Add(new TenantAccessView(current.Id, current.Name, current.LogoUrl, account.Authorization.ToString(), current.ParentTenantId, parentName));
             foreach (var child in childrenByParent[current.Id]) queue.Enqueue(child);
         }
         return result;

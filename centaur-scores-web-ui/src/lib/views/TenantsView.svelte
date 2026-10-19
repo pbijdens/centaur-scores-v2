@@ -1,4 +1,5 @@
 <script lang="ts">
+  import PageHeader from '../PageHeader.svelte'
   import { navigateOnClick, tenantPath } from '../router'
 import type { Tenant } from '../types'
 
@@ -21,11 +22,7 @@ import type { Tenant } from '../types'
   }
 </script>
 
-<button class="back-link" on:click={onBack}>← {labels.home}</button>
-<div class="page-intro">
-  <div><p class="eyebrow">{labels.eyebrowTenantAdmin}</p><h1>{labels.tenants}</h1><p class="muted">{labels.tenantsHint}</p></div>
-  <button class="primary" on:click={() => (showAddForm = !showAddForm)}>+ {labels.newTenant}</button>
-</div>
+<PageHeader eyebrow={labels.tenants} title={labels.tenants} subtitle={labels.tenantsHint} backLabel={labels.home} {onBack} actions={[{ label: `+ ${labels.newTenant}`, header: 'primary', onClick: () => (showAddForm = !showAddForm) }]} />
 {#if showAddForm}
   <form class="inline-form" on:submit|preventDefault={submitAdd}>
     <label>{labels.tenantName}<input bind:value={newTenantName} /></label>

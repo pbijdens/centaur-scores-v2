@@ -1,17 +1,21 @@
 <script lang="ts">
   import type { ApiClient } from '../api'
+  import MatchPageHeader from '../MatchPageHeader.svelte'
+  import type { MatchHeaderHandlers } from '../pageActions'
   import { labelForError } from '../errors'
   import { parseMatchKeyboardConfig } from '../matchConfig'
   import { deriveLastName } from '../participantName'
   import ParticipantSelectionTable from '../ParticipantSelectionTable.svelte'
-  import type { Category, Match, MatchParticipant, ParticipantList } from '../types'
+  import type { Category, Language, Match, MatchParticipant, ParticipantList } from '../types'
 
   export let api: ApiClient
   export let match: Match
   export let participant: MatchParticipant
   export let categories: Category[]
   export let sourceList: ParticipantList | null
+  export let language: Language
   export let labels: Record<string, string>
+  export let headerHandlers: MatchHeaderHandlers
   export let onBack: () => void
   export let onSaved: () => void
 
@@ -74,15 +78,7 @@
 </script>
 
 <div class="replace-view">
-  <button class="back-link" on:click={onBack}>← {participant.fullName || participant.lastName}</button>
-  <div class="page-intro">
-    <div>
-      <p class="eyebrow">{labels.eyebrowReplaceParticipant}</p>
-      <h1>{heading}</h1>
-      <p class="muted">{labels.replaceParticipantHint}</p>
-    </div>
-  </div>
-
+  <MatchPageHeader {api} {match} {language} {labels} handlers={headerHandlers} title={heading} subtitle={labels.replaceParticipantHint} backLabel={participant.fullName || participant.lastName} {onBack} />
   <section class="panel section-gap" class:fill-panel={!!sourceList}>
     {#if sourceList}
       {#if match.allowFreeParticipants}
@@ -129,7 +125,7 @@
     height: calc(100dvh - 196px);
   }
 
-  .replace-view .back-link {
+  .replace-view :global(.back-link) {
     align-self: flex-start;
     text-align: left;
   }

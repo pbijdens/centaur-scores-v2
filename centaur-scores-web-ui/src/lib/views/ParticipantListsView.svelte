@@ -1,4 +1,5 @@
 <script lang="ts">
+  import PageHeader from '../PageHeader.svelte'
   import type { ApiClient } from '../api'
   import { labelForError } from '../errors'
   import { navigateOnClick, participantListPath } from '../router'
@@ -31,11 +32,7 @@
   }
 </script>
 
-<button class="back-link" on:click={onBack}>← {labels.home}</button>
-<div class="page-intro">
-  <div><p class="eyebrow">{labels.eyebrowParticipantLists}</p><h1>{labels.participants}</h1><p class="muted">{labels.participantsHint}</p></div>
-  <button class="primary" on:click={() => (showAddForm = !showAddForm)}>+ {labels.newParticipantList}</button>
-</div>
+<PageHeader eyebrow={labels.participants} title={labels.participants} subtitle={labels.participantsHint} backLabel={labels.home} {onBack} actions={[{ label: `+ ${labels.newParticipantList}`, header: 'primary', onClick: () => (showAddForm = !showAddForm) }]} />
 {#if showAddForm}
   <form class="inline-form" on:submit|preventDefault={submitAdd}>
     <label>{labels.listNameLabel}<input bind:value={newListName} /></label>

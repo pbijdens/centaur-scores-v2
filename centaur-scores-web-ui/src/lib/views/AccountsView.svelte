@@ -1,4 +1,5 @@
 <script lang="ts">
+  import PageHeader from '../PageHeader.svelte'
   import type { ApiClient } from '../api'
   import { authorizationLabel } from '../authorization'
   import { labelForError } from '../errors'
@@ -29,11 +30,7 @@
   }
 </script>
 
-<button class="back-link" on:click={onBack}>← {labels.home}</button>
-<div class="page-intro">
-  <div><p class="eyebrow">{labels.eyebrowAccounts}</p><h1>{labels.accounts}</h1><p class="muted">{labels.accountsHint}</p></div>
-  <button class="primary" on:click={() => (showAddForm = !showAddForm)}>+ {labels.newAccount}</button>
-</div>
+<PageHeader eyebrow={labels.accounts} title={labels.accounts} subtitle={labels.accountsHint} backLabel={labels.home} {onBack} actions={[{ label: `+ ${labels.newAccount}`, header: 'primary', onClick: () => (showAddForm = !showAddForm) }]} />
 {#if showAddForm}
   <form class="inline-form" on:submit|preventDefault={submitAdd}>
     <label>{labels.usernameLabel}<input bind:value={newAccountUsername} /></label>

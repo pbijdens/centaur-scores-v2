@@ -59,6 +59,9 @@ public sealed class SecurityTests
         Assert.Contains(result, item => item.TenantId == root.Id);
         Assert.Contains(result, item => item.TenantId == child.Id);
         Assert.Contains(result, item => item.TenantId == grandchild.Id);
+        Assert.Null(result.Single(item => item.TenantId == root.Id).ParentTenantName);
+        Assert.Equal(root.Id, result.Single(item => item.TenantId == child.Id).ParentTenantId);
+        Assert.Equal("Child", result.Single(item => item.TenantId == grandchild.Id).ParentTenantName);
     }
 
     [Fact]
@@ -77,6 +80,7 @@ public sealed class SecurityTests
 
         Assert.Single(result);
         Assert.Equal(child.Id, result[0].TenantId);
+        Assert.Equal("Root", result[0].ParentTenantName);
     }
 
     [Fact]

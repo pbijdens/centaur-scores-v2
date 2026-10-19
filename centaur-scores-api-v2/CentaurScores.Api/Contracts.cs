@@ -5,7 +5,7 @@ namespace CentaurScores.Api.Contracts;
 public sealed record ApiError(string Code, string Message);
 public sealed record LoginRequest(string Username, string Password);
 public sealed record SelectTenantRequest(Guid TenantId);
-public sealed record TenantAccessView(Guid TenantId, string TenantName, string? LogoUrl, string Authorization);
+public sealed record TenantAccessView(Guid TenantId, string TenantName, string? LogoUrl, string Authorization, Guid? ParentTenantId, string? ParentTenantName);
 public sealed record CreateTenantRequest(string Name, string? LogoUrl, Guid? ParentTenantId, string? DefaultNarrowcastScope = null);
 public sealed record UpdateDefaultNarrowcastScopeRequest(string? DefaultNarrowcastScope);
 public sealed record DefaultScopeSettings(string? TenantValue, string EffectiveValue);

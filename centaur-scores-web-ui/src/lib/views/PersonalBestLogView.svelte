@@ -1,4 +1,5 @@
 <script lang="ts">
+  import PageHeader from '../PageHeader.svelte'
   import type { ApiClient } from '../api'
   import { formatLocalDate } from '../date'
   import type { Language, PersonalBestLogRow } from '../types'
@@ -36,10 +37,7 @@
   )
 </script>
 
-<button class="back-link" on:click={onBack}>← {labels.personalBest}</button>
-<div class="page-intro">
-  <div><p class="eyebrow">{labels.eyebrowPersonalBestLog}</p><h1>{labels.viewPersonalBests}</h1><p class="muted">{labels.personalBestLogHint}</p></div>
-</div>
+<PageHeader eyebrow={labels.personalBest} title={labels.viewPersonalBests} subtitle={labels.personalBestLogHint} backLabel={labels.personalBest} {onBack} />
 
 <div class="table-scroll">
   <table class="data-table">
