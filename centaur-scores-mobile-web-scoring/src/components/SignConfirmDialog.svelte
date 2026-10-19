@@ -13,6 +13,7 @@
   class="overlay"
   role="alertdialog"
   aria-modal="true"
+  tabindex="-1"
   onpointerdown={(event) => event.stopPropagation()}
   onpointermove={(event) => event.stopPropagation()}
   onpointerup={(event) => event.stopPropagation()}
