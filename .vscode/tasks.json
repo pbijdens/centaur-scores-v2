@@ -1,0 +1,66 @@
+{
+    // See https://go.microsoft.com/fwlink/?LinkId=733558
+    // for the documentation about the tasks.json format
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "build-api",
+            "command": "dotnet build",
+            "type": "shell",
+            "options": {
+                "cwd": "${workspaceFolder}/centaur-scores-api-v2"
+            },
+            "group": "build",
+            "presentation": {
+                "reveal": "silent"
+            },
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "dev-web-ui",
+            "type": "process",
+            "command": "wsl.exe",
+            // -i (not -l) so nvm's Node is used instead of the system Node.
+            "args": [
+                "bash",
+                "-ic",
+                "cd /mnt/e/centaur-scores-v2/centaur-scores-web-ui && npm run dev -- --port 5173 --strictPort"
+            ],
+            "isBackground": true,
+            "problemMatcher": {
+                "owner": "vite",
+                "pattern": {
+                    "regexp": "^__never_matches__$"
+                },
+                "background": {
+                    "activeBegins": true,
+                    "beginsPattern": "VITE v",
+                    "endsPattern": "Local:"
+                }
+            }
+        },
+        {
+            "label": "dev-scorekeeper",
+            "type": "process",
+            "command": "wsl.exe",
+            // -i (not -l) so nvm's Node is used instead of the system Node.
+            "args": [
+                "bash",
+                "-ic",
+                "cd /mnt/e/centaur-scores-v2/centaur-scores-mobile-web-scoring && npm run dev -- --port 5174 --strictPort"
+            ],
+            "isBackground": true,
+            "problemMatcher": {
+                "owner": "vite",
+                "pattern": {
+                    "regexp": "^__never_matches__$"
+                },
+                "background": {
+                    "activeBegins": true,
+                    "beginsPattern": "VITE v",
+                    "endsPattern": "Local:"
+                }
+            }
+        }
+    ]
+}
