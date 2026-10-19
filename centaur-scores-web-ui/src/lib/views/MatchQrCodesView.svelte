@@ -5,6 +5,7 @@
 
   export let match: Match
   export let tenantId: string
+  export let scorekeeperBaseUrl: string | null | undefined = undefined
   export let language: Language
   export let labels: Record<string, string>
 
@@ -14,6 +15,7 @@
   $: devices = [...(match.devices ?? [])].sort((a, b) => (a.sortOrder ?? Number.MAX_SAFE_INTEGER) - (b.sortOrder ?? Number.MAX_SAFE_INTEGER) || a.name.localeCompare(b.name))
   $: {
     tenantId
+    scorekeeperBaseUrl
     language
     match.id
     devices
@@ -29,7 +31,7 @@
 
     const entries = await Promise.all(
       devices.map(async (device) => {
-        const url = scorekeeperUrl(tenantId, match.id, device.id, language)
+        const url = scorekeeperUrl(tenantId, match.id, device.id, language, scorekeeperBaseUrl)
         const dataUrl = await QRCode.toDataURL(url, { width: 480, margin: 1 })
         return [device.id, dataUrl] as const
       })
@@ -55,7 +57,7 @@
       {:else}
         <div class="qr-placeholder" aria-label="Loading QR code"></div>
       {/if}
-      <p class="qr-device-name"><a href={scorekeeperUrl(tenantId, match.id, device.id, language)}>{device.name}</a></p>
+      <p class="qr-device-name"><a href={scorekeeperUrl(tenantId, match.id, device.id, language, scorekeeperBaseUrl)}>{device.name}</a></p>
     </div>
   {/each}
 </div>

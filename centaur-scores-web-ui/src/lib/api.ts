@@ -302,6 +302,10 @@ export class ApiClient {
     return this.request('/api/tenants/current/default-scope', { method: 'PUT', body: JSON.stringify({ defaultNarrowcastScope }) })
   }
 
+  updateScorekeeperBaseUrl(scorekeeperBaseUrl: string | null): Promise<Tenant> {
+    return this.request('/api/tenants/current/scorekeeper-url', { method: 'PUT', body: JSON.stringify({ scorekeeperBaseUrl }) })
+  }
+
   fetchAccounts(): Promise<Account[]> {
     return this.request('/api/accounts')
   }
@@ -525,11 +529,13 @@ export async function fetchLiveScoringPage(scope: string, matchId: string): Prom
   return response.json()
 }
 
-export function scorekeeperUrl(tenantId: string, matchId: string, deviceId: string, language: Language): string {
+// scorekeeperBaseUrl is the tenant's optional override for where the scorekeeper app is hosted; without it
+// the app is assumed to live at /scores on this web UI's own origin.
+export function scorekeeperUrl(tenantId: string, matchId: string, deviceId: string, language: Language, scorekeeperBaseUrl?: string | null): string {
   const apiUrl = `${apiBase}/scorekeeper/${tenantId}/${matchId}/${deviceId}`
   const languageCode = language === 'nl' ? 'NL' : 'EN'
   const base = typeof window === 'undefined' ? apiBase : window.location.origin
-  const scoresUrl = new URL('/scores', base)
+  const scoresUrl = scorekeeperBaseUrl ? new URL(scorekeeperBaseUrl) : new URL('/scores', base)
   scoresUrl.searchParams.set('api', apiUrl)
   scoresUrl.searchParams.set('language', languageCode)
   return scoresUrl.toString()

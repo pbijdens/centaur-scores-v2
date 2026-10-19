@@ -23,7 +23,8 @@
     refreshParticipantLists as fetchParticipantListsList,
     refreshPersonalBestStatus as fetchPersonalBestStatus,
     refreshTemplates as fetchTemplatesList,
-    refreshDefaultScopeSettings as fetchDefaultScopeSettings
+    refreshDefaultScopeSettings as fetchDefaultScopeSettings,
+    refreshCurrentTenant as fetchCurrentTenant
   } from './lib/data'
   import { labelForError } from './lib/errors'
   import { translationsFor } from './lib/i18n'
@@ -457,7 +458,7 @@
 {#if view === 'narrowcast' && narrowcastScope}
   <LiveScoringView scope={narrowcastScope} />
 {:else if view === 'match-qr' && selectedMatch}
-  <MatchQrCodesView match={selectedMatch} tenantId={tenant} {language} labels={t} />
+  <MatchQrCodesView match={selectedMatch} tenantId={tenant} scorekeeperBaseUrl={$currentTenant?.scorekeeperBaseUrl} {language} labels={t} />
 {:else if view === 'match-print' && selectedMatch}
   <!-- MatchPrintView is rendered from this single spot (not duplicated per step) so switching between
        its 'select' and 'sheet' steps only toggles the surrounding chrome - it never destroys/recreates
@@ -566,7 +567,7 @@
       {:else if view === 'template' && selectedTemplate}
         <TemplateEditView {api} template={selectedTemplate} categories={$categories} participantLists={$participantLists} labels={t} onBack={() => navigate('/templates')} onSaved={refreshTemplates} onDeleted={onTemplateDeleted} />
       {:else if view === 'tenant-settings' && canManage}
-        <TenantSettingsView {api} labels={t} onBack={() => navigate('/')} onSaved={() => fetchDefaultScopeSettings(api)} />
+        <TenantSettingsView {api} labels={t} onBack={() => navigate('/')} onSaved={() => Promise.all([fetchDefaultScopeSettings(api), fetchCurrentTenant(api)])} />
       {:else if view === 'personal-best'}
         <PersonalBestView {api} status={$personalBestStatus} labels={t} onBack={() => navigate('/')} onNavigate={navigate} onChanged={refreshPersonalBestStatus} />
       {:else if view === 'personal-best-classifiers'}

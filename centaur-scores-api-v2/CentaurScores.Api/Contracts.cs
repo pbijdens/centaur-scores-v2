@@ -9,6 +9,7 @@ public sealed record TenantAccessView(Guid TenantId, string TenantName, string? 
 public sealed record CreateTenantRequest(string Name, string? LogoUrl, Guid? ParentTenantId, string? DefaultNarrowcastScope = null);
 public sealed record UpdateDefaultNarrowcastScopeRequest(string? DefaultNarrowcastScope);
 public sealed record DefaultScopeSettings(string? TenantValue, string EffectiveValue);
+public sealed record UpdateScorekeeperBaseUrlRequest(string? ScorekeeperBaseUrl);
 public sealed record ScopeConflictSummary(Guid TenantId, string TenantName, string Scope, int MatchCount);
 public sealed record UpdateAccountRequest(string Username, string? Password, string? DisplayName, string? Email, string? Authorization);
 public sealed record UpdateProfileRequest(string? DisplayName, string? Email);

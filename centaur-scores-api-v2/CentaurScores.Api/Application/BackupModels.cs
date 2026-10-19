@@ -6,7 +6,8 @@ namespace CentaurScores.Api.Application;
 
 public sealed record BackupIndex(int FormatVersion, DateTime ExportedAt, Guid RootTenantId, List<Guid> TenantIds, bool IncludeSubTenants, int DroppedPersonalBestDisciplineMappings, string GeneratorVersion);
 
-public sealed record TenantBackup(Guid Id, string Name, string? LogoUrl, Guid? ParentTenantId, bool PersonalBestEnabled);
+// ScorekeeperBaseUrl defaults to null so archives written before it existed still restore.
+public sealed record TenantBackup(Guid Id, string Name, string? LogoUrl, Guid? ParentTenantId, bool PersonalBestEnabled, string? ScorekeeperBaseUrl = null);
 
 public sealed record AccountBackup(Guid Id, Guid TenantId, string Username, string PasswordHash, string? DisplayName, string? Email, string Authorization);
 

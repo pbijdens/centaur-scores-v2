@@ -46,6 +46,7 @@ JWTs are returned by `POST /api/auth/login` and contain the account and active t
 | `DELETE` | `/api/tenants/{id}` | admin | Delete a child tenant. The logged-in tenant cannot delete itself. Cascades: every descendant tenant (recursively) and all data owned by the tenant/its descendants (accounts, categories, participant lists, matches, templates, competitions, personal-best config) is deleted too, in one transaction. |
 | `GET` | `/api/tenants/current/default-scope` | user | Return `{ tenantValue, effectiveValue }` for the active tenant's default narrowcast scope: `tenantValue` is this tenant's own override (`null` if unset), `effectiveValue` is resolved by walking `ParentTenantId` up to the nearest ancestor with one set, falling back to `"all"`. |
 | `PUT` | `/api/tenants/current/default-scope` | manager | Set or clear (`null`) the active tenant's own default narrowcast scope override. Unlike the other `tenants/current`/`children` endpoints, this only requires manager, not admin. |
+| `PUT` | `/api/tenants/current/scorekeeper-url` | manager | Set or clear (`null`/blank) the active tenant's optional `scorekeeperBaseUrl`: the absolute http(s) base URL of the scorekeeper web app that device QR codes/links point to (the web UI falls back to `/scores` on its own origin when unset). Not inherited by sub-tenants. Returns the updated tenant. `400 INVALID_SCOREKEEPER_URL` when the value is not an absolute http(s) URL. The value is also exposed on `GET /api/tenants/current`. |
 
 ## Accounts
 
