@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { arrowsShotCount, endTotal, groupRunningTotal, groupTotals, hasGroups, isGroupDivider, runningTotal, scoreFor, totalScore } from './scorecard'
+import { arrowsShotCount, endTotal, groupEndRanges, groupRunningTotal, groupTotals, hasGroups, isGroupDivider, runningTotal, scoreFor, totalScore } from './scorecard'
 import type { ArrowScore, Match } from './types'
 
 function match(overrides: Partial<Match> = {}): Match {
@@ -101,5 +101,16 @@ describe('groupTotals', () => {
     const m = match({ ends: 4, groupEnds: null })
     const scores = [score(1, 1, 10), score(4, 1, 5)]
     expect(groupTotals(m, scores)).toEqual([15])
+  })
+})
+
+describe('groupEndRanges', () => {
+  it('returns the end range of every group, with a shorter final group when ends do not divide evenly', () => {
+    expect(groupEndRanges(match({ ends: 20, groupEnds: 10 }))).toEqual([[1, 10], [11, 20]])
+    expect(groupEndRanges(match({ ends: 7, groupEnds: 3 }))).toEqual([[1, 3], [4, 6], [7, 7]])
+  })
+
+  it('returns a single range covering the whole match when there are no groups', () => {
+    expect(groupEndRanges(match({ ends: 6, groupEnds: null }))).toEqual([[1, 6]])
   })
 })

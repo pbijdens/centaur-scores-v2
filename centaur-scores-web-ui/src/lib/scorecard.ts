@@ -58,3 +58,13 @@ export function groupTotals(match: Match, scores: ArrowScore[] | undefined): num
   }
   return totals
 }
+
+// The [firstEnd, lastEnd] range of every group-of-ends block (a single range covering all ends when ungrouped).
+export function groupEndRanges(match: Match): [number, number][] {
+  const groupEnds = effectiveGroupEnds(match)
+  const ranges: [number, number][] = []
+  for (let groupStart = 1; groupStart <= match.ends; groupStart += groupEnds) {
+    ranges.push([groupStart, Math.min(groupStart + groupEnds - 1, match.ends)])
+  }
+  return ranges
+}
