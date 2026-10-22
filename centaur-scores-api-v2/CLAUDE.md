@@ -32,6 +32,8 @@ Run `dotnet build` and `dotnet test CentaurScores.Api.Tests/CentaurScores.Api.Te
 
 **Lane-assignment Excel export** (`GET .../lanes.xlsx`) is built by the pure static `Application/LaneAssignmentExcelExport` (ClosedXML, no DI) from `LaneSheetParticipant` rows the controller prepares; it shares `LoadMatchCategoriesAsync`/`CategoryValueName` with the CSV export so category columns stay in match `categoryOrder`.
 
+**External results** (`POST /api/matches/find`, [../documentation/FIND-MATCHES.md](../documentation/FIND-MATCHES.md)): logic lives in `Application/MatchFindService.cs`. Its `MatchFindController` is the one authenticated controller that does not derive from `ApiControllerBase`, because external systems call it with the tenant-less login token; it scopes data by the account's authorized tenants instead. `Category.ApiName` is used only there and in the category editor.
+
 **Scorekeeper contract**: implemented in `Application/ScorekeeperService.cs` — keep all participant policy, ordering, projection, and optimistic score conflict logic there, with `PublicScoresController` limited to anonymous routing, active-match checks, logging, and response status mapping. Preserve the public live-score and scorekeeper endpoints described in the specification.
 
 ## Conventions

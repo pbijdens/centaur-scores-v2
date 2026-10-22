@@ -117,6 +117,11 @@ namespace CentaurScores.Api.Infrastructure.Migrations
                         .HasColumnType("char(36)")
                         .HasColumnName("id");
 
+                    b.Property<string>("ApiName")
+                        .HasMaxLength(64)
+                        .HasColumnType("varchar(64)")
+                        .HasColumnName("api_name");
+
                     b.Property<bool>("IsUsed")
                         .HasColumnType("tinyint(1)")
                         .HasColumnName("is_used");

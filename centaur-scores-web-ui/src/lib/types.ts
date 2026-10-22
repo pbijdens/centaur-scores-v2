@@ -83,7 +83,7 @@ export type TenantAccess = { tenantId: string; tenantName: string; logoUrl?: str
 export type Profile = { id: string; username: string; displayName?: string | null; email?: string | null; authorization: string; authorizedForTenants: TenantAccess[] }
 export type Account = { id: string; username: string; displayName?: string | null; email?: string | null; authorization: string }
 export type CategoryValue = { categoryId: string; valueId: number; name: string }
-export type Category = { id: string; name: string; isUsed: boolean; values: CategoryValue[] }
+export type Category = { id: string; name: string; apiName?: string | null; isUsed: boolean; values: CategoryValue[] }
 export type ParticipantListMember = { id: string; participantListId: string; lastName: string; fullName: string; federationNumber?: string | null; categories: Record<string, number>; isActive: boolean }
 export type ParticipantList = { id: string; name: string; isActive: boolean; members: ParticipantListMember[] }
 // Shape of GET /api/participant-lists: unlike ParticipantList (one list's full detail, with members),

@@ -12,6 +12,7 @@
   export let onBack: () => void
 
   let categoryName = category.name
+  let categoryApiName = category.apiName ?? ''
   let categoryMessage = ''
   let categoryError = ''
   let showAddValueForm = false
@@ -22,13 +23,14 @@
   let editValueName = ''
 
   $: sortedValues = [...category.values].sort((a, b) => a.name.localeCompare(b.name))
+  $: categoryChanged = categoryName.trim() !== category.name || categoryApiName.trim() !== (category.apiName ?? '')
 
   async function submitEditCategory() {
     if (!categoryName.trim()) return
     categoryMessage = ''
     categoryError = ''
     try {
-      await api.updateCategory(category.id, categoryName.trim())
+      await api.updateCategory(category.id, categoryName.trim(), categoryApiName.trim() || null)
       categoryMessage = labels.categorySaved
       onChanged()
     } catch (error) {
@@ -94,8 +96,10 @@
 <section class="panel">
   <form class="inline-form" on:submit|preventDefault={submitEditCategory}>
     <label>{labels.categoryNameLabel}<input bind:value={categoryName} /></label>
-    <button class="primary" type="submit" disabled={!categoryName.trim() || categoryName.trim() === category.name}>{labels.save}</button>
+    <label>{labels.categoryApiNameLabel}<input bind:value={categoryApiName} maxlength="64" /></label>
+    <button class="primary" type="submit" disabled={!categoryName.trim() || !categoryChanged}>{labels.save}</button>
   </form>
+  <p class="muted">{labels.categoryApiNameHint}</p>
   {#if categoryError}<p class="error">{categoryError}</p>{/if}
   {#if categoryMessage}<p class="success">{categoryMessage}</p>{/if}
 </section>
