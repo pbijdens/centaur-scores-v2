@@ -41,6 +41,9 @@ public enum AuthorizationProfile { Viewer, Manager, Administrator }
 public sealed class Category : TenantOwnedEntity
 {
     public string Name { get; set; } = "";
+    // Optional property name used for this category by the external results endpoint
+    // (POST api/matches/find, see documentation/FIND-MATCHES.md). Not used anywhere else.
+    public string? ApiName { get; set; }
     public bool IsUsed { get; set; }
     public List<CategoryValue> Values { get; set; } = [];
 }

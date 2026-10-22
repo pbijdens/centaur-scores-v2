@@ -29,7 +29,12 @@ public sealed class CategoriesController(ApplicationDbContext db, ITenantContext
         if (!CanManage) return Forbid();
         var category = await db.Categories.SingleOrDefaultAsync(item => item.Id == categoryId && item.TenantId == TenantId, cancellationToken);
         if (category is null) return NotFound();
+        var apiName = CategoryApiNames.Normalize(request.ApiName);
+        if (CategoryApiNames.Validate(apiName) is { } error) return BadRequest(error);
+        if (apiName is not null && await IsApiNameTakenAsync(categoryId, apiName, cancellationToken))
+            return Conflict(new ApiError("CATEGORY_API_NAME_TAKEN", $"Another category already uses the API name '{apiName}'."));
         category.Name = request.Name;
+        category.ApiName = apiName;
         await db.SaveChangesAsync(cancellationToken);
         return Ok(category);
     }
@@ -78,5 +83,16 @@ public sealed class CategoriesController(ApplicationDbContext db, ITenantContext
         db.CategoryValues.Remove(value);
         await db.SaveChangesAsync(cancellationToken);
         return NoContent();
+    }
+
+    // Case-insensitive in memory: MySQL collation would do this in SQL, but SQLite (tests) compares
+    // case-sensitively, and a tenant only has a handful of categories.
+    private async Task<bool> IsApiNameTakenAsync(Guid categoryId, string apiName, CancellationToken cancellationToken)
+    {
+        var otherApiNames = await db.Categories.AsNoTracking()
+            .Where(item => item.TenantId == TenantId && item.Id != categoryId && item.ApiName != null)
+            .Select(item => item.ApiName!)
+            .ToListAsync(cancellationToken);
+        return otherApiNames.Any(item => string.Equals(item, apiName, StringComparison.OrdinalIgnoreCase));
     }
 }

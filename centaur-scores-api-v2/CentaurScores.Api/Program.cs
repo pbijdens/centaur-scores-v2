@@ -21,6 +21,7 @@ builder.Services.AddDbContext<ApplicationDbContext>(options => options.UseMySql(
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<ITenantContext, TenantContext>();
 builder.Services.AddScoped<IScoringService, ScoringService>();
+builder.Services.AddScoped<IMatchFindService, MatchFindService>();
 builder.Services.AddScoped<ILiveScoringService, LiveScoringService>();
 builder.Services.AddScoped<ICompetitionService, CompetitionService>();
 builder.Services.AddScoped<IScorekeeperService, ScorekeeperService>();

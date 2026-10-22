@@ -8,7 +8,7 @@ The API uses JSON unless an endpoint explicitly returns CSV. Authenticated endpo
 Authorization: Bearer <jwt>
 ```
 
-JWTs are returned by `POST /api/auth/login` and contain the account and active tenant. Login itself carries no tenant - the issued token starts with an empty tenant claim, and `POST /api/auth/select-tenant` mints a new token scoped to a specific tenant once one is chosen (see below). All tenant-scoped query and mutation endpoints enforce the tenant in that claim and reject a token whose tenant claim is still empty. Administrator-only operations are marked `admin`; manager operations require the `manager` or `admin` authorization profile.
+JWTs are returned by `POST /api/auth/login` and contain the account and active tenant. Login itself carries no tenant - the issued token starts with an empty tenant claim, and `POST /api/auth/select-tenant` mints a new token scoped to a specific tenant once one is chosen (see below). All tenant-scoped query and mutation endpoints enforce the tenant in that claim and reject a token whose tenant claim is still empty. The one exception is `POST /api/matches/find` (see [External results](#external-results)), which accepts the plain login token and searches every tenant the account is authorized for. Administrator-only operations are marked `admin`; manager operations require the `manager` or `admin` authorization profile.
 
 ## Conventions
 
@@ -64,7 +64,7 @@ JWTs are returned by `POST /api/auth/login` and contain the account and active t
 |---|---|---|---|
 | `GET` | `/api/categories` | user | List categories and their values alphabetically. |
 | `POST` | `/api/categories` | manager | Create a category. |
-| `PUT` | `/api/categories/{categoryId}` | manager | Rename a category with `{ name }`. |
+| `PUT` | `/api/categories/{categoryId}` | manager | Rename a category and set its optional API name with `{ name, apiName? }`. `apiName` is trimmed; blank or omitted clears it. It is only used by `POST /api/matches/find`. `400` `CATEGORY_API_NAME_RESERVED` for `name`/`score`/`lidnummer` (case-insensitive), `400` `CATEGORY_API_NAME_INVALID` when longer than 64 characters, `409` `CATEGORY_API_NAME_TAKEN` when another category of the tenant already uses it (case-insensitive). |
 | `POST` | `/api/categories/{categoryId}/values` | manager | Add a `{ valueId, name }` category value. |
 | `PUT` | `/api/categories/{categoryId}/values/{valueId}` | manager | Rename a category value with `{ name }`. |
 | `DELETE` | `/api/categories/{categoryId}/values/{valueId}` | manager | Remove a category value. |
@@ -173,6 +173,33 @@ Lets a tenant administrator export a tenant (optionally with its whole sub-tenan
 |---|---|---|---|
 | `POST` | `/api/backup/export` | admin | Build a backup ZIP for the active tenant with `{ includeSubTenants }` and return it as `application/zip` (synchronous, in-memory, single request/response). |
 | `POST` | `/api/backup/restore` | admin | Upload a backup ZIP (`multipart/form-data`, field `file`, max 200 MB) and restore it as a new sub-tenant under the active tenant, inside a single database transaction. Returns `{ newTenantId, newTenantName, warnings }` on success. `400` with a coded error body on failure: `RESTORE_FILE_MISSING`, `RESTORE_INVALID_FILE`, `RESTORE_MISSING_INDEX`, `RESTORE_INVALID_INDEX`, `RESTORE_UNSUPPORTED_VERSION`, `RESTORE_INVALID_ROOT_TENANT`. |
+
+## External results
+
+Lets an external system fetch the results of one match. See [../documentation/FIND-MATCHES.md](../documentation/FIND-MATCHES.md).
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| `POST` | `/api/matches/find` | user | Find exactly one match by `{ date, starttime }` (`yyyy-MM-dd`, `hh:mm` 24h) and return its results. Works with the token straight from `POST /api/auth/login` (no tenant selection needed): it searches every tenant the account is authorized for (home tenant plus descendants). A match matches when its `date` equals `date` and its `shortCode` parses to the same time as `starttime` (`9:30` matches `09:30`; non-time short codes never match); open and closed matches alike. Other body properties are ignored. Returns `200` with `{ description, date, shortCode, results }`, where `description` is `"{tenant name} - {match name}"` and each `results` row (ranked by score, then name) has `name`, `score`, `lidnummer` (federation number or `null`) plus one property per category the participant has a value for: key = the category's `apiName`, else its name; value = the category value's name. Categories resolving to `name`/`score`/`lidnummer` are skipped; on duplicate keys the first category by name wins. Errors: `400` `INVALID_DATE` / `INVALID_STARTTIME`, `404` `MATCH_NOT_FOUND`, `409` `MATCH_AMBIGUOUS` (more than one match; `message` lists them - the endpoint never returns more than one match). |
+
+```http
+POST /api/matches/find
+Authorization: Bearer <token from /api/auth/login>
+Content-Type: application/json
+
+{ "date": "2026-10-22", "starttime": "19:30" }
+```
+
+```json
+{
+  "description": "Centaur - Wintercompetitie ronde 3",
+  "date": "2026-10-22",
+  "shortCode": "19:30",
+  "results": [
+    { "name": "Amy Archer", "score": 287, "lidnummer": "123456", "klasse": "Senioren", "discipline": "Recurve" }
+  ]
+}
+```
 
 ## Public score consumers
 

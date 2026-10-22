@@ -2,6 +2,8 @@
 
 - [DESIGN.md](DESIGN.md)
   Documents the design and use cases for this software
+- [INTEGRATION-FIND-MATCHES.nl.md](INTEGRATION-FIND-MATCHES.nl.md) / [INTEGRATION-FIND-MATCHES.en.md](INTEGRATION-FIND-MATCHES.en.md)
+  Integration guide (Dutch / English) for external systems importing match scores, from match set-up to fetching results
 
 
 # Index to project documentation

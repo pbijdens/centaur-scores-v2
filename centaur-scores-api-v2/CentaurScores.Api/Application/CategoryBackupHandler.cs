@@ -13,7 +13,8 @@ public sealed class CategoryBackupHandler : IBackupHandler
         var categories = await db.Categories.AsNoTracking().Include(item => item.Values).Where(item => tenantIds.Contains(item.TenantId)).ToListAsync(cancellationToken);
         return categories.Select(item => (item.Id, (object)new CategoryBackup(
             item.Id, item.TenantId, item.Name, item.IsUsed,
-            item.Values.Select(value => new CategoryValueBackup(value.ValueId, value.Name)).ToList()))).ToList();
+            item.Values.Select(value => new CategoryValueBackup(value.ValueId, value.Name)).ToList(),
+            item.ApiName))).ToList();
     }
 
     public async Task<BackupImportOutcome> ImportAsync(BackupImportContext context, CancellationToken cancellationToken)
@@ -36,6 +37,7 @@ public sealed class CategoryBackupHandler : IBackupHandler
                 Id = newCategoryId,
                 TenantId = newTenantId,
                 Name = entry.Name,
+                ApiName = entry.ApiName,
                 IsUsed = entry.IsUsed,
                 Values = entry.Values.Select(value => new CategoryValue { Id = Guid.NewGuid(), TenantId = newTenantId, CategoryId = newCategoryId, ValueId = value.ValueId, Name = value.Name }).ToList()
             });

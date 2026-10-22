@@ -15,9 +15,14 @@ public sealed record UpdateAccountRequest(string Username, string? Password, str
 public sealed record UpdateProfileRequest(string? DisplayName, string? Email);
 public sealed record ChangePasswordRequest(string CurrentPassword, string NewPassword);
 public sealed record CreateCategoryRequest(string Name);
-public sealed record UpdateCategoryRequest(string Name);
+public sealed record UpdateCategoryRequest(string Name, string? ApiName = null);
 public sealed record CreateCategoryValueRequest(int ValueId, string Name);
 public sealed record UpdateCategoryValueRequest(string Name);
+// External results endpoint (POST api/matches/find). Only date and starttime are part of the contract;
+// any other body property is ignored on deserialization and never read.
+public sealed record FindMatchRequest(string? Date, string? Starttime);
+// Results rows are dictionaries because the category properties are dynamic (API name or category name).
+public sealed record FoundMatch(string Description, string Date, string? ShortCode, IReadOnlyList<Dictionary<string, object?>> Results);
 public sealed record CreateParticipantListRequest(string Name, bool IsActive);
 public sealed record CreateParticipantRequest(string LastName, string FullName, string? FederationNumber, Dictionary<Guid, int> Categories, bool IsActive = true);
 public sealed record ImportParticipantListResult(int Created, int Updated, IReadOnlyList<string> Warnings);

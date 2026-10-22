@@ -12,7 +12,7 @@ public sealed record TenantBackup(Guid Id, string Name, string? LogoUrl, Guid? P
 public sealed record AccountBackup(Guid Id, Guid TenantId, string Username, string PasswordHash, string? DisplayName, string? Email, string Authorization);
 
 public sealed record CategoryValueBackup(int ValueId, string Name);
-public sealed record CategoryBackup(Guid Id, Guid TenantId, string Name, bool IsUsed, List<CategoryValueBackup> Values);
+public sealed record CategoryBackup(Guid Id, Guid TenantId, string Name, bool IsUsed, List<CategoryValueBackup> Values, string? ApiName = null);
 
 public sealed record ParticipantListMemberBackup(Guid Id, string LastName, string FullName, string? FederationNumber, Dictionary<Guid, int> Categories, bool IsActive);
 public sealed record ParticipantListBackup(Guid Id, Guid TenantId, string Name, bool IsActive, List<ParticipantListMemberBackup> Members);

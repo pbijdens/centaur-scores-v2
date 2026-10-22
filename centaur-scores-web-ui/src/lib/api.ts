@@ -334,8 +334,8 @@ export class ApiClient {
     return this.request('/api/categories', { method: 'POST', body: JSON.stringify({ name }) })
   }
 
-  updateCategory(categoryId: string, name: string): Promise<Category> {
-    return this.request(`/api/categories/${categoryId}`, { method: 'PUT', body: JSON.stringify({ name }) })
+  updateCategory(categoryId: string, name: string, apiName: string | null): Promise<Category> {
+    return this.request(`/api/categories/${categoryId}`, { method: 'PUT', body: JSON.stringify({ name, apiName }) })
   }
 
   addCategoryValue(categoryId: string, valueId: number, name: string) {

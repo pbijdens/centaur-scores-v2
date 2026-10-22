@@ -1,3 +1,4 @@
+using CentaurScores.Api.Application;
 using CentaurScores.Api.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
@@ -69,6 +70,7 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
         // Explicit lengths keep these string columns as indexable varchar rather than the longtext that a
         // bare `string` property maps to by default - without this, the 5-column composite index below
         // exceeds MySQL's 3072-byte max key length.
+        modelBuilder.Entity<Category>().Property(item => item.ApiName).HasMaxLength(CategoryApiNames.MaxLength);
         modelBuilder.Entity<PersonalBestClassifier>().Property(item => item.Name).HasMaxLength(100);
         modelBuilder.Entity<PersonalBestDiscipline>().Property(item => item.Name).HasMaxLength(100);
         modelBuilder.Entity<PersonalBestArcherName>().Property(item => item.FederationNumber).HasMaxLength(32);
