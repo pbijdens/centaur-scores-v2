@@ -192,7 +192,7 @@
   }
 </script>
 
-<MatchPageHeader {api} {match} {language} {labels} handlers={headerHandlers} title={participant.fullName || participant.lastName} subtitle={categoryLabel()} backLabel={match.name} {onBack} pageActions={participantActions} />
+<MatchPageHeader {api} {match} {language} {labels} handlers={headerHandlers} matchActions={false} title={participant.fullName || participant.lastName} subtitle={categoryLabel()} backLabel={match.name} {onBack} pageActions={participantActions} />
 {#if removeError}<p class="error">{removeError}</p>{/if}
 {#if match.signatureMode !== 'none'}
   <div class="panel signature-status-banner" class:is-signed={participant.signed}>
@@ -207,8 +207,13 @@
 <section class="panel">
   <h2>{labels.participantDetailsLabel}</h2>
   <p class="muted">{participant.federationNumber} / {participant.fullName || participant.lastName}{#if categoryLabel()}<span class="muted">/ {categoryLabel()}</span>{/if}</p>
-  {#if !participant.participantListMemberId && sourceList && canManage}
-    <a class="primary" href={participantMemberPath(sourceList.id, 'new')} on:click={(event) => navigateOnClick(event, onAddToList)}>{labels.addToParticipantList.replace('{name}', sourceList.name)}</a>
+  {#if !participant.participantListMemberId}
+    <div class="details-actions">
+      <a class="primary" href={matchParticipantEditPath(match.id, participant.id)} on:click={(event) => navigateOnClick(event, onEditDetails)}>✎ {labels.editUnlistedParticipantDetails}</a>
+      {#if sourceList && canManage}
+        <a class="primary" href={participantMemberPath(sourceList.id, 'new')} on:click={(event) => navigateOnClick(event, onAddToList)}>{labels.addToParticipantList.replace('{name}', sourceList.name)}</a>
+      {/if}
+    </div>
   {/if}
 </section>
 
@@ -259,6 +264,17 @@
 <style>
   .section-gap {
     margin-top: 32px;
+  }
+
+  .details-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 12px;
+  }
+
+  .details-actions a {
+    text-decoration: none;
   }
 
   .scores-header {

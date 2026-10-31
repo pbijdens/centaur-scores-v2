@@ -1,4 +1,5 @@
 import type { Account, Category, Competition, CompetitionResultsDocument, CompetitionRound, CompetitionScoreRule, DefaultScopeSettings, Language, LiveScoringMatch, LiveScoringPage, Match, MatchListItem, MatchParticipant, MatchParticipantSignature, MatchTemplate, ParticipantList, ParticipantListSummary, PersonalBestAvailableValue, PersonalBestConflictResolution, PersonalBestDiscipline, PersonalBestDisciplineValueRef, PersonalBestExportConfig, PersonalBestExportField, PersonalBestExportMode, PersonalBestDateFormat, PersonalBestImportConfig, PersonalBestImportResult, PersonalBestLogRow, PersonalBestStatus, Profile, RestoreBackupResult, ScopeConflict, ScoreDevice, Tenant } from './types'
+import { filenameFromDisposition } from './contentDisposition'
 
 export const apiBase = import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:5080'
 
@@ -245,17 +246,13 @@ export class ApiClient {
   async downloadMatchExport(matchId: string, language: Language): Promise<{ blob: Blob; filename: string }> {
     const response = await fetch(`${apiBase}/api/matches/${matchId}/export.csv?language=${language}`, { headers: this.headers() })
     if (!response.ok) throw await readApiError(response)
-    const disposition = response.headers.get('content-disposition') ?? ''
-    const filenameMatch = /filename="?([^"]+)"?/.exec(disposition)
-    return { blob: await response.blob(), filename: filenameMatch?.[1] ?? 'export.csv' }
+    return { blob: await response.blob(), filename: filenameFromDisposition(response.headers.get('content-disposition'), 'export.csv') }
   }
 
   async downloadLaneAssignmentExport(matchId: string, language: Language): Promise<{ blob: Blob; filename: string }> {
     const response = await fetch(`${apiBase}/api/matches/${matchId}/lanes.xlsx?language=${language}`, { headers: this.headers() })
     if (!response.ok) throw await readApiError(response)
-    const disposition = response.headers.get('content-disposition') ?? ''
-    const filenameMatch = /filename="?([^"]+)"?/.exec(disposition)
-    return { blob: await response.blob(), filename: filenameMatch?.[1] ?? 'lanes.xlsx' }
+    return { blob: await response.blob(), filename: filenameFromDisposition(response.headers.get('content-disposition'), 'lanes.xlsx') }
   }
 
   fetchProfile(): Promise<Profile> {
@@ -389,9 +386,7 @@ export class ApiClient {
   async downloadParticipantListExport(listId: string, language: Language): Promise<{ blob: Blob; filename: string }> {
     const response = await fetch(`${apiBase}/api/participant-lists/${listId}/export.xlsx?language=${language}`, { headers: { Authorization: `Bearer ${this.getToken()}` } })
     if (!response.ok) throw await readApiError(response)
-    const disposition = response.headers.get('content-disposition') ?? ''
-    const filenameMatch = /filename="?([^"]+)"?/.exec(disposition)
-    return { blob: await response.blob(), filename: filenameMatch?.[1] ?? 'participants.xlsx' }
+    return { blob: await response.blob(), filename: filenameFromDisposition(response.headers.get('content-disposition'), 'participants.xlsx') }
   }
 
   async importParticipantList(listId: string, file: File): Promise<{ created: number; updated: number; warnings: string[] }> {
@@ -483,9 +478,7 @@ export class ApiClient {
   async downloadPersonalBestExport(): Promise<{ blob: Blob; filename: string }> {
     const response = await fetch(`${apiBase}/api/personal-best/export.xlsx`, { headers: { Authorization: `Bearer ${this.getToken()}` } })
     if (!response.ok) throw await readApiError(response)
-    const disposition = response.headers.get('content-disposition') ?? ''
-    const filenameMatch = /filename="?([^"]+)"?/.exec(disposition)
-    return { blob: await response.blob(), filename: filenameMatch?.[1] ?? 'personal-best-updates.xlsx' }
+    return { blob: await response.blob(), filename: filenameFromDisposition(response.headers.get('content-disposition'), 'personal-best-updates.xlsx') }
   }
 
   fetchPersonalBestLog(): Promise<PersonalBestLogRow[]> {
@@ -496,9 +489,7 @@ export class ApiClient {
     const response = await fetch(`${apiBase}/api/backup/export`, { method: 'POST', headers: this.headers(), body: JSON.stringify({ includeSubTenants }) })
     if (response.status === 401) this.onUnauthorized()
     if (!response.ok) throw await readApiError(response)
-    const disposition = response.headers.get('content-disposition') ?? ''
-    const filenameMatch = /filename="?([^"]+)"?/.exec(disposition)
-    return { blob: await response.blob(), filename: filenameMatch?.[1] ?? 'backup.zip' }
+    return { blob: await response.blob(), filename: filenameFromDisposition(response.headers.get('content-disposition'), 'backup.zip') }
   }
 
   async restoreBackup(file: File): Promise<RestoreBackupResult> {
