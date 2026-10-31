@@ -78,7 +78,7 @@
 </script>
 
 <div class="replace-view">
-  <MatchPageHeader {api} {match} {language} {labels} handlers={headerHandlers} title={heading} subtitle={labels.replaceParticipantHint} backLabel={participant.fullName || participant.lastName} {onBack} />
+  <MatchPageHeader {api} {match} {language} {labels} handlers={headerHandlers} matchActions={false} title={heading} subtitle={labels.replaceParticipantHint} backLabel={participant.fullName || participant.lastName} {onBack} />
   <section class="panel section-gap" class:fill-panel={!!sourceList}>
     {#if sourceList}
       {#if match.allowFreeParticipants}

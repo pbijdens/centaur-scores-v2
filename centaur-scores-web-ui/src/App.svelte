@@ -509,7 +509,7 @@
         <MatchMetadataEditView {api} match={currentMatch} categories={$categories} participantLists={$participantLists} {language} labels={t} headerHandlers={matchHeaderHandlers} onBack={() => navigate(`/matches/${currentMatch.id}`)} onSaved={refreshSelectedMatch} />
       {:else if view === 'match-devices' && selectedMatch}
         {@const currentMatch = selectedMatch}
-        <MatchDevicesView {api} match={currentMatch} categories={$categories} {language} labels={t} headerHandlers={matchHeaderHandlers} onBack={() => navigate(`/matches/${currentMatch.id}`)} onChanged={refreshSelectedMatch} />
+        <MatchDevicesView {api} match={currentMatch} categories={$categories} {language} labels={t} headerHandlers={matchHeaderHandlers} onBack={() => navigate(`/matches/${currentMatch.id}`)} onChanged={refreshSelectedMatch} onOpenParticipant={openParticipant} />
       {:else if view === 'match-participant' && selectedMatch && selectedParticipant}
         {@const currentMatch = selectedMatch}
         {@const currentParticipant = selectedParticipant}

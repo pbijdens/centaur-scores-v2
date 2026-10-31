@@ -22,10 +22,17 @@
   let categoryValues: Record<string, string> = {}
   let saveError = ''
 
-  $: keyboardConfig = parseMatchKeyboardConfig(match.keyboardJson)
-  $: matchCategories = keyboardConfig.categoryOrder.map((id) => categories.find((category) => category.id === id)).filter((category): category is Category => !!category)
+  $: matchCategories = matchCategoriesFor(match, categories)
 
-  for (const category of matchCategories) {
+  function matchCategoriesFor(currentMatch: Match, allCategories: Category[]): Category[] {
+    return parseMatchKeyboardConfig(currentMatch.keyboardJson).categoryOrder
+      .map((id) => allCategories.find((category) => category.id === id))
+      .filter((category): category is Category => !!category)
+  }
+
+  // Seeds the form from the participant. This runs during component init, before `$:` statements have
+  // computed anything, so it must not read the reactive `matchCategories` (it is still undefined here).
+  for (const category of matchCategoriesFor(match, categories)) {
     const value = participant.categories[category.id]
     if (value !== undefined) categoryValues[category.id] = String(value)
   }
@@ -47,7 +54,7 @@
   }
 </script>
 
-<MatchPageHeader {api} {match} {language} {labels} handlers={headerHandlers} title={labels.editParticipantDetails} subtitle={participant.fullName || participant.lastName} backLabel={participant.fullName || participant.lastName} {onBack} />
+<MatchPageHeader {api} {match} {language} {labels} handlers={headerHandlers} matchActions={false} title={labels.editParticipantDetails} subtitle={participant.fullName || participant.lastName} backLabel={participant.fullName || participant.lastName} {onBack} />
 <section class="panel">
   <form class="inline-form" on:submit|preventDefault={save}>
     <label>{labels.fullNameLabel}<input bind:value={fullName} autocomplete="off" /></label>

@@ -7,7 +7,7 @@
   import { matchDevicesPath, matchEditPath, matchPrintPath, matchQrPath, matchResultsPath } from './router'
   import type { Language, Match } from './types'
 
-  // The header shared by the match page and every page below it. It always offers the match-level
+  // The header shared by the match page and every page below it. Unless matchActions is off, it offers the match-level
   // actions - Activate/Deactivate, QR codes and Results next to the title, and the match's full ⋯ menu -
   // with the current page's own actions (pageActions) listed between the two in that menu.
   export let api: ApiClient
@@ -22,6 +22,9 @@
   export let pageActions: PageAction[] = []
   // The match sub-page being shown, so the menu leaves out the link to itself.
   export let current: 'match' | 'metadata' | 'devices' | 'print' | null = null
+  // Participant pages turn this off: their header then offers only the participant's own actions, so a
+  // destructive match-level item (Delete match) can't be mistaken for the participant's Remove.
+  export let matchActions = true
 
   let actionError = ''
   let showCopyForm = false
@@ -45,7 +48,7 @@
     ] },
     { label: labels.copyMatch, onClick: () => (showCopyForm = !showCopyForm) }
   ] satisfies PageAction[]
-  $: actions = [
+  $: actions = !matchActions ? pageActions : [
     { label: match.isOpen ? labels.deactivate : labels.activate, header: 'highlight', active: match.isOpen, onClick: handlers.onToggleOpen },
     { label: labels.viewQrCodes, header: 'icon', headerLabel: '▦', href: matchQrPath(match.id), newTab: true },
     ...resultsAction,

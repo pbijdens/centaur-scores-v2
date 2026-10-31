@@ -85,7 +85,7 @@
 
 <svelte:window on:keydown={onKeydown} />
 
-<MatchPageHeader {api} {match} {language} {labels} handlers={headerHandlers} title={labels.viewEditScores} subtitle={participant.fullName || participant.lastName} backLabel={participant.fullName || participant.lastName} {onBack} pageActions={[
+<MatchPageHeader {api} {match} {language} {labels} handlers={headerHandlers} matchActions={false} title={labels.viewEditScores} subtitle={participant.fullName || participant.lastName} backLabel={participant.fullName || participant.lastName} {onBack} pageActions={[
   { label: labels.undo, headerLabel: `↶ ${labels.undo}`, header: 'text', disabled: !canUndo || !canEditScores, onClick: undo },
   { label: labels.redo, headerLabel: `↷ ${labels.redo}`, header: 'text', disabled: !canRedo || !canEditScores, onClick: redo }
 ]} />
