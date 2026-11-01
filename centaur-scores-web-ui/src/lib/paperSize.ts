@@ -1,5 +1,5 @@
-// The paper a printable page is laid out for. Pages that compute their own pagination or sizes in mm (results in
-// PDF mode, scorecards, the lane sheet) take the sheet's dimensions from here instead of assuming A4. The browser
+// The paper a printable page is laid out for. Pages that compute their own pagination or sizes in mm (printed
+// results, scorecards, the lane sheet) take the sheet's dimensions from here instead of assuming A4. The browser
 // is not told the size (no `@page { size }`, which would hide its orientation switch - except on the portrait-only
 // lane sheet), so the same paper has to be picked in the browser's print dialog.
 //

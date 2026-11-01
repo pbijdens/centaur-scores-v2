@@ -79,7 +79,7 @@ describe('paginate', () => {
 })
 
 describe('unitsPerColumn', () => {
-  const options = { mode: 'pages', detailLines: 2, fontScale: 1 } as const
+  const options = { detailLines: 2, fontScale: 1 } as const
 
   it('fits fewer units in landscape and with larger fonts', () => {
     expect(unitsPerColumn('A4', 'portrait', options)).toBe(23)
@@ -130,11 +130,11 @@ describe('ruleBlocks', () => {
 
 describe('layout options', () => {
   it('keeps valid stored options', () => {
-    expect(parseLayoutOptions({ mode: 'pages', detailLines: 3, fontScale: 1.41 })).toEqual({ mode: 'pages', detailLines: 3, fontScale: 1.41 })
+    expect(parseLayoutOptions({ detailLines: 3, fontScale: 1.41 })).toEqual({ detailLines: 3, fontScale: 1.41 })
   })
 
   it('falls back to defaults for missing or invalid values', () => {
-    expect(parseLayoutOptions(null)).toEqual({ mode: 'stream', detailLines: 2, fontScale: 1 })
-    expect(parseLayoutOptions({ mode: 'bogus', detailLines: 7, fontScale: 3 })).toEqual({ mode: 'stream', detailLines: 2, fontScale: 1 })
+    expect(parseLayoutOptions(null)).toEqual({ detailLines: 2, fontScale: 1 })
+    expect(parseLayoutOptions({ mode: 'stream', detailLines: 7, fontScale: 3 })).toEqual({ detailLines: 2, fontScale: 1 })
   })
 })

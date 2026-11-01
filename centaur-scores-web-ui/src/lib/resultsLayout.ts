@@ -3,16 +3,13 @@ import type { CompetitionResultEntry, CompetitionResultGroup, LiveScoringBlock, 
 
 // Printed results - competition results (see ../documentation/COMPETITION-RESULT-SCREEN.md) and a match's results per
 // scope share one report format. The report is a stream of equally high units - a group header or a participant row -
-// laid out over two columns in one of two modes:
-// - 'stream': notice-board mode; the stream is split in half, the left column holds the first half and the right
-//   column the second, each running down across as many pages as needed.
-// - 'pages': PDF mode; classic two-column pages read left column, right column, next page.
-export type ResultsLayoutMode = 'stream' | 'pages'
+// printed as pages of two columns, read left column, right column, next page (paginate). On screen the stream is
+// split in half over two columns instead (splitInTwo).
 export type ResultsDetailLines = 2 | 3
 // Multiplies every printed text size; 1.41 (√2) makes A3 paper look like the A4 layout enlarged.
 export const resultsFontScales = [1, 1.2, 1.41, 1.7, 2] as const
 export type ResultsFontScale = typeof resultsFontScales[number]
-export type ResultsLayoutOptions = { mode: ResultsLayoutMode; detailLines: ResultsDetailLines; fontScale: ResultsFontScale }
+export type ResultsLayoutOptions = { detailLines: ResultsDetailLines; fontScale: ResultsFontScale }
 
 export type ResultUnit =
   | { kind: 'header'; name: string }
@@ -22,7 +19,7 @@ export type ResultUnit =
 export type RuleScoreItem = { text: string; struck: boolean; missing: boolean }
 export type RuleBlock = { label: string; total: number; scores: RuleScoreItem[] }
 
-export const defaultLayoutOptions: ResultsLayoutOptions = { mode: 'stream', detailLines: 2, fontScale: 1 }
+export const defaultLayoutOptions: ResultsLayoutOptions = { detailLines: 2, fontScale: 1 }
 
 export function flattenResults(groups: CompetitionResultGroup[]): ResultUnit[] {
   return groups
@@ -36,7 +33,7 @@ export function flattenMatchResults(blocks: LiveScoringBlock[]): ResultUnit[] {
     .flatMap((block): ResultUnit[] => [{ kind: 'header', name: block.name }, ...block.entries.map((entry): ResultUnit => ({ kind: 'match-entry', entry }))])
 }
 
-// Splits the stream roughly in half. Every unit is equally high, so a unit count is a height. The left column never
+// Splits the stream roughly in half, for the on-screen report. Every unit is equally high, so a unit count is a height. The left column never
 // ends on a header: when the halfway cut falls right after one, that header moves to the right column. The right
 // column may start with the tail of a group (an orphan) - that is accepted.
 export function splitInTwo(units: ResultUnit[]): [ResultUnit[], ResultUnit[]] {
@@ -45,7 +42,7 @@ export function splitInTwo(units: ResultUnit[]): [ResultUnit[], ResultUnit[]] {
   return [units.slice(0, cut), units.slice(cut)]
 }
 
-// PDF mode lays out its pages explicitly instead of with CSS multi-column: Safari ignores `columns` when printing
+// The printed report lays out its pages explicitly instead of with CSS multi-column: Safari ignores `columns` when printing
 // and prints a single column. Every unit has a fixed height (ResultUnit.svelte), so the units per column follow from
 // the printable height of the chosen paper (inside the pages' 10mm @page margins) minus the report header repeated
 // on every page (ResultsReportHeader.svelte, title clamped to two lines) and a safety margin for rounding.
@@ -99,11 +96,9 @@ export function ruleBlocks(entry: CompetitionResultEntry): RuleBlock[] {
 
 // Validates the layout options remembered for a results page's print dialog (see printOptions.ts).
 export function parseLayoutOptions(stored: Record<string, unknown> | null): ResultsLayoutOptions {
-  const mode = stored?.mode
   const lines = stored?.detailLines
   const scale = resultsFontScales.find((value) => value === stored?.fontScale)
   return {
-    mode: mode === 'stream' || mode === 'pages' ? mode : defaultLayoutOptions.mode,
     detailLines: lines === 3 || lines === 2 ? lines : defaultLayoutOptions.detailLines,
     fontScale: scale ?? defaultLayoutOptions.fontScale,
   }

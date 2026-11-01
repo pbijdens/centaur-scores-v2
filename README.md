@@ -95,7 +95,7 @@ If not every archer has a smartphone, or you prefer club-owned devices on the ta
   - **Best scores:** add up each archer's highest *N* scores over the rounds, with an optional minimum number of rounds shot.
   - **Points per round:** rank archers in every round and award F1-style points (12, 10, 8, 7, …), then add up the points.
 - Several scoring rules per competition (for example 18 m and 25 m), with a total.
-- Printable result lists: a compact two-column layout for the notice board, or a page-by-page version for PDF.
+- Printable result lists: a compact layout of two columns per page, for any common paper size.
 
 ### Personal bests
 

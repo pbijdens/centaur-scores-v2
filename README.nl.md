@@ -95,7 +95,7 @@ Heeft niet iedere schutter een smartphone, of wil je liever verenigingsapparaten
   - **Beste scores:** tel per schutter de hoogste *N* scores over de rondes op, met optioneel een minimum aantal geschoten rondes.
   - **Punten per ronde:** rangschik de schutters in elke ronde, ken punten toe zoals in de Formule 1 (12, 10, 8, 7, …) en tel die op.
 - Meerdere telregels per competitie (bijvoorbeeld 18 m en 25 m), met een totaal.
-- Printbare uitslagenlijsten: compact in twee kolommen voor het prikbord, of pagina voor pagina voor een pdf.
+- Printbare uitslagenlijsten: compact in twee kolommen per pagina, op elk gangbaar papierformaat.
 
 ### Persoonlijke records
 

@@ -25,3 +25,5 @@ My requirements:
                4. the block for a scoring rule is prefixed/labeld with the name of the scoring rule. so I might get something like 18 meter: 100 - - - 90 - 120, 25 meter: 70, 70, 70, 70, 70, -60-, -40-
 4. Mode 1 is to be pinned to a notice board, mode 2 is for sending out printed PDF results.
 
+> **Update 2026-11-01:** mode 1 (notice board) has been dropped. The printed report is always mode 2, pages of two columns read page by page, for a paper size picked in the print dialog. The on-screen page still shows the stream split in half over two columns.
+
