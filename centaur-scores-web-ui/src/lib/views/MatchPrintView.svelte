@@ -29,7 +29,8 @@
   // stored as what was *left out*, so an archer or category added to the match later is included by
   // default, and the selection never depends on the order in which the match and the tenant's categories
   // finish loading.
-  type ScorecardPrintOptions = { excludedCategoryIds: string[]; excludedParticipantIds: string[]; freeText: string; splitByGroup: boolean }
+  // blackOnly prints all text and lines in pure black (only the logo keeps its colours), for low-quality printers.
+  type ScorecardPrintOptions = { excludedCategoryIds: string[]; excludedParticipantIds: string[]; freeText: string; splitByGroup: boolean; blackOnly: boolean }
 
   function parseOptions(stored: Record<string, unknown> | null): ScorecardPrintOptions {
     const ids = (value: unknown) => (Array.isArray(value) ? value.filter((id): id is string => typeof id === 'string') : [])
@@ -37,7 +38,8 @@
       excludedCategoryIds: ids(stored?.excludedCategoryIds),
       excludedParticipantIds: ids(stored?.excludedParticipantIds),
       freeText: typeof stored?.freeText === 'string' ? stored.freeText : '',
-      splitByGroup: stored?.splitByGroup === true
+      splitByGroup: stored?.splitByGroup === true,
+      blackOnly: stored?.blackOnly === true
     }
   }
 
@@ -65,6 +67,9 @@
   let dialogExcludedParticipantIds = new Set<string>()
   let dialogFreeText = ''
   let dialogSplitByGroup = false
+  let dialogBlackOnly = false
+  // The archer list starts collapsed every time the dialog opens; its summary shows how many are selected.
+  let participantsExpanded = false
 
   $: dialogSelectedCount = participants.filter((participant) => !dialogExcludedParticipantIds.has(participant.id)).length
   $: allParticipantsSelected = participants.length > 0 && dialogSelectedCount === participants.length
@@ -76,6 +81,8 @@
     dialogExcludedParticipantIds = new Set(options.excludedParticipantIds)
     dialogFreeText = options.freeText
     dialogSplitByGroup = options.splitByGroup
+    dialogBlackOnly = options.blackOnly
+    participantsExpanded = false
     dialogOpen = true
   }
 
@@ -98,7 +105,8 @@
       excludedCategoryIds: [...dialogExcludedCategoryIds].filter((id) => categoryIds.has(id)),
       excludedParticipantIds: [...dialogExcludedParticipantIds].filter((id) => participantIds.has(id)),
       freeText: dialogFreeText,
-      splitByGroup: dialogSplitByGroup
+      splitByGroup: dialogSplitByGroup,
+      blackOnly: dialogBlackOnly
     }
     savePrintOptions(optionsKey, options)
     dialogOpen = false
@@ -201,20 +209,23 @@
     return (match.devices ?? []).find((device) => device.id === participant.deviceId)?.name ?? '-'
   }
 
-  // Printed sizes, only applied on paper (as CSS variables, see the print rules below). The score table is
-  // a flex-grow child that stretches to fill the card's full page height, but the browser's table row
-  // auto-stretch algorithm ignores `max-height` set on individual cells/rows - only a max-height on the
-  // <table> itself is respected as a clamp. This caps end-rows at ~1cm each regardless of how much space
-  // is available.
+  // Printed sizes, only applied on paper (as CSS variables, see the print rules below), computed separately
+  // for each orientation so the score grid fills the card's height in both: a card is 140.5mm tall in
+  // portrait (2×2) and 198mm in landscape (4 across), see the orientation CSS below. Around the grid the card
+  // needs ~57mm regardless of the number of ends (header with lane box, participant line, two stacked
+  // signature boxes - measured in Chrome's print layout), plus the two-line categories block and the taller
+  // header of the optional free-text line when present. Every one of those lines is fixed in height (single
+  // lines with an ellipsis, the categories block clamped to two lines), so the same chrome holds for every
+  // card. CHROME_SAFETY_MM covers font-metric differences between browsers. The column headers and the totals
+  // rows take another TABLE_HEADER_ROW_MM + TOTALS_ROWS_MM. The rest is divided over the rows, up to
+  // MAX_ROW_HEIGHT_MM each.
   //
-  // A portrait card is only ~140.5mm tall (see the orientation:portrait CSS below) and the chrome around
-  // the table (header with lane box, participant line, categories, two stacked signature boxes) takes up
-  // ~74mm of that regardless of how many ends the match has, the totals row below the grid another 7.5mm.
   // Without shrinking, a match with enough ends makes the table's natural minimum height overflow the card,
   // which pushes the whole grid row to the next page (and, worse, can corrupt the page's layout entirely
   // rather than gracefully paginating - CSS Grid fragmentation in Chrome's print engine does not degrade
-  // gently). Sizing each row down to fit guarantees 4-up always; the max-height still lets rows stretch
-  // back up to 1cm when there's extra room (landscape, or a low end count).
+  // gently). The table is also a flex-grow child of the card, so any safety margin left over still goes to
+  // the rows; the browser's table row auto-stretch algorithm ignores `max-height` on cells/rows - only a
+  // max-height on the <table> itself clamps it, which keeps rows at MAX_ROW_HEIGHT_MM for short matches.
   //
   // A `height` on a table cell is only a suggestion the browser can grow past to fit its content's line
   // box - it cannot shrink a row below the line-height its font-size needs. So for high end counts the
@@ -224,14 +235,34 @@
   // would make it the tallest cell and override every other cell's shrunk height.
   // No lower clamp on either value: forcing a legibility floor would silently reintroduce the overflow
   // this guards against for very high end counts.
-  const PORTRAIT_CARD_HEIGHT_MM = 140.5
-  const CARD_CHROME_HEIGHT_MM = 74
-  const TABLE_HEADER_ROW_MM = 2
+  const CARD_HEIGHT_MM = { portrait: 140.5, landscape: 198 }
+  // The width inside a card's border and padding: two cards across in portrait, four in landscape. The table
+  // is laid out with equal-width columns (end number, arrows, score, subtotal, 10s, 9s), so this bounds the
+  // digit size too - a three-digit subtotal must fit its column on one line (6 arrows in landscape: ~5.8mm).
+  const CARD_INNER_WIDTH_MM = { portrait: 92, landscape: 64 }
+  const DIGITS_PER_CELL = 3
+  const DIGIT_WIDTH_EM = 0.62
+  const CARD_CHROME_HEIGHT_MM = 57
+  const CATEGORIES_BLOCK_MM = 5.2
+  const FREE_TEXT_LINE_MM = 1.5
+  const CHROME_SAFETY_MM = 2.5
+  const TABLE_HEADER_ROW_MM = 3.5
   const TOTALS_ROWS_MM = 7.5
+  const MAX_ROW_HEIGHT_MM = 15
+  const MAX_CELL_FONT_PX = 13
   const MM_TO_PX = 96 / 25.4
-  $: rowHeightMm = Math.min(10, (PORTRAIT_CARD_HEIGHT_MM - CARD_CHROME_HEIGHT_MM - TABLE_HEADER_ROW_MM - TOTALS_ROWS_MM) / rowsPerCard)
-  $: cellFontSizePx = Math.min(11, rowHeightMm * MM_TO_PX * 0.85)
-  $: printSizes = `--row-height: ${rowHeightMm}mm; --cell-font: ${cellFontSizePx}px; --end-font: ${Math.min(8, cellFontSizePx)}px; --table-max-height: ${rowsPerCard * 10 + 6 + TOTALS_ROWS_MM}mm`
+
+  function orientationSizes(orientation: keyof typeof CARD_HEIGHT_MM, rows: number, columns: number, chromeMm: number): string {
+    const rowHeightMm = Math.min(MAX_ROW_HEIGHT_MM, (CARD_HEIGHT_MM[orientation] - chromeMm - TABLE_HEADER_ROW_MM - TOTALS_ROWS_MM) / rows)
+    const columnWidthPx = (CARD_INNER_WIDTH_MM[orientation] / columns) * MM_TO_PX
+    const cellFontPx = Math.min(MAX_CELL_FONT_PX, rowHeightMm * MM_TO_PX * 0.8, columnWidthPx / (DIGITS_PER_CELL * DIGIT_WIDTH_EM + 0.3))
+    return `--row-height-${orientation}: ${rowHeightMm}mm; --cell-font-${orientation}: ${cellFontPx}px; --end-font-${orientation}: ${Math.min(9, cellFontPx)}px`
+  }
+
+  $: chromeMm = CARD_CHROME_HEIGHT_MM + (printCategories.length > 0 ? CATEGORIES_BLOCK_MM : 0) + (options.freeText ? FREE_TEXT_LINE_MM : 0) + CHROME_SAFETY_MM
+  // End number, arrows, score and subtotal, plus the 10s and 9s columns when the keyboard has those keys.
+  $: tableColumns = match.arrowsPerEnd + (tenKey && nineKey ? 5 : 3)
+  $: printSizes = `${orientationSizes('portrait', rowsPerCard, tableColumns, chromeMm)}; ${orientationSizes('landscape', rowsPerCard, tableColumns, chromeMm)}; --table-max-height: ${rowsPerCard * MAX_ROW_HEIGHT_MM + TABLE_HEADER_ROW_MM + TOTALS_ROWS_MM}mm`
 
   function categoryValueFor(participant: MatchParticipant, category: Category): string | null {
     const valueId = participant.categories[category.id]
@@ -312,11 +343,19 @@
     </label>
   {/if}
 
+  <label class="checkbox-label">
+    <input type="checkbox" bind:checked={dialogBlackOnly} />
+    {labels.printBlackOnlyLabel}
+  </label>
+
   <p class="muted layout-hint">{labels.printLayoutFourColumnHint}</p>
 
-  <section>
-    <div class="participants-header">
+  <details class="participants-details" bind:open={participantsExpanded}>
+    <summary>
       <h3>{labels.printParticipantsLabel}</h3>
+      <span class="muted">{labels.printParticipantsSelectedSummary.replace('{selected}', String(dialogSelectedCount)).replace('{total}', String(participants.length))}</span>
+    </summary>
+    <div class="participants-header">
       <label class="checkbox-label">
         <input type="checkbox" checked={allParticipantsSelected} indeterminate={participantsIndeterminate} on:change={toggleAllParticipants} />
         {labels.printSelectAllLabel}
@@ -332,8 +371,8 @@
       {/each}
       {#if participants.length === 0}<p class="empty-state">{labels.emptyState}</p>{/if}
     </div>
-    {#if noParticipantsSelected}<p class="error">{labels.printNoParticipantsSelected}</p>{/if}
-  </section>
+  </details>
+  {#if noParticipantsSelected}<p class="error">{labels.printNoParticipantsSelected}</p>{/if}
 </PrintDialog>
 
 {#snippet printCard(card: PrintCard)}
@@ -359,12 +398,14 @@
       </div>
     </div>
     <div class="card-participant-line">
-      <span>{participant.fullName || participant.lastName}</span>
-      {#if participant.federationNumber}<span>{labels.federationNumberLabel}: {participant.federationNumber}</span>{/if}
+      <span class="card-participant-name">{participant.fullName || participant.lastName}</span>
+      {#if participant.federationNumber}<span class="card-federation-number">{labels.federationNumberLabel}: {participant.federationNumber}</span>{/if}
     </div>
-    {#if lines.length > 0}
+    <!-- Present on every card as soon as any category is printed, always exactly two lines high (see
+         CATEGORIES_BLOCK_MM), so long values can never push the grid down and every card's grid lines up. -->
+    {#if printCategories.length > 0}
       <div class="card-categories">
-        {#each lines as line}<span>{line.name}: {line.value}</span>{/each}
+        {#each lines as line}<span class="card-category">{line.name}: {line.value}</span>{' '}{/each}
       </div>
     {/if}
 
@@ -460,7 +501,7 @@
 
 <!-- On screen the cards form a responsive grid; on paper there are four per page, in a 2×2 grid in
      portrait or side by side in landscape (see the print rules below). -->
-<div class="print-page print-output" style={printSizes}>
+<div class="print-page print-output" class:black-only={options.blackOnly} style={printSizes}>
   {#each printPages as pageItems, pageIndex (pageIndex)}
     <div class="print-sheet">
       {#each chunk(pageItems, 2) as halfRowItems, halfIndex (halfIndex)}
@@ -496,11 +537,36 @@
     font-size: 13px;
   }
 
+  .participants-details summary {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+    cursor: pointer;
+  }
+
+  .participants-details summary::before {
+    content: '›';
+    font-weight: 700;
+    transition: transform 0.15s;
+  }
+
+  .participants-details[open] summary::before {
+    transform: rotate(90deg);
+  }
+
+  .participants-details summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .participants-details summary h3 {
+    margin: 0;
+  }
+
   .participants-header {
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 16px;
+    justify-content: flex-end;
+    margin: 10px 0;
   }
 
   .checkbox-row {
@@ -547,6 +613,14 @@
     }
   }
 
+  /* The "black only" print option: every text and line in pure black - no greys, no semi-transparent
+     borders - for printers that render grey poorly. Images (logo, signatures) keep their colours. */
+  .black-only .print-card,
+  .black-only .print-card :not(img) {
+    color: #000 !important;
+    border-color: #000 !important;
+  }
+
   .print-card {
     border: 1.5px solid #000;
     padding: 8px;
@@ -576,6 +650,17 @@
   .card-heading {
     flex: 1;
     min-width: 0;
+  }
+
+  /* Every line of the card's header is a single line (cut off with an ellipsis): a wrapped line would make
+     the card taller than the space its grid was sized for (see CARD_CHROME_HEIGHT_MM). */
+  .card-match-name,
+  .card-match-date,
+  .card-free-text,
+  .card-participant-name {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
   }
 
   .card-match-name {
@@ -638,20 +723,40 @@
   .card-participant-line {
     display: flex;
     justify-content: space-between;
+    gap: 6px;
     font-weight: 700;
     font-size: 10px;
     line-height: 1.1;
     margin-bottom: 1px;
   }
 
+  .card-participant-name,
+  .card-match-date {
+    min-width: 0;
+  }
+
+  .card-federation-number {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+
+  /* Exactly two lines, whatever the values: longer text is cut off after the second line. */
   .card-categories {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 1px 10px;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
+    height: 2.2em;
     font-size: 8px;
     line-height: 1.1;
     color: #333;
     margin-bottom: 2px;
+  }
+
+  .card-category {
+    margin-right: 6px;
+    white-space: nowrap;
   }
 
   .score-table {
@@ -684,6 +789,7 @@
   }
 
   .score-cell {
+    white-space: nowrap;
     border: 1px solid rgba(0, 0, 0, 0.5);
     text-align: center;
     height: 18px;
@@ -797,7 +903,7 @@
       box-sizing: border-box;
       margin: 0;
       /* Overrides the base .print-card's break-inside:avoid. Each card is already sized to fit exactly
-         within its grid cell (see rowHeightMm), so this should never need to break. But if that sizing is
+         within its grid cell (see orientationSizes), so this should never need to break. But if that sizing is
          ever slightly off, break-inside:avoid on an overflowing grid item makes Chrome's print engine
          corrupt the whole page (rows disappearing/overlapping) instead of just letting the small excess
          spill - a far safer failure mode. */
@@ -829,6 +935,12 @@
      letting its cards join that grid directly), while portrait's "2x2" is built from two independent
      single-row grids stacked in normal flow instead of one two-row grid. */
   @media print and (orientation: landscape) {
+    .print-page {
+      --row-height: var(--row-height-landscape);
+      --cell-font: var(--cell-font-landscape);
+      --end-font: var(--end-font-landscape);
+    }
+
     .print-sheet {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
@@ -843,6 +955,12 @@
   }
 
   @media print and (orientation: portrait) {
+    .print-page {
+      --row-height: var(--row-height-portrait);
+      --cell-font: var(--cell-font-portrait);
+      --end-font: var(--end-font-portrait);
+    }
+
     .print-sheet {
       display: block;
       height: 285mm;
