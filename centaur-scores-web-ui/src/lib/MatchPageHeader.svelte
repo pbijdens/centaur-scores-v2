@@ -21,7 +21,7 @@
   export let onBack: () => void
   export let pageActions: PageAction[] = []
   // The match sub-page being shown, so the menu leaves out the link to itself.
-  export let current: 'match' | 'metadata' | 'devices' | 'print' | null = null
+  export let current: 'match' | 'metadata' | 'devices' | 'print' | 'qr' | 'results' | null = null
   // Participant pages turn this off: their header then offers only the participant's own actions, so a
   // destructive match-level item (Delete match) can't be mistaken for the participant's Remove.
   export let matchActions = true
@@ -33,10 +33,14 @@
   let copyError = ''
 
   $: sortedLiveScopes = [...(match.liveScopes ?? [])].sort((a, b) => a.scope.localeCompare(b.scope))
-  $: resultsAction = sortedLiveScopes.length === 1
-    ? [{ label: labels.resultsLabel, header: 'primary', href: matchResultsPath(match.id, sortedLiveScopes[0].scope), newTab: true } satisfies PageAction]
+  // On a results page a single scope's button would only link to the page itself; several scopes still
+  // offer switching between them.
+  $: resultsAction = sortedLiveScopes.length === 1 && current === 'results'
+    ? []
+    : sortedLiveScopes.length === 1
+    ? [{ ...navigationItem(labels.resultsLabel, matchResultsPath(match.id, sortedLiveScopes[0].scope)), header: 'primary' } satisfies PageAction]
     : sortedLiveScopes.length > 1
-      ? [{ label: labels.resultsLabel, header: 'primary', children: sortedLiveScopes.map((scope) => ({ label: scope.scope, href: matchResultsPath(match.id, scope.scope), newTab: true })) } satisfies PageAction]
+      ? [{ label: labels.resultsLabel, header: 'primary', children: sortedLiveScopes.map((scope) => navigationItem(scope.scope, matchResultsPath(match.id, scope.scope))) } satisfies PageAction]
       : []
   $: matchItems = [
     ...(current !== 'metadata' ? [navigationItem(labels.editMetadata, matchEditPath(match.id))] : []),
@@ -50,7 +54,7 @@
   ] satisfies PageAction[]
   $: actions = !matchActions ? pageActions : [
     { label: match.isOpen ? labels.deactivate : labels.activate, header: 'highlight', active: match.isOpen, onClick: handlers.onToggleOpen },
-    { label: labels.viewQrCodes, header: 'icon', headerLabel: '▦', href: matchQrPath(match.id), newTab: true },
+    ...(current !== 'qr' ? [{ ...navigationItem(labels.viewQrCodes, matchQrPath(match.id)), header: 'icon', headerLabel: '▦' } satisfies PageAction] : []),
     ...resultsAction,
     ...asGroup(pageActions),
     ...asGroup(matchItems),

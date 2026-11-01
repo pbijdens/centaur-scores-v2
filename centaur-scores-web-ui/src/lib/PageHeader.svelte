@@ -50,7 +50,7 @@
             <svelte:fragment slot="trigger">{action.headerLabel ?? action.label}</svelte:fragment>
             {#each action.children as child}
               {#if child.href}
-                <a class="menu-item" href={child.href} target={child.newTab ? '_blank' : undefined} rel={child.newTab ? 'noopener' : undefined}>{child.label}</a>
+                <a class="menu-item" href={child.href} target={child.newTab ? '_blank' : undefined} rel={child.newTab ? 'noopener' : undefined} on:click={(event) => child.onClick && !child.newTab && navigateOnClick(event, child.onClick)}>{child.label}</a>
               {:else}
                 <button class="menu-item" disabled={child.disabled} on:click={child.onClick}>{child.label}</button>
               {/if}
@@ -59,7 +59,7 @@
         {:else if action.href && action.newTab}
           <a class={headerClass(action)} href={action.href} target="_blank" rel="noopener" aria-label={action.label} title={action.label}>{action.headerLabel ?? action.label}</a>
         {:else if action.href}
-          <a class={headerClass(action)} href={action.href} on:click={(event) => action.onClick && navigateOnClick(event, action.onClick)}>{action.headerLabel ?? action.label}</a>
+          <a class={headerClass(action)} href={action.href} aria-label={action.label} title={action.label} on:click={(event) => action.onClick && navigateOnClick(event, action.onClick)}>{action.headerLabel ?? action.label}</a>
         {:else}
           <button class={headerClass(action)} disabled={action.disabled} aria-label={action.label} title={action.label} on:click={action.onClick}>{action.headerLabel ?? action.label}</button>
         {/if}
@@ -76,7 +76,7 @@
               {#if expandedGroups[action.label]}
                 {#each action.children as child}
                   {#if child.href}
-                    <a class="menu-item menu-subitem" href={child.href} target={child.newTab ? '_blank' : undefined} rel={child.newTab ? 'noopener' : undefined}>{child.label}</a>
+                    <a class="menu-item menu-subitem" href={child.href} target={child.newTab ? '_blank' : undefined} rel={child.newTab ? 'noopener' : undefined} on:click={(event) => child.onClick && !child.newTab && navigateOnClick(event, child.onClick)}>{child.label}</a>
                   {:else}
                     <button class="menu-item menu-subitem" disabled={child.disabled} on:click={child.onClick}>{child.label}</button>
                   {/if}

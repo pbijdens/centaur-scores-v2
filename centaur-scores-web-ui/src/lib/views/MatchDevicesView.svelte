@@ -3,7 +3,7 @@
   import CategoryTag from '../CategoryTag.svelte'
   import LaneSheet from '../LaneSheet.svelte'
   import MatchPageHeader from '../MatchPageHeader.svelte'
-  import type { MatchHeaderHandlers } from '../pageActions'
+  import { printAction, type MatchHeaderHandlers } from '../pageActions'
   import { labelForError } from '../errors'
   import { distinctValues, mixedLaneNumbers, parseLane, uniformDeviceValue } from '../laneSheet'
   import { parseMatchKeyboardConfig } from '../matchConfig'
@@ -304,43 +304,19 @@
 </script>
 
 <svelte:head>
-  <!-- Present only while this page is shown: printing it yields just the lane sheet. -->
+  <!-- Present only while this page is shown. The lane sheet is laid out for A4 portrait only, so this also
+       keeps the browser from offering landscape. -->
   <style>
     @page {
       size: A4 portrait;
       margin: 10mm;
-    }
-
-    @media print {
-      .app-shell > header {
-        display: none !important;
-      }
-
-      .app-shell {
-        min-height: 0 !important;
-        background: none !important;
-      }
-
-      main.content {
-        width: auto !important;
-        margin: 0 !important;
-        padding: 0 !important;
-      }
-
-      main.content > :not(.lane-sheet) {
-        display: none !important;
-      }
-
-      main.content > .lane-sheet {
-        display: block !important;
-      }
     }
   </style>
 </svelte:head>
 
 <MatchPageHeader {api} {match} {language} {labels} handlers={headerHandlers} current="devices" title={labels.manageDevices} subtitle={labels.devicesHint} backLabel={match.name} {onBack} pageActions={[
   { label: `+ ${labels.newDevice}`, header: 'primary', onClick: () => (showAddForm = !showAddForm) },
-  { label: labels.printLaneSheet, header: 'text', onClick: () => window.print() }
+  printAction(labels, () => window.print())
 ]} />
 {#if showAddForm}
   <form class="inline-form" on:submit|preventDefault={submitAdd}>

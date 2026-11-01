@@ -1,27 +1,38 @@
-import type { CompetitionResultEntry, CompetitionResultGroup } from './types'
+import type { CompetitionResultEntry, CompetitionResultGroup, LiveScoringBlock, LiveScoringEntry } from './types'
 
-// Printed competition results (see ../documentation/COMPETITION-RESULT-SCREEN.md). The report is a stream of equally
-// high units - a group header or a participant row - laid out over two columns in one of two modes:
+// Printed results - competition results (see ../documentation/COMPETITION-RESULT-SCREEN.md) and a match's results per
+// scope share one report format. The report is a stream of equally high units - a group header or a participant row -
+// laid out over two columns in one of two modes:
 // - 'stream': notice-board mode; the stream is split in half, the left column holds the first half and the right
 //   column the second, each running down across as many pages as needed.
 // - 'pages': PDF mode; classic two-column pages read left column, right column, next page.
 export type ResultsLayoutMode = 'stream' | 'pages'
 export type ResultsDetailLines = 2 | 3
-export type ResultsLayoutOptions = { mode: ResultsLayoutMode; detailLines: ResultsDetailLines }
+// Multiplies every printed text size; 1.41 (√2) gives an A4-sized layout on A3 paper.
+export const resultsFontScales = [1, 1.2, 1.41, 1.7, 2] as const
+export type ResultsFontScale = typeof resultsFontScales[number]
+export type ResultsLayoutOptions = { mode: ResultsLayoutMode; detailLines: ResultsDetailLines; fontScale: ResultsFontScale }
 
 export type ResultUnit =
   | { kind: 'header'; name: string }
   | { kind: 'entry'; entry: CompetitionResultEntry }
+  | { kind: 'match-entry'; entry: LiveScoringEntry }
 
 export type RuleScoreItem = { text: string; struck: boolean; missing: boolean }
 export type RuleBlock = { label: string; total: number; scores: RuleScoreItem[] }
 
-export const defaultLayoutOptions: ResultsLayoutOptions = { mode: 'stream', detailLines: 2 }
+export const defaultLayoutOptions: ResultsLayoutOptions = { mode: 'stream', detailLines: 2, fontScale: 1 }
 
 export function flattenResults(groups: CompetitionResultGroup[]): ResultUnit[] {
   return groups
     .filter((group) => group.entries.length > 0)
     .flatMap((group): ResultUnit[] => [{ kind: 'header', name: group.name }, ...group.entries.map((entry): ResultUnit => ({ kind: 'entry', entry }))])
+}
+
+export function flattenMatchResults(blocks: LiveScoringBlock[]): ResultUnit[] {
+  return blocks
+    .filter((block) => block.entries.length > 0)
+    .flatMap((block): ResultUnit[] => [{ kind: 'header', name: block.name }, ...block.entries.map((entry): ResultUnit => ({ kind: 'match-entry', entry }))])
 }
 
 // Splits the stream roughly in half. Every unit is equally high, so a unit count is a height. The left column never
@@ -50,16 +61,14 @@ export function ruleBlocks(entry: CompetitionResultEntry): RuleBlock[] {
   }))
 }
 
-export function parseLayoutOptions(search: string): ResultsLayoutOptions {
-  const params = new URLSearchParams(search)
-  const mode = params.get('layout')
-  const lines = params.get('lines')
+// Validates the layout options remembered for a results page's print dialog (see printOptions.ts).
+export function parseLayoutOptions(stored: Record<string, unknown> | null): ResultsLayoutOptions {
+  const mode = stored?.mode
+  const lines = stored?.detailLines
+  const scale = resultsFontScales.find((value) => value === stored?.fontScale)
   return {
     mode: mode === 'stream' || mode === 'pages' ? mode : defaultLayoutOptions.mode,
-    detailLines: lines === '3' ? 3 : lines === '2' ? 2 : defaultLayoutOptions.detailLines,
+    detailLines: lines === 3 || lines === 2 ? lines : defaultLayoutOptions.detailLines,
+    fontScale: scale ?? defaultLayoutOptions.fontScale,
   }
-}
-
-export function layoutOptionsSearch(options: ResultsLayoutOptions): string {
-  return `?${new URLSearchParams({ layout: options.mode, lines: String(options.detailLines) }).toString()}`
 }

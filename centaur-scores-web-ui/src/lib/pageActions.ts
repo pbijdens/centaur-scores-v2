@@ -37,3 +37,9 @@ export type MatchHeaderHandlers = {
 export function asGroup(actions: PageAction[]): PageAction[] {
   return actions.map((action, index) => (index === 0 ? { ...action, separatorBefore: true } : action))
 }
+
+// The "Print this" header button every printable page shows. Pages with print options open their
+// PrintDialog from onClick; pages without options print straight away.
+export function printAction(labels: Record<string, string>, onClick: () => void, disabled = false): PageAction {
+  return { label: labels.printThis, header: 'primary', headerLabel: `🖨 ${labels.printThis}`, onClick, disabled }
+}

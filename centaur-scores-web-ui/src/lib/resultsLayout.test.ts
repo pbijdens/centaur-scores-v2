@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { flattenResults, layoutOptionsSearch, parseLayoutOptions, rankLabel, ruleBlocks, splitInTwo, type ResultUnit } from './competitionResultsLayout'
-import type { CompetitionResultEntry } from './types'
+import { flattenMatchResults, flattenResults, parseLayoutOptions, rankLabel, ruleBlocks, splitInTwo, type ResultUnit } from './resultsLayout'
+import type { CompetitionResultEntry, LiveScoringEntry } from './types'
 
 function entry(name: string, overrides: Partial<CompetitionResultEntry> = {}): CompetitionResultEntry {
   return { position: '1', needsTieBreaker: false, name, disqualified: false, total: 0, roundScores: {}, ruleScores: {}, rules: [], ...overrides }
@@ -8,7 +8,7 @@ function entry(name: string, overrides: Partial<CompetitionResultEntry> = {}): C
 
 const header = (name: string): ResultUnit => ({ kind: 'header', name })
 const row = (name: string): ResultUnit => ({ kind: 'entry', entry: entry(name) })
-const shape = (units: ResultUnit[]) => units.map((unit) => unit.kind === 'header' ? `H:${unit.name}` : unit.entry.name)
+const shape = (units: ResultUnit[]) => units.map((unit) => unit.kind === 'header' ? `H:${unit.name}` : unit.kind === 'entry' ? unit.entry.name : unit.entry.line1)
 
 describe('flattenResults', () => {
   it('emits a header before each group and skips empty groups', () => {
@@ -18,6 +18,20 @@ describe('flattenResults', () => {
       { name: 'Compound', entries: [entry('c')] },
     ])
     expect(shape(units)).toEqual(['H:Recurve', 'a', 'b', 'H:Compound', 'c'])
+  })
+})
+
+describe('flattenMatchResults', () => {
+  const matchEntry = (line1: string): LiveScoringEntry => ({ position: 1, needsTieBreaker: false, line1, arrows: 3, score: 27, aboveTarget: false })
+
+  it('emits a header before each scope block and skips empty blocks', () => {
+    const units = flattenMatchResults([
+      { name: 'Recurve', entries: [matchEntry('a'), matchEntry('b')] },
+      { name: 'Empty', entries: [] },
+      { name: 'Compound', entries: [matchEntry('c')] },
+    ])
+    expect(shape(units)).toEqual(['H:Recurve', 'a', 'b', 'H:Compound', 'c'])
+    expect(units[1].kind).toBe('match-entry')
   })
 })
 
@@ -77,12 +91,12 @@ describe('ruleBlocks', () => {
 })
 
 describe('layout options', () => {
-  it('round-trips through the query string', () => {
-    expect(parseLayoutOptions(layoutOptionsSearch({ mode: 'pages', detailLines: 3 }))).toEqual({ mode: 'pages', detailLines: 3 })
+  it('keeps valid stored options', () => {
+    expect(parseLayoutOptions({ mode: 'pages', detailLines: 3, fontScale: 1.41 })).toEqual({ mode: 'pages', detailLines: 3, fontScale: 1.41 })
   })
 
   it('falls back to defaults for missing or invalid values', () => {
-    expect(parseLayoutOptions('')).toEqual({ mode: 'stream', detailLines: 2 })
-    expect(parseLayoutOptions('?layout=bogus&lines=7')).toEqual({ mode: 'stream', detailLines: 2 })
+    expect(parseLayoutOptions(null)).toEqual({ mode: 'stream', detailLines: 2, fontScale: 1 })
+    expect(parseLayoutOptions({ mode: 'bogus', detailLines: 7, fontScale: 3 })).toEqual({ mode: 'stream', detailLines: 2, fontScale: 1 })
   })
 })

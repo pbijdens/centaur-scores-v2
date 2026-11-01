@@ -76,11 +76,11 @@ describe('isSessionWatchActive', () => {
     expect(isSessionWatchActive({ ...baseState, tenantAccessError: true })).toBe(false)
   })
 
-  it('is inactive for result, QR, and print pages, which run unattended without anyone to dismiss a popup', () => {
-    expect(isSessionWatchActive({ ...baseState, view: 'match-results-scope' })).toBe(false)
-    expect(isSessionWatchActive({ ...baseState, view: 'competition-results' })).toBe(false)
-    expect(isSessionWatchActive({ ...baseState, view: 'match-qr' })).toBe(false)
-    expect(isSessionWatchActive({ ...baseState, view: 'match-print' })).toBe(false)
+  it('is active on the printable result, QR, and scorecard pages, which are normal management pages', () => {
+    expect(isSessionWatchActive({ ...baseState, view: 'match-results-scope' })).toBe(true)
+    expect(isSessionWatchActive({ ...baseState, view: 'competition-results' })).toBe(true)
+    expect(isSessionWatchActive({ ...baseState, view: 'match-qr' })).toBe(true)
+    expect(isSessionWatchActive({ ...baseState, view: 'match-print' })).toBe(true)
   })
 
   // The narrowcast display runs on unattended kiosks with no login of its own - it must never be

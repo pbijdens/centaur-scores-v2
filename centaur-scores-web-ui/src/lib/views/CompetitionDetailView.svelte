@@ -18,6 +18,7 @@
   export let onChanged: () => void | Promise<void>
   export let onDeleted: () => void
   export let onCopied: (competition: Competition) => void
+  export let onViewResults: () => void
 
   let name = competition.name
   let startDate = competition.startDate.slice(0, 10)
@@ -61,7 +62,7 @@
     ...categories.filter((category) => !groupByCategoryIds.includes(category.id))
   ]
   $: headerActions = [
-    { label: labels.viewResults, header: 'primary', href: competitionResultsPath(competition.id), newTab: true },
+    { label: labels.viewResults, header: 'primary', href: competitionResultsPath(competition.id), onClick: onViewResults },
     { label: labels.saveCopy, separatorBefore: true, onClick: copyCompetition },
     { label: labels.deleteCompetition, danger: true, separatorBefore: true, onClick: deleteCompetition }
   ] satisfies PageAction[]

@@ -28,7 +28,7 @@
   } from './lib/data'
   import { labelForError } from './lib/errors'
   import { translationsFor } from './lib/i18n'
-  import { accountPath, categoryPath, competitionPath, matchAddParticipantsPath, matchParticipantEditPath, matchParticipantPath, matchParticipantReplacePath, matchParticipantScorePath, matchPath, navigateTo, participantListPath, participantMemberPath, resolveRoute, templatePath, tenantPath } from './lib/router'
+  import { accountPath, categoryPath, competitionPath, competitionResultsPath, matchAddParticipantsPath, matchParticipantEditPath, matchParticipantPath, matchParticipantReplacePath, matchParticipantScorePath, matchPath, navigateTo, participantListPath, participantMemberPath, resolveRoute, templatePath, tenantPath } from './lib/router'
   import type { MatchHeaderHandlers } from './lib/pageActions'
   import { isSessionWatchActive } from './lib/sessionWatch'
   import type { Account, Category, Competition, Language, Match, MatchTemplate, ParticipantList, ParticipantListMember, ParticipantListSummary, TenantAccess, Tenant, View } from './lib/types'
@@ -84,7 +84,6 @@
   let password = ''
   let language = (localStorage.getItem('centaur-language') ?? 'nl') as Language
   let view: View = 'home'
-  let matchPrintStep: 'select' | 'sheet' = 'select'
   let selectedMatch: Match | null = null
   let matchSourceList: ParticipantList | null = null
   let selectedList: ParticipantList | null = null
@@ -423,7 +422,6 @@
   function applyRouteResult(route: ReturnType<typeof resolveRoute>) {
     if (route.invalid) { navigate('/', true); return }
     view = route.view
-    if (route.view === 'match-print') matchPrintStep = 'select'
     narrowcastScope = route.view === 'narrowcast' ? route.scope ?? null : null
     selectedResultsScope = route.view === 'match-results-scope' ? route.scope ?? null : null
     const matchScopedViews: View[] = ['match', 'match-metadata', 'match-devices', 'match-qr', 'match-print', 'match-results-scope', 'match-participant', 'match-participant-edit', 'match-participant-replace', 'match-participant-scores', 'match-add-participants']
@@ -466,24 +464,6 @@
 
 {#if view === 'narrowcast' && narrowcastScope}
   <LiveScoringView scope={narrowcastScope} />
-{:else if view === 'match-qr' && selectedMatch}
-  <MatchQrCodesView match={selectedMatch} tenantId={tenant} scorekeeperBaseUrl={$currentTenant?.scorekeeperBaseUrl} {language} labels={t} />
-{:else if view === 'match-print' && selectedMatch}
-  <!-- MatchPrintView is rendered from this single spot (not duplicated per step) so switching between
-       its 'select' and 'sheet' steps only toggles the surrounding chrome - it never destroys/recreates
-       the component, which would silently reset the organizer's participant selection mid-workflow. -->
-  <div class="app-shell" class:app-shell-bare={matchPrintStep === 'sheet'}>
-    {#if matchPrintStep !== 'sheet'}
-      <AppHeader username={headerUsername} {language} {view} labels={t} tenantName={$currentTenant?.name} tenantLogoUrl={$currentTenant?.logoUrl} showTenantSwitch={($profile?.authorizedForTenants?.length ?? 0) > 1} moreLinks={homeQuickLinks} onNavigate={navigate} onLanguageChange={setLanguage} onLogout={signOut} />
-    {/if}
-    <main class="content" class:content-bare={matchPrintStep === 'sheet'}>
-      <MatchPrintView {api} bind:step={matchPrintStep} match={selectedMatch} categories={$categories} tenantLogoUrl={$currentTenant?.logoUrl} {language} labels={t} headerHandlers={matchHeaderHandlers} />
-    </main>
-  </div>
-{:else if view === 'match-results-scope' && selectedMatchId && selectedResultsScope}
-  <MatchResultsScopeView {api} matchId={selectedMatchId} scope={selectedResultsScope} {language} labels={t} />
-{:else if view === 'competition-results' && selectedCompetitionId}
-  <CompetitionResultsView {api} competitionId={selectedCompetitionId} tenantLogoUrl={$currentTenant?.logoUrl} {language} labels={t} />
 {:else if !loggedIn}
   <LoginView bind:username bind:password {loginError} {language} labels={t} onSubmit={signIn} onLanguageChange={setLanguage} />
 {:else if tenantAccessError}
@@ -504,6 +484,17 @@
       {:else if view === 'match-add-participants' && selectedMatch}
         {@const currentMatch = selectedMatch}
         <MatchAddParticipantsView {api} match={currentMatch} categories={$categories} sourceList={matchSourceList} {language} labels={t} headerHandlers={matchHeaderHandlers} onBack={() => navigate(`/matches/${currentMatch.id}`)} onChanged={refreshSelectedMatch} />
+      {:else if view === 'match-qr' && selectedMatch}
+        {@const currentMatch = selectedMatch}
+        <MatchQrCodesView {api} match={currentMatch} tenantId={tenant} scorekeeperBaseUrl={$currentTenant?.scorekeeperBaseUrl} {language} labels={t} headerHandlers={matchHeaderHandlers} onBack={() => navigate(matchPath(currentMatch.id))} />
+      {:else if view === 'match-print' && selectedMatch}
+        {@const currentMatch = selectedMatch}
+        <MatchPrintView {api} match={currentMatch} categories={$categories} tenantLogoUrl={$currentTenant?.logoUrl} {language} labels={t} headerHandlers={matchHeaderHandlers} onBack={() => navigate(matchPath(currentMatch.id))} />
+      {:else if view === 'match-results-scope' && selectedMatch && selectedResultsScope}
+        {@const currentMatch = selectedMatch}
+        {#key `${currentMatch.id}/${selectedResultsScope}`}
+          <MatchResultsScopeView {api} match={currentMatch} scope={selectedResultsScope} {language} labels={t} headerHandlers={matchHeaderHandlers} onBack={() => navigate(matchPath(currentMatch.id))} />
+        {/key}
       {:else if view === 'match-metadata' && selectedMatch}
         {@const currentMatch = selectedMatch}
         <MatchMetadataEditView {api} match={currentMatch} categories={$categories} participantLists={$participantLists} {language} labels={t} headerHandlers={matchHeaderHandlers} onBack={() => navigate(`/matches/${currentMatch.id}`)} onSaved={refreshSelectedMatch} />
@@ -546,9 +537,14 @@
         <MatchParticipantScoreView {api} match={currentMatch} participant={currentParticipant} {canManage} {language} labels={t} headerHandlers={matchHeaderHandlers} onBack={() => navigate(matchParticipantPath(currentMatch.id, currentParticipant.id))} />
       {:else if view === 'competitions'}
         <CompetitionsView {api} competitions={$competitions} {language} labels={t} onOpenCompetition={openCompetition} onChanged={loadCompetitionsList} />
+      {:else if view === 'competition-results' && selectedCompetitionId}
+        {@const currentCompetitionId = selectedCompetitionId}
+        {#key currentCompetitionId}
+          <CompetitionResultsView {api} competitionId={currentCompetitionId} tenantLogoUrl={$currentTenant?.logoUrl} {language} labels={t} onBack={() => navigate(competitionPath(currentCompetitionId))} />
+        {/key}
       {:else if view === 'competition' && selectedCompetition}
         {@const currentCompetition = selectedCompetition}
-        <CompetitionDetailView {api} competition={currentCompetition} categories={$categories} matches={$matches} {language} labels={t} onBack={() => navigate('/competitions')} onChanged={onCompetitionChanged} onDeleted={onCompetitionDeleted} onCopied={(copy) => { loadCompetitionsList(); openCompetition(copy) }} />
+        <CompetitionDetailView {api} competition={currentCompetition} categories={$categories} matches={$matches} {language} labels={t} onBack={() => navigate('/competitions')} onChanged={onCompetitionChanged} onDeleted={onCompetitionDeleted} onCopied={(copy) => { loadCompetitionsList(); openCompetition(copy) }} onViewResults={() => navigate(competitionResultsPath(currentCompetition.id))} />
       {:else if view === 'profile'}
         <ProfileView {api} labels={t} onBack={() => navigate('/')} />
       {:else if view === 'select-tenant'}
