@@ -79,12 +79,21 @@ describe('paginate', () => {
 })
 
 describe('unitsPerColumn', () => {
+  const options = { mode: 'pages', detailLines: 2, fontScale: 1 } as const
+
   it('fits fewer units in landscape and with larger fonts', () => {
-    const options = { mode: 'pages', detailLines: 2, fontScale: 1 } as const
-    expect(unitsPerColumn('portrait', options)).toBe(23)
-    expect(unitsPerColumn('landscape', options)).toBe(15)
-    expect(unitsPerColumn('portrait', { ...options, detailLines: 3 })).toBeLessThan(23)
-    expect(unitsPerColumn('portrait', { ...options, fontScale: 2 })).toBeLessThan(12)
+    expect(unitsPerColumn('A4', 'portrait', options)).toBe(23)
+    expect(unitsPerColumn('A4', 'landscape', options)).toBe(15)
+    expect(unitsPerColumn('A4', 'portrait', { ...options, detailLines: 3 })).toBeLessThan(23)
+    expect(unitsPerColumn('A4', 'portrait', { ...options, fontScale: 2 })).toBeLessThan(12)
+  })
+
+  it('follows the paper size', () => {
+    expect(unitsPerColumn('Letter', 'portrait', options)).toBe(22)
+    expect(unitsPerColumn('A3', 'portrait', options)).toBe(35)
+    expect(unitsPerColumn('A5', 'portrait', options)).toBe(15)
+    // A3 at 141% holds about as many units as A4 at 100% (the safety margin does not scale with the font).
+    expect(unitsPerColumn('A3', 'portrait', { ...options, fontScale: 1.41 })).toBe(24)
   })
 })
 

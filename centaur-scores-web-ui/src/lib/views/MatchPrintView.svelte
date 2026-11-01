@@ -6,6 +6,8 @@
   import type { ApiClient } from '../api'
   import MatchPageHeader from '../MatchPageHeader.svelte'
   import { printAction, type MatchHeaderHandlers } from '../pageActions'
+  import PaperSizeSelect from '../PaperSizeSelect.svelte'
+  import { loadPaperSize, printableArea, savePaperSize, type PaperSize, type PrintOrientation } from '../paperSize'
   import PrintDialog from '../PrintDialog.svelte'
   import { loadPrintOptions, printOptionsKey, savePrintOptions } from '../printOptions'
   import type { Category, Language, Match, MatchParticipant, MatchParticipantSignature } from '../types'
@@ -62,7 +64,10 @@
   $: printCategories = matchCategories.filter((category) => !options.excludedCategoryIds.includes(category.id)).sort((a, b) => a.name.localeCompare(b.name))
 
   // The dialog edits a copy of the options; only printing commits (and remembers) them.
+  // The paper is remembered once for every printable page (see paperSize.ts).
+  let paper: PaperSize = loadPaperSize()
   let dialogOpen = false
+  let dialogPaper: PaperSize = paper
   let dialogExcludedCategoryIds = new Set<string>()
   let dialogExcludedParticipantIds = new Set<string>()
   let dialogFreeText = ''
@@ -82,6 +87,7 @@
     dialogFreeText = options.freeText
     dialogSplitByGroup = options.splitByGroup
     dialogBlackOnly = options.blackOnly
+    dialogPaper = paper
     participantsExpanded = false
     dialogOpen = true
   }
@@ -109,6 +115,8 @@
       blackOnly: dialogBlackOnly
     }
     savePrintOptions(optionsKey, options)
+    paper = dialogPaper
+    savePaperSize(paper)
     dialogOpen = false
     await tick()
     window.print()
@@ -210,8 +218,9 @@
   }
 
   // Printed sizes, only applied on paper (as CSS variables, see the print rules below), computed separately
-  // for each orientation so the score grid fills the card's height in both: a card is 140.5mm tall in
-  // portrait (2×2) and 198mm in landscape (4 across), see the orientation CSS below. Around the grid the card
+  // for each orientation so the score grid fills the card's height in both. The card size follows from the
+  // chosen paper (cardSize): on A4 a card is 97 × 140.5mm in portrait (2×2) and 68 × 198mm in landscape
+  // (4 across), see the orientation CSS below. Around the grid the card
   // needs ~57mm regardless of the number of ends (header with lane box, participant line, two stacked
   // signature boxes - measured in Chrome's print layout), plus the two-line categories block and the taller
   // header of the optional free-text line when present. Every one of those lines is fixed in height (single
@@ -235,11 +244,13 @@
   // would make it the tallest cell and override every other cell's shrunk height.
   // No lower clamp on either value: forcing a legibility floor would silently reintroduce the overflow
   // this guards against for very high end counts.
-  const CARD_HEIGHT_MM = { portrait: 140.5, landscape: 198 }
-  // The width inside a card's border and padding: two cards across in portrait, four in landscape. The table
-  // is laid out with equal-width columns (end number, arrows, score, subtotal, 10s, 9s), so this bounds the
-  // digit size too - a three-digit subtotal must fit its column on one line (6 arrows in landscape: ~5.8mm).
-  const CARD_INNER_WIDTH_MM = { portrait: 92, landscape: 64 }
+  // The @page margin and the gap between cards. Two cards across in portrait (two rows of two), four in landscape.
+  const PAGE_MARGIN_MM = 6
+  const CARD_GAP_MM = 4
+  // A card's border and padding: the width inside it bounds the digit size too. The table is laid out with
+  // equal-width columns (end number, arrows, score, subtotal, 10s, 9s), so a three-digit subtotal must fit its
+  // column on one line (6 arrows in landscape on A4: ~5.8mm).
+  const CARD_FRAME_MM = 5
   const DIGITS_PER_CELL = 3
   const DIGIT_WIDTH_EM = 0.62
   const CARD_CHROME_HEIGHT_MM = 57
@@ -252,17 +263,25 @@
   const MAX_CELL_FONT_PX = 13
   const MM_TO_PX = 96 / 25.4
 
-  function orientationSizes(orientation: keyof typeof CARD_HEIGHT_MM, rows: number, columns: number, chromeMm: number): string {
-    const rowHeightMm = Math.min(MAX_ROW_HEIGHT_MM, (CARD_HEIGHT_MM[orientation] - chromeMm - TABLE_HEADER_ROW_MM - TOTALS_ROWS_MM) / rows)
-    const columnWidthPx = (CARD_INNER_WIDTH_MM[orientation] / columns) * MM_TO_PX
+  function cardSize(paper: PaperSize, orientation: PrintOrientation): { sheetHeight: number; width: number; height: number } {
+    const area = printableArea(paper, orientation, PAGE_MARGIN_MM)
+    return orientation === 'portrait'
+      ? { sheetHeight: area.height, width: (area.width - CARD_GAP_MM) / 2, height: (area.height - CARD_GAP_MM) / 2 }
+      : { sheetHeight: area.height, width: (area.width - 3 * CARD_GAP_MM) / 4, height: area.height }
+  }
+
+  function orientationSizes(paper: PaperSize, orientation: PrintOrientation, rows: number, columns: number, chromeMm: number): string {
+    const card = cardSize(paper, orientation)
+    const rowHeightMm = Math.min(MAX_ROW_HEIGHT_MM, (card.height - chromeMm - TABLE_HEADER_ROW_MM - TOTALS_ROWS_MM) / rows)
+    const columnWidthPx = ((card.width - CARD_FRAME_MM) / columns) * MM_TO_PX
     const cellFontPx = Math.min(MAX_CELL_FONT_PX, rowHeightMm * MM_TO_PX * 0.8, columnWidthPx / (DIGITS_PER_CELL * DIGIT_WIDTH_EM + 0.3))
-    return `--row-height-${orientation}: ${rowHeightMm}mm; --cell-font-${orientation}: ${cellFontPx}px; --end-font-${orientation}: ${Math.min(9, cellFontPx)}px`
+    return `--sheet-height-${orientation}: ${card.sheetHeight}mm; --card-height-${orientation}: ${card.height}mm; --row-height-${orientation}: ${rowHeightMm}mm; --cell-font-${orientation}: ${cellFontPx}px; --end-font-${orientation}: ${Math.min(9, cellFontPx)}px`
   }
 
   $: chromeMm = CARD_CHROME_HEIGHT_MM + (printCategories.length > 0 ? CATEGORIES_BLOCK_MM : 0) + (options.freeText ? FREE_TEXT_LINE_MM : 0) + CHROME_SAFETY_MM
   // End number, arrows, score and subtotal, plus the 10s and 9s columns when the keyboard has those keys.
   $: tableColumns = match.arrowsPerEnd + (tenKey && nineKey ? 5 : 3)
-  $: printSizes = `${orientationSizes('portrait', rowsPerCard, tableColumns, chromeMm)}; ${orientationSizes('landscape', rowsPerCard, tableColumns, chromeMm)}; --table-max-height: ${rowsPerCard * MAX_ROW_HEIGHT_MM + TABLE_HEADER_ROW_MM + TOTALS_ROWS_MM}mm`
+  $: printSizes = `${orientationSizes(paper, 'portrait', rowsPerCard, tableColumns, chromeMm)}; ${orientationSizes(paper, 'landscape', rowsPerCard, tableColumns, chromeMm)}; --table-max-height: ${rowsPerCard * MAX_ROW_HEIGHT_MM + TABLE_HEADER_ROW_MM + TOTALS_ROWS_MM}mm`
 
   function categoryValueFor(participant: MatchParticipant, category: Category): string | null {
     const valueId = participant.categories[category.id]
@@ -310,7 +329,8 @@
 
 <svelte:head>
   <title>{labels.printScorecards} - {match.name}</title>
-  <!-- No page size: the cards follow the orientation picked in the browser's print dialog. -->
+  <!-- No page size: the cards follow the orientation picked in the browser's print dialog. The margin is
+       PAGE_MARGIN_MM. -->
   <style>
     @page {
       margin: 6mm;
@@ -347,6 +367,8 @@
     <input type="checkbox" bind:checked={dialogBlackOnly} />
     {labels.printBlackOnlyLabel}
   </label>
+
+  <PaperSizeSelect bind:value={dialogPaper} {labels} />
 
   <p class="muted layout-hint">{labels.printLayoutFourColumnHint}</p>
 
@@ -946,7 +968,7 @@
       grid-template-columns: repeat(4, 1fr);
       grid-template-rows: 1fr;
       gap: 4mm;
-      height: 198mm;
+      height: var(--sheet-height-landscape);
     }
 
     .print-half-row {
@@ -963,7 +985,7 @@
 
     .print-sheet {
       display: block;
-      height: 285mm;
+      height: var(--sheet-height-portrait);
     }
 
     .print-half-row {
@@ -971,7 +993,7 @@
       grid-template-columns: repeat(2, 1fr);
       grid-template-rows: 1fr;
       gap: 4mm;
-      height: 140.5mm;
+      height: var(--card-height-portrait);
     }
 
     .print-half-row:first-child {

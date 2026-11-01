@@ -1,3 +1,4 @@
+import { printableArea, type PaperSize, type PrintOrientation } from './paperSize'
 import type { CompetitionResultEntry, CompetitionResultGroup, LiveScoringBlock, LiveScoringEntry } from './types'
 
 // Printed results - competition results (see ../documentation/COMPETITION-RESULT-SCREEN.md) and a match's results per
@@ -8,7 +9,7 @@ import type { CompetitionResultEntry, CompetitionResultGroup, LiveScoringBlock, 
 // - 'pages': PDF mode; classic two-column pages read left column, right column, next page.
 export type ResultsLayoutMode = 'stream' | 'pages'
 export type ResultsDetailLines = 2 | 3
-// Multiplies every printed text size; 1.41 (√2) gives an A4-sized layout on A3 paper.
+// Multiplies every printed text size; 1.41 (√2) makes A3 paper look like the A4 layout enlarged.
 export const resultsFontScales = [1, 1.2, 1.41, 1.7, 2] as const
 export type ResultsFontScale = typeof resultsFontScales[number]
 export type ResultsLayoutOptions = { mode: ResultsLayoutMode; detailLines: ResultsDetailLines; fontScale: ResultsFontScale }
@@ -46,10 +47,9 @@ export function splitInTwo(units: ResultUnit[]): [ResultUnit[], ResultUnit[]] {
 
 // PDF mode lays out its pages explicitly instead of with CSS multi-column: Safari ignores `columns` when printing
 // and prints a single column. Every unit has a fixed height (ResultUnit.svelte), so the units per column follow from
-// the printable height of an A4 page (10mm @page margins on 297 x 210mm) minus the report header repeated on every
-// page (ResultsReportHeader.svelte, title clamped to two lines) and a safety margin for rounding.
-export type PrintOrientation = 'portrait' | 'landscape'
-export const printableHeightMm: Record<PrintOrientation, number> = { portrait: 277, landscape: 190 }
+// the printable height of the chosen paper (inside the pages' 10mm @page margins) minus the report header repeated
+// on every page (ResultsReportHeader.svelte, title clamped to two lines) and a safety margin for rounding.
+export const PAGE_MARGIN_MM = 10
 const MM_PER_PT = 25.4 / 72
 const HEADER_MM = 21.5
 const SAFETY_MM = 4
@@ -59,8 +59,8 @@ export function unitHeightMm(options: ResultsLayoutOptions): number {
   return (11 + options.detailLines * 8 + 3) * options.fontScale * MM_PER_PT
 }
 
-export function unitsPerColumn(orientation: PrintOrientation, options: ResultsLayoutOptions): number {
-  const available = printableHeightMm[orientation] - HEADER_MM * options.fontScale - SAFETY_MM
+export function unitsPerColumn(paper: PaperSize, orientation: PrintOrientation, options: ResultsLayoutOptions): number {
+  const available = printableArea(paper, orientation, PAGE_MARGIN_MM).height - HEADER_MM * options.fontScale - SAFETY_MM
   return Math.max(2, Math.floor(available / unitHeightMm(options)))
 }
 

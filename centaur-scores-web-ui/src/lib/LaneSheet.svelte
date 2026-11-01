@@ -1,12 +1,13 @@
 <script lang="ts">
   import CategoryTag from './CategoryTag.svelte'
   import { formatLocalDate } from './date'
+  import { printableArea, type PaperSize } from './paperSize'
   import { buildLaneSheet, configurationColor, configurationKey, distinctValues, parseLane, type LaneSheetBlock } from './laneSheet'
   import type { Category, Language, Match, MatchParticipant, ScoreDevice } from './types'
 
   // The printable lane assignment sheet of MatchDevicesView: hidden on screen, it is the only thing
-  // printed from that page (it is the page's .print-output, see app.scss). Six lane blocks per A4 portrait
-  // page, grouped by device; each lane header shows its target configuration (the values of
+  // printed from that page (it is the page's .print-output, see app.scss). Lane blocks per portrait page of the
+  // chosen paper (six on A4), grouped by device; each lane header shows its target configuration (the values of
   // `laneCategory` on that lane number) on a background colour per configuration, and each archer gets
   // a presence box plus the selected categories as tags.
   export let match: Match
@@ -15,16 +16,23 @@
   export let participants: MatchParticipant[]
   export let laneCategory: Category | null
   export let deviceCategory: Category | null
+  export let paper: PaperSize
   export let language: Language
   export let labels: Record<string, string>
 
-  const blocksPerPage = 6
+  // The @page margin MatchDevicesView sets. Six blocks fit the 277mm printable height of A4; other paper gets
+  // proportionally more or fewer.
+  const PAGE_MARGIN_MM = 10
+  const A4_BLOCKS_PER_PAGE = 6
+  const A4_PRINTABLE_HEIGHT_MM = 277
 
+  $: pageHeightMm = printableArea(paper, 'portrait', PAGE_MARGIN_MM).height
+  $: blocksPerPage = Math.max(2, Math.floor((A4_BLOCKS_PER_PAGE * pageHeightMm) / A4_PRINTABLE_HEIGHT_MM))
   $: sheet = buildLaneSheet(devices, participants, blocksPerPage)
   $: tagCategories = [laneCategory, deviceCategory].filter((category): category is Category => !!category)
-  // Room for 6 lane headers, device headings and gaps on a 277mm-high page; the rest is split over the
-  // rows of the six blocks.
-  $: rowHeightMm = Math.min(10, Math.max(5, (277 - 12 - blocksPerPage * 18) / (blocksPerPage * sheet.slotCount)))
+  // Room for the page header and, per block, a lane header, device heading and gaps; the rest of the page is
+  // split over the rows of its blocks.
+  $: rowHeightMm = Math.min(10, Math.max(5, (pageHeightMm - 12 - blocksPerPage * 18) / (blocksPerPage * sheet.slotCount)))
   // A lane split over two devices is still one lane: its configuration comes from all its archers.
   $: laneValues = laneCategory ? lanesValues(participants, laneCategory.id) : new Map<number, (number | null)[]>()
   $: configurationIndex = indexConfigurations(laneValues)

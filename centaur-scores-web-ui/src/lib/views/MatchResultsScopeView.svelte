@@ -4,6 +4,7 @@
   import MatchPageHeader from '../MatchPageHeader.svelte'
   import MatchProgress from '../MatchProgress.svelte'
   import { printAction, type MatchHeaderHandlers } from '../pageActions'
+  import { loadPaperSize, savePaperSize, type PaperSize } from '../paperSize'
   import { loadPrintOptions, printOptionsKey, savePrintOptions } from '../printOptions'
   import ResultsPrintDialog from '../ResultsPrintDialog.svelte'
   import ResultsReport from '../ResultsReport.svelte'
@@ -25,13 +26,17 @@
   // The print options are chosen in the print dialog and remembered per match.
   const optionsKey = printOptionsKey('match-results', match.id)
   let options: ResultsLayoutOptions = loadPrintOptions(optionsKey, parseLayoutOptions)
+  // The paper is remembered once for every printable page (see paperSize.ts).
+  let paper: PaperSize = loadPaperSize()
   let dialogOpen = false
 
   $: units = page ? flattenMatchResults(page.blocks) : []
 
-  async function print(chosen: ResultsLayoutOptions) {
+  async function print(chosen: ResultsLayoutOptions, chosenPaper: PaperSize) {
     options = chosen
+    paper = chosenPaper
     savePrintOptions(optionsKey, options)
+    savePaperSize(paper)
     dialogOpen = false
     await tick()
     window.print()
@@ -59,7 +64,7 @@
   {#if page}<div class="progress"><MatchProgress {page} label={labels.matchProgressLabel} /></div>{/if}
 </MatchPageHeader>
 
-<ResultsPrintDialog bind:open={dialogOpen} {options} {labels} onPrint={print} />
+<ResultsPrintDialog bind:open={dialogOpen} {options} {paper} {labels} onPrint={print} />
 
 <div class="print-output">
   {#if loadError}
@@ -67,7 +72,7 @@
   {:else if !page}
     <p class="muted">…</p>
   {:else}
-    <ResultsReport title={page.matchName} startDate={page.matchDate} logoUrl={page.logo} {units} {options} {language} {labels} />
+    <ResultsReport title={page.matchName} startDate={page.matchDate} logoUrl={page.logo} {units} {options} {paper} {language} {labels} />
   {/if}
 </div>
 

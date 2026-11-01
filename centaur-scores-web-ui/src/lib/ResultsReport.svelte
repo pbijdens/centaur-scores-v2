@@ -1,7 +1,8 @@
 <script lang="ts">
   import ResultsReportHeader from './ResultsReportHeader.svelte'
   import ResultUnit from './ResultUnit.svelte'
-  import { paginate, splitInTwo, unitsPerColumn, type PrintOrientation, type ResultsLayoutOptions, type ResultUnit as Unit } from './resultsLayout'
+  import type { PaperSize, PrintOrientation } from './paperSize'
+  import { paginate, splitInTwo, unitsPerColumn, type ResultsLayoutOptions, type ResultUnit as Unit } from './resultsLayout'
   import type { Language } from './types'
 
   // A results report (see resultsLayout.ts), shared by the competition and match results pages. The screen always
@@ -13,13 +14,15 @@
   export let logoUrl: string | null | undefined = undefined
   export let units: Unit[]
   export let options: ResultsLayoutOptions
+  // The paper PDF mode is paginated for.
+  export let paper: PaperSize
   export let language: Language
   export let labels: Record<string, string>
 
   $: columns = splitInTwo(units)
   // PDF mode is paginated for both orientations; the print media queries below show the one matching the paper.
   const orientations: PrintOrientation[] = ['portrait', 'landscape']
-  $: pagesByOrientation = orientations.map((orientation) => ({ orientation, pages: paginate(units, unitsPerColumn(orientation, options)) }))
+  $: pagesByOrientation = orientations.map((orientation) => ({ orientation, pages: paginate(units, unitsPerColumn(paper, orientation, options)) }))
 </script>
 
 {#snippet reportHeader()}
