@@ -15,6 +15,8 @@ describe('resolveRoute', () => {
 
   it('resolves the match add-participants route', () => {
     expect(resolveRoute('/matches/match-1/add-participants')).toEqual({ view: 'match-add-participants', matchId: 'match-1' })
+    expect(resolveRoute('/matches/match-1/devices')).toEqual({ view: 'match-devices', matchId: 'match-1' })
+    expect(resolveRoute('/matches/match-1/devices/quick-edit')).toEqual({ view: 'match-lane-editor', matchId: 'match-1' })
   })
 
   it('resolves the select-tenant route', () => {

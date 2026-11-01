@@ -6,13 +6,13 @@
   import MatchPageHeader from '../MatchPageHeader.svelte'
   import { printAction, type MatchHeaderHandlers } from '../pageActions'
   import { labelForError } from '../errors'
+  import { laneCheckCategories, loadLaneCheck, saveLaneCheck } from '../laneCheck'
   import { distinctValues, mixedLaneNumbers, parseLane, uniformDeviceValue } from '../laneSheet'
-  import { parseMatchKeyboardConfig } from '../matchConfig'
   import PaperSizeSelect from '../PaperSizeSelect.svelte'
   import { loadPaperSize, savePaperSize, type PaperSize } from '../paperSize'
   import PrintDialog from '../PrintDialog.svelte'
   import RowActions from '../RowActions.svelte'
-  import { matchParticipantPath, navigateOnClick } from '../router'
+  import { matchLaneEditorPath, matchParticipantPath, navigateOnClick } from '../router'
   import type { Category, Language, Match, MatchParticipant, ScoreDevice } from '../types'
 
   export let api: ApiClient
@@ -26,6 +26,8 @@
   export let onOpenParticipant: (participantId: string) => void
 
   let showAddForm = false
+  // The quick lane editor needs mouse drag and drop, so it is not offered on touch-only devices.
+  const canQuickEdit = typeof matchMedia === 'function' && matchMedia('(hover: hover) and (pointer: fine)').matches
   let openParticipantEditorDeviceId: string | null = null
   let newDeviceName = ''
   let pendingSelections: Record<string, string> = {}
@@ -56,43 +58,22 @@
     window.print()
   }
 
-  // The two categories picked for the lane check, remembered per match on this browser.
-  const laneCheckStorageKey = `centaur-lane-check-${match.id}`
-  let { laneCategoryId, deviceCategoryId } = loadLaneCheck()
+  // The two categories picked for the lane check, remembered per match on this browser (laneCheck.ts).
+  let { laneCategoryId, deviceCategoryId } = loadLaneCheck(match.id)
 
   $: devices = [...(match.devices ?? [])].sort((a, b) => (a.sortOrder ?? Number.MAX_SAFE_INTEGER) - (b.sortOrder ?? Number.MAX_SAFE_INTEGER) || a.name.localeCompare(b.name))
   $: participants = match.participants ?? []
   $: unassignedParticipants = participants
     .filter((participant) => !participant.deviceId)
     .sort((a, b) => participantName(a).localeCompare(participantName(b)))
-  $: matchCategories = matchCategoriesFor(match, categories)
+  $: matchCategories = laneCheckCategories(match, categories)
   $: laneCategory = matchCategories.find((category) => category.id === laneCategoryId) ?? null
   $: deviceCategory = matchCategories.find((category) => category.id === deviceCategoryId) ?? null
   $: tagCategories = [laneCategory, deviceCategory].filter((category): category is Category => !!category)
-  $: saveLaneCheck(laneCategoryId, deviceCategoryId)
+  $: saveLaneCheck(match.id, { laneCategoryId, deviceCategoryId })
   $: mixedLanes = laneCategory ? mixedLaneNumbers(participants, laneCategory.id) : new Set<number>()
   $: laneOverview = laneCategory ? laneOverviewFor(participants, laneCategory.id) : []
   $: sheetParticipants = [...devices.flatMap((device) => sortedDeviceParticipants(participants, device.id)), ...unassignedParticipants]
-
-  function matchCategoriesFor(currentMatch: Match, allCategories: Category[]): Category[] {
-    const ordered = parseMatchKeyboardConfig(currentMatch.keyboardJson).categoryOrder
-      .map((id) => allCategories.find((category) => category.id === id))
-      .filter((category): category is Category => !!category)
-    return ordered.length > 0 ? ordered : allCategories
-  }
-
-  function loadLaneCheck(): { laneCategoryId: string; deviceCategoryId: string } {
-    try {
-      const stored = JSON.parse(localStorage.getItem(laneCheckStorageKey) ?? '{}')
-      return { laneCategoryId: String(stored.laneCategoryId ?? ''), deviceCategoryId: String(stored.deviceCategoryId ?? '') }
-    } catch {
-      return { laneCategoryId: '', deviceCategoryId: '' }
-    }
-  }
-
-  function saveLaneCheck(lane: string, device: string) {
-    localStorage.setItem(laneCheckStorageKey, JSON.stringify({ laneCategoryId: lane, deviceCategoryId: device }))
-  }
 
   // Every lane number from the lowest to the highest in use, with the values of the lane category on it.
   function laneOverviewFor(all: MatchParticipant[], categoryId: string): { number: number; values: (number | null)[] }[] {
@@ -332,6 +313,7 @@
 </svelte:head>
 
 <MatchPageHeader {api} {match} {language} {labels} handlers={headerHandlers} current="devices" title={labels.manageDevices} subtitle={labels.devicesHint} backLabel={match.name} {onBack} pageActions={[
+  ...(canQuickEdit ? [{ label: labels.laneEditorQuickEdit, header: 'primary' as const, href: matchLaneEditorPath(match.id), onClick: () => headerHandlers.onNavigate(matchLaneEditorPath(match.id)) }] : []),
   { label: `+ ${labels.newDevice}`, header: 'primary', onClick: () => (showAddForm = !showAddForm) },
   printAction(labels, openPrintDialog)
 ]} />
