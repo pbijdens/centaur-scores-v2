@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { tick } from 'svelte'
   import type { ApiClient } from '../api'
   import CategoryTag from '../CategoryTag.svelte'
   import LaneSheet from '../LaneSheet.svelte'
@@ -7,6 +8,9 @@
   import { labelForError } from '../errors'
   import { distinctValues, mixedLaneNumbers, parseLane, uniformDeviceValue } from '../laneSheet'
   import { parseMatchKeyboardConfig } from '../matchConfig'
+  import PaperSizeSelect from '../PaperSizeSelect.svelte'
+  import { loadPaperSize, savePaperSize, type PaperSize } from '../paperSize'
+  import PrintDialog from '../PrintDialog.svelte'
   import RowActions from '../RowActions.svelte'
   import { matchParticipantPath, navigateOnClick } from '../router'
   import type { Category, Language, Match, MatchParticipant, ScoreDevice } from '../types'
@@ -33,6 +37,24 @@
   let renameError = ''
   let dragging: { deviceId: string; participantId: string } | null = null
   let dropTarget: { participantId: string; after: boolean } | null = null
+
+  // The lane sheet's paper, remembered once for every printable page (see paperSize.ts).
+  let paper: PaperSize = loadPaperSize()
+  let printDialogOpen = false
+  let dialogPaper: PaperSize = paper
+
+  function openPrintDialog() {
+    dialogPaper = paper
+    printDialogOpen = true
+  }
+
+  async function printLaneSheet() {
+    paper = dialogPaper
+    savePaperSize(paper)
+    printDialogOpen = false
+    await tick()
+    window.print()
+  }
 
   // The two categories picked for the lane check, remembered per match on this browser.
   const laneCheckStorageKey = `centaur-lane-check-${match.id}`
@@ -304,20 +326,19 @@
 </script>
 
 <svelte:head>
-  <!-- Present only while this page is shown. The lane sheet is laid out for A4 portrait only, so this also
-       keeps the browser from offering landscape. -->
-  <style>
-    @page {
-      size: A4 portrait;
-      margin: 10mm;
-    }
-  </style>
+  <!-- Present only while this page is shown. The lane sheet is laid out for portrait only, so naming the size
+       (the chosen paper) also keeps the browser from offering landscape. The margin is LaneSheet's PAGE_MARGIN_MM. -->
+  {@html `<style>@page { size: ${paper} portrait; margin: 10mm; }</style>`}
 </svelte:head>
 
 <MatchPageHeader {api} {match} {language} {labels} handlers={headerHandlers} current="devices" title={labels.manageDevices} subtitle={labels.devicesHint} backLabel={match.name} {onBack} pageActions={[
   { label: `+ ${labels.newDevice}`, header: 'primary', onClick: () => (showAddForm = !showAddForm) },
-  printAction(labels, () => window.print())
+  printAction(labels, openPrintDialog)
 ]} />
+
+<PrintDialog bind:open={printDialogOpen} title={labels.printOptionsTitle} {labels} onPrint={printLaneSheet}>
+  <PaperSizeSelect bind:value={dialogPaper} {labels} />
+</PrintDialog>
 {#if showAddForm}
   <form class="inline-form" on:submit|preventDefault={submitAdd}>
     <label>{labels.deviceNameLabel}<input bind:value={newDeviceName} /></label>
@@ -481,7 +502,7 @@
 {#if laneError}<p class="error">{laneError}</p>{/if}
 {#if orderError}<p class="error">{orderError}</p>{/if}
 
-<LaneSheet {match} {devices} participants={sheetParticipants} {laneCategory} {deviceCategory} {language} {labels} />
+<LaneSheet {match} {devices} participants={sheetParticipants} {laneCategory} {deviceCategory} {paper} {language} {labels} />
 
 <style>
   .list-panel {

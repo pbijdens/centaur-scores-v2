@@ -3,6 +3,7 @@
   import type { ApiClient } from '../api'
   import PageHeader from '../PageHeader.svelte'
   import { printAction } from '../pageActions'
+  import { loadPaperSize, savePaperSize, type PaperSize } from '../paperSize'
   import { loadPrintOptions, printOptionsKey, savePrintOptions } from '../printOptions'
   import ResultsPrintDialog from '../ResultsPrintDialog.svelte'
   import ResultsReport from '../ResultsReport.svelte'
@@ -22,13 +23,17 @@
   // The print options are chosen in the print dialog and remembered per competition.
   const optionsKey = printOptionsKey('competition-results', competitionId)
   let options: ResultsLayoutOptions = loadPrintOptions(optionsKey, parseLayoutOptions)
+  // The paper is remembered once for every printable page (see paperSize.ts).
+  let paper: PaperSize = loadPaperSize()
   let dialogOpen = false
 
   $: units = document_ ? flattenResults(document_.groups) : []
 
-  async function print(chosen: ResultsLayoutOptions) {
+  async function print(chosen: ResultsLayoutOptions, chosenPaper: PaperSize) {
     options = chosen
+    paper = chosenPaper
     savePrintOptions(optionsKey, options)
+    savePaperSize(paper)
     dialogOpen = false
     await tick()
     window.print()
@@ -54,7 +59,7 @@
 
 <PageHeader eyebrow={labels.competitions} title={labels.resultsPageTitle} subtitle={document_?.competitionName} backLabel={document_?.competitionName ?? labels.competitions} {onBack} actions={[printAction(labels, () => (dialogOpen = true), !document_)]} />
 
-<ResultsPrintDialog bind:open={dialogOpen} {options} {labels} onPrint={print} />
+<ResultsPrintDialog bind:open={dialogOpen} {options} {paper} {labels} onPrint={print} />
 
 <div class="print-output">
   {#if loadError}
@@ -62,6 +67,6 @@
   {:else if !document_}
     <p class="muted">…</p>
   {:else}
-    <ResultsReport title={document_.competitionName} startDate={document_.startDate} endDate={document_.endDate} logoUrl={tenantLogoUrl} {units} {options} {language} {labels} />
+    <ResultsReport title={document_.competitionName} startDate={document_.startDate} endDate={document_.endDate} logoUrl={tenantLogoUrl} {units} {options} {paper} {language} {labels} />
   {/if}
 </div>

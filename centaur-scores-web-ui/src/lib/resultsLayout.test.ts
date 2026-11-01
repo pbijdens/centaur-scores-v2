@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { flattenMatchResults, flattenResults, parseLayoutOptions, rankLabel, ruleBlocks, splitInTwo, type ResultUnit } from './resultsLayout'
+import { flattenMatchResults, flattenResults, paginate, parseLayoutOptions, rankLabel, ruleBlocks, splitInTwo, unitsPerColumn, type ResultUnit } from './resultsLayout'
 import type { CompetitionResultEntry, LiveScoringEntry } from './types'
 
 function entry(name: string, overrides: Partial<CompetitionResultEntry> = {}): CompetitionResultEntry {
@@ -59,6 +59,44 @@ describe('splitInTwo', () => {
   })
 })
 
+describe('paginate', () => {
+  it('fills two columns per page, left column first', () => {
+    const pages = paginate([header('A'), row('a1'), row('a2'), row('a3'), row('a4'), row('a5'), row('a6')], 3)
+    expect(pages.map((page) => page.map(shape))).toEqual([
+      [['H:A', 'a1', 'a2'], ['a3', 'a4', 'a5']],
+      [['a6']],
+    ])
+  })
+
+  it('never ends a column on a header', () => {
+    const pages = paginate([header('A'), row('a1'), header('B'), row('b1'), row('b2')], 3)
+    expect(pages.map((page) => page.map(shape))).toEqual([[['H:A', 'a1'], ['H:B', 'b1', 'b2']]])
+  })
+
+  it('returns no pages for an empty report', () => {
+    expect(paginate([], 3)).toEqual([])
+  })
+})
+
+describe('unitsPerColumn', () => {
+  const options = { detailLines: 2, fontScale: 1 } as const
+
+  it('fits fewer units in landscape and with larger fonts', () => {
+    expect(unitsPerColumn('A4', 'portrait', options)).toBe(23)
+    expect(unitsPerColumn('A4', 'landscape', options)).toBe(15)
+    expect(unitsPerColumn('A4', 'portrait', { ...options, detailLines: 3 })).toBeLessThan(23)
+    expect(unitsPerColumn('A4', 'portrait', { ...options, fontScale: 2 })).toBeLessThan(12)
+  })
+
+  it('follows the paper size', () => {
+    expect(unitsPerColumn('Letter', 'portrait', options)).toBe(22)
+    expect(unitsPerColumn('A3', 'portrait', options)).toBe(35)
+    expect(unitsPerColumn('A5', 'portrait', options)).toBe(15)
+    // A3 at 141% holds about as many units as A4 at 100% (the safety margin does not scale with the font).
+    expect(unitsPerColumn('A3', 'portrait', { ...options, fontScale: 1.41 })).toBe(24)
+  })
+})
+
 describe('rankLabel', () => {
   it('shows the position, marked when a tie-breaker is needed', () => {
     expect(rankLabel(entry('a', { position: '3' }))).toBe('3')
@@ -92,11 +130,11 @@ describe('ruleBlocks', () => {
 
 describe('layout options', () => {
   it('keeps valid stored options', () => {
-    expect(parseLayoutOptions({ mode: 'pages', detailLines: 3, fontScale: 1.41 })).toEqual({ mode: 'pages', detailLines: 3, fontScale: 1.41 })
+    expect(parseLayoutOptions({ detailLines: 3, fontScale: 1.41 })).toEqual({ detailLines: 3, fontScale: 1.41 })
   })
 
   it('falls back to defaults for missing or invalid values', () => {
-    expect(parseLayoutOptions(null)).toEqual({ mode: 'stream', detailLines: 2, fontScale: 1 })
-    expect(parseLayoutOptions({ mode: 'bogus', detailLines: 7, fontScale: 3 })).toEqual({ mode: 'stream', detailLines: 2, fontScale: 1 })
+    expect(parseLayoutOptions(null)).toEqual({ detailLines: 2, fontScale: 1 })
+    expect(parseLayoutOptions({ mode: 'stream', detailLines: 7, fontScale: 3 })).toEqual({ detailLines: 2, fontScale: 1 })
   })
 })

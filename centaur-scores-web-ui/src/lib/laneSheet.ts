@@ -2,7 +2,7 @@ import type { Category, MatchParticipant, ScoreDevice } from './types'
 
 // Lane-assignment helpers for MatchDevicesView: parsing the free-form lane annotation ("1A", "12b"),
 // the two sanity checks (one target configuration per lane number, more than one club per device), the
-// category-value tag colours, and the printable lane sheet layout (fixed number of lane blocks per page).
+// category-value tag colours, and the printable lane sheet layout (blocks of fixed-height rows, paginated by row).
 
 export type ParsedLane = { number: number | null; letter: string | null }
 
@@ -84,9 +84,18 @@ export type LaneSheetBlock = {
   participants: MatchParticipant[]
   rows: LaneSheetRow[]
 }
-export type LaneSheetPage = { blocks: LaneSheetBlock[] }
+// A block, or the part of it that fits on a page: a block taller than a whole page continues on the next one.
+export type LaneSheetSegment = { block: LaneSheetBlock; rows: LaneSheetRow[]; continued: boolean }
+export type LaneSheetPage = { segments: LaneSheetSegment[] }
 
 const slotLetter = (index: number) => String.fromCharCode(65 + index)
+// Every block on the lane sheet has at least this many rows (a target holds four archers, A-D), so blocks
+// have a predictable height; spare rows stay empty for late entries.
+export const MIN_LANE_ROWS = 4
+
+function padRows(rows: LaneSheetRow[]): LaneSheetRow[] {
+  return [...rows, ...Array.from({ length: Math.max(0, MIN_LANE_ROWS - rows.length) }, () => ({ slot: '', participant: null }))]
+}
 
 // Places archers on their lettered slot (A = 0); archers without a letter, or whose slot is taken, fill
 // the first free slot. Returns the slots indexed by position (holes are undefined).
@@ -110,8 +119,9 @@ function slotParticipants(participants: MatchParticipant[]): (MatchParticipant |
 // Builds the printable lane sheet: per device (in device order) one block per lane number, then one
 // block for its archers without a lane number; lane numbers missing between the lowest and highest
 // get an empty block; archers without a device come last. Every numbered lane block gets as many rows
-// as the fullest lane needs, so blocks line up; blocks are split into pages of `blocksPerPage`.
-export function buildLaneSheet(devices: ScoreDevice[], participants: MatchParticipant[], blocksPerPage = 6): { pages: LaneSheetPage[]; slotCount: number } {
+// as the fullest lane needs, at least MIN_LANE_ROWS, so blocks line up and have the same height (see
+// paginateLaneSheet); the other blocks are padded to MIN_LANE_ROWS too.
+export function buildLaneSheet(devices: ScoreDevice[], participants: MatchParticipant[]): { blocks: LaneSheetBlock[]; slotCount: number } {
   const blocks: LaneSheetBlock[] = []
   const laneSlots = new Map<LaneSheetBlock, (MatchParticipant | undefined)[]>()
 
@@ -130,7 +140,7 @@ export function buildLaneSheet(devices: ScoreDevice[], participants: MatchPartic
       blocks.push(block)
     }
     if (withoutNumber.length > 0) {
-      blocks.push({ kind: 'noLane', deviceId: device.id, deviceName: device.name, laneNumber: null, participants: withoutNumber, rows: withoutNumber.map((participant) => ({ slot: participant.deviceLane ?? '', participant })) })
+      blocks.push({ kind: 'noLane', deviceId: device.id, deviceName: device.name, laneNumber: null, participants: withoutNumber, rows: padRows(withoutNumber.map((participant) => ({ slot: participant.deviceLane ?? '', participant }))) })
     }
   }
 
@@ -150,7 +160,7 @@ export function buildLaneSheet(devices: ScoreDevice[], participants: MatchPartic
     }
   }
 
-  const slotCount = Math.max(1, ...[...laneSlots.values()].map((slots) => slots.length))
+  const slotCount = Math.max(MIN_LANE_ROWS, ...[...laneSlots.values()].map((slots) => slots.length))
   for (const block of blocks) {
     if (block.kind !== 'lane' && block.kind !== 'empty') continue
     const slots = laneSlots.get(block) ?? []
@@ -159,10 +169,37 @@ export function buildLaneSheet(devices: ScoreDevice[], participants: MatchPartic
 
   const unassigned = participants.filter((participant) => !participant.deviceId)
   if (unassigned.length > 0) {
-    blocks.push({ kind: 'noDevice', deviceId: null, deviceName: null, laneNumber: null, participants: unassigned, rows: unassigned.map((participant) => ({ slot: '', participant })) })
+    blocks.push({ kind: 'noDevice', deviceId: null, deviceName: null, laneNumber: null, participants: unassigned, rows: padRows(unassigned.map((participant) => ({ slot: '', participant }))) })
   }
 
+  return { blocks, slotCount }
+}
+
+// Fills pages of at most `rowsPerPage` rows (every row has the same printed height). A block never splits
+// across pages unless it is taller than a whole page (a long list of archers without a lane number or
+// device); such a block fills the rest of the page and continues on the next.
+export function paginateLaneSheet(blocks: LaneSheetBlock[], rowsPerPage: number): LaneSheetPage[] {
+  const capacity = Math.max(1, rowsPerPage)
   const pages: LaneSheetPage[] = []
-  for (let index = 0; index < blocks.length; index += blocksPerPage) pages.push({ blocks: blocks.slice(index, index + blocksPerPage) })
-  return { pages, slotCount }
+  let page: LaneSheetPage = { segments: [] }
+  let free = capacity
+  const newPage = () => {
+    if (page.segments.length > 0) pages.push(page)
+    page = { segments: [] }
+    free = capacity
+  }
+  for (const block of blocks) {
+    const rows = block.rows.length > 0 ? block.rows : [{ slot: '', participant: null }]
+    if (rows.length > free && rows.length <= capacity) newPage()
+    let start = 0
+    while (start < rows.length) {
+      if (free === 0) newPage()
+      const end = Math.min(rows.length, start + free)
+      page.segments.push({ block, rows: rows.slice(start, end), continued: start > 0 })
+      free -= end - start
+      start = end
+    }
+  }
+  newPage()
+  return pages
 }

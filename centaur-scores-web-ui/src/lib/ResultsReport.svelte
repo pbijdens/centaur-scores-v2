@@ -1,29 +1,35 @@
 <script lang="ts">
   import ResultsReportHeader from './ResultsReportHeader.svelte'
   import ResultUnit from './ResultUnit.svelte'
-  import { splitInTwo, type ResultsLayoutOptions, type ResultUnit as Unit } from './resultsLayout'
+  import type { PaperSize, PrintOrientation } from './paperSize'
+  import { paginate, splitInTwo, unitsPerColumn, type ResultsLayoutOptions, type ResultUnit as Unit } from './resultsLayout'
   import type { Language } from './types'
 
-  // A results report (see resultsLayout.ts), shared by the competition and match results pages. The screen always
-  // shows the notice-board stream at normal size (one column on narrow screens); the printed report follows the
-  // print options: layout mode, detail lines and font size.
+  // A results report (see resultsLayout.ts), shared by the competition and match results pages. The screen shows the
+  // stream split in half over two columns at normal size (one column on narrow screens); the printed report is pages
+  // of two columns and follows the print options: paper, detail lines and font size.
   export let title: string
   export let startDate: string
   export let endDate: string | null | undefined = undefined
   export let logoUrl: string | null | undefined = undefined
   export let units: Unit[]
   export let options: ResultsLayoutOptions
+  // The paper the printed report is paginated for.
+  export let paper: PaperSize
   export let language: Language
   export let labels: Record<string, string>
 
   $: columns = splitInTwo(units)
+  // The printed report is paginated for both orientations; the print media queries below show the one matching the paper.
+  const orientations: PrintOrientation[] = ['portrait', 'landscape']
+  $: pagesByOrientation = orientations.map((orientation) => ({ orientation, pages: paginate(units, unitsPerColumn(paper, orientation, options)) }))
 </script>
 
 {#snippet reportHeader()}
   <ResultsReportHeader {title} {startDate} {endDate} {logoUrl} {language} {labels} />
 {/snippet}
 
-{#snippet streamReport()}
+<div class="report screen-only" style="--detail-lines: {options.detailLines}">
   {@render reportHeader()}
   <div class="stream-columns">
     {#each columns as column}
@@ -32,34 +38,26 @@
       </div>
     {/each}
   </div>
-{/snippet}
-
-<div class="report screen-only" style="--detail-lines: {options.detailLines}">
-  {@render streamReport()}
 </div>
 <div class="report print-only" style="--detail-lines: {options.detailLines}; --font-scale: {options.fontScale}">
-  {#if options.mode === 'stream'}
-    {@render streamReport()}
-  {:else}
-    <!-- PDF mode repeats the report header on every printed page: browsers repeat a table's <thead> when the table
-         breaks across pages, so the header and the column flow share one single-cell table. -->
-    <table class="page-table">
-      <thead>
-        <tr>
-          <td>{@render reportHeader()}</td>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td>
-            <div class="page-columns">
-              {#each units as unit}<ResultUnit {unit} averageLabel={labels.resultsAverageLabel} />{/each}
-            </div>
-          </td>
-        </tr>
-      </tbody>
-    </table>
-  {/if}
+  <!-- Explicit pages of two columns, each with its own report header (see paginate in resultsLayout.ts; Safari
+       ignores CSS multi-column when printing). -->
+  {#each pagesByOrientation as { orientation, pages }}
+    <div class="paged {orientation}">
+      {#each pages as page}
+        <div class="printed-page">
+          {@render reportHeader()}
+          <div class="stream-columns">
+            {#each page as column}
+              <div class="stream-column">
+                {#each column as unit}<ResultUnit {unit} averageLabel={labels.resultsAverageLabel} />{/each}
+              </div>
+            {/each}
+          </div>
+        </div>
+      {/each}
+    </div>
+  {/each}
 </div>
 
 <style>
@@ -98,17 +96,19 @@
     }
   }
 
-  .page-table {
-    width: 100%;
-    border-collapse: collapse;
+  .printed-page + .printed-page {
+    break-before: page;
   }
 
-  .page-table td {
-    padding: 0;
+  @media print and (orientation: portrait) {
+    .paged.landscape {
+      display: none;
+    }
   }
 
-  .page-columns {
-    columns: 2;
-    column-gap: calc(6mm * var(--font-scale, 1));
+  @media print and (orientation: landscape) {
+    .paged.portrait {
+      display: none;
+    }
   }
 </style>

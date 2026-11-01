@@ -1,25 +1,28 @@
 <script lang="ts">
+  import PaperSizeSelect from './PaperSizeSelect.svelte'
+  import type { PaperSize } from './paperSize'
   import PrintDialog from './PrintDialog.svelte'
   import { resultsFontScales, type ResultsFontScale, type ResultsLayoutOptions } from './resultsLayout'
 
-  // The print options of a results report (see ResultsReport.svelte): layout mode, an extra detail line and the font
-  // size. Edits a copy of `options`; onPrint receives the chosen options.
+  // The print options of a results report (see ResultsReport.svelte): the paper it is paginated for, an extra
+  // detail line and the font size. Edits a copy of `options` and `paper`; onPrint receives the choices.
   export let open = false
   export let options: ResultsLayoutOptions
+  export let paper: PaperSize
   export let labels: Record<string, string>
-  export let onPrint: (options: ResultsLayoutOptions) => void
+  export let onPrint: (options: ResultsLayoutOptions, paper: PaperSize) => void
 
-  let mode: ResultsLayoutOptions['mode'] = 'stream'
   let extraLine = false
   let fontScale: ResultsFontScale = 1
+  let dialogPaper: PaperSize = paper
   let wasOpen = false
 
   $: if (open !== wasOpen) {
     wasOpen = open
     if (open) {
-      mode = options.mode
       extraLine = options.detailLines === 3
       fontScale = options.fontScale
+      dialogPaper = paper
     }
   }
 
@@ -31,14 +34,8 @@
   }
 </script>
 
-<PrintDialog bind:open title={labels.printOptionsTitle} {labels} onPrint={() => onPrint({ mode, detailLines: extraLine ? 3 : 2, fontScale })}>
-  <label>
-    {labels.resultsLayoutLabel}
-    <select bind:value={mode}>
-      <option value="stream">{labels.resultsLayoutStream}</option>
-      <option value="pages">{labels.resultsLayoutPages}</option>
-    </select>
-  </label>
+<PrintDialog bind:open title={labels.printOptionsTitle} {labels} onPrint={() => onPrint({ detailLines: extraLine ? 3 : 2, fontScale }, dialogPaper)}>
+  <PaperSizeSelect bind:value={dialogPaper} {labels} />
   <label>
     {labels.resultsFontSizeLabel}
     <select bind:value={fontScale}>

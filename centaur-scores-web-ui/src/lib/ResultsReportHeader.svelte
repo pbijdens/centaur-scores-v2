@@ -48,6 +48,12 @@
     font-size: calc(20pt * var(--font-scale, 1));
     line-height: 1.1;
     margin: 0;
+    /* At most two lines: the printed report reserves room for that on every page (resultsLayout.ts). */
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
   }
 
   .report-dates {
