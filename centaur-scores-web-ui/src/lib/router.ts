@@ -5,6 +5,7 @@ export type Route = { view: View; matchId?: string; tenantId?: string; scope?: s
 export function matchPath(matchId: string): string { return `/matches/${matchId}` }
 export function matchEditPath(matchId: string): string { return `/matches/${matchId}/edit` }
 export function matchDevicesPath(matchId: string): string { return `/matches/${matchId}/devices` }
+export function matchLaneEditorPath(matchId: string): string { return `/matches/${matchId}/devices/quick-edit` }
 export function matchQrPath(matchId: string): string { return `/matches/${matchId}/qr` }
 export function matchPrintPath(matchId: string): string { return `/matches/${matchId}/print` }
 export function matchResultsPath(matchId: string, scope: string): string { return `/matches/${matchId}/results/${encodeURIComponent(scope)}` }
@@ -50,6 +51,7 @@ export function resolveRoute(path = location.pathname): Route {
   if (section === 'matches') {
     if (!segments[1]) return { view: 'matches' }
     if (segments[2] === 'edit') return { view: 'match-metadata', matchId: segments[1] }
+    if (segments[2] === 'devices' && segments[3] === 'quick-edit') return { view: 'match-lane-editor', matchId: segments[1] }
     if (segments[2] === 'devices') return { view: 'match-devices', matchId: segments[1] }
     if (segments[2] === 'qr') return { view: 'match-qr', matchId: segments[1] }
     if (segments[2] === 'print') return { view: 'match-print', matchId: segments[1] }

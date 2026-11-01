@@ -574,6 +574,12 @@ nav a.active:after {
   padding: 60px 0;
 }
 
+// The quick lane editor uses the full screen width.
+.content:has(> .lane-editor) {
+  width: calc(100% - 36px);
+  padding-top: 32px;
+}
+
 // Printable pages (scorecards, results, QR codes, lane sheet) render inside the normal site chrome and
 // mark the part that gets printed with .print-output, a direct child of .content: printing such a page
 // prints only that part, without the header, page title or any on-screen controls. Within a page,

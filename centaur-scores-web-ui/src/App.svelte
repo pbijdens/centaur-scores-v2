@@ -28,7 +28,7 @@
   } from './lib/data'
   import { labelForError } from './lib/errors'
   import { translationsFor } from './lib/i18n'
-  import { accountPath, categoryPath, competitionPath, competitionResultsPath, matchAddParticipantsPath, matchParticipantEditPath, matchParticipantPath, matchParticipantReplacePath, matchParticipantScorePath, matchPath, navigateTo, participantListPath, participantMemberPath, resolveRoute, templatePath, tenantPath } from './lib/router'
+  import { accountPath, categoryPath, competitionPath, competitionResultsPath, matchAddParticipantsPath, matchDevicesPath, matchParticipantEditPath, matchParticipantPath, matchParticipantReplacePath, matchParticipantScorePath, matchPath, navigateTo, participantListPath, participantMemberPath, resolveRoute, templatePath, tenantPath } from './lib/router'
   import type { MatchHeaderHandlers } from './lib/pageActions'
   import { isSessionWatchActive } from './lib/sessionWatch'
   import type { Account, Category, Competition, Language, Match, MatchTemplate, ParticipantList, ParticipantListMember, ParticipantListSummary, TenantAccess, Tenant, View } from './lib/types'
@@ -47,6 +47,7 @@
   import MatchAddParticipantsView from './lib/views/MatchAddParticipantsView.svelte'
   import MatchDetailView from './lib/views/MatchDetailView.svelte'
   import MatchDevicesView from './lib/views/MatchDevicesView.svelte'
+  import MatchLaneEditorView from './lib/views/MatchLaneEditorView.svelte'
   import MatchesView from './lib/views/MatchesView.svelte'
   import MatchMetadataEditView from './lib/views/MatchMetadataEditView.svelte'
   import MatchParticipantEditView from './lib/views/MatchParticipantEditView.svelte'
@@ -424,7 +425,7 @@
     view = route.view
     narrowcastScope = route.view === 'narrowcast' ? route.scope ?? null : null
     selectedResultsScope = route.view === 'match-results-scope' ? route.scope ?? null : null
-    const matchScopedViews: View[] = ['match', 'match-metadata', 'match-devices', 'match-qr', 'match-print', 'match-results-scope', 'match-participant', 'match-participant-edit', 'match-participant-replace', 'match-participant-scores', 'match-add-participants']
+    const matchScopedViews: View[] = ['match', 'match-metadata', 'match-devices', 'match-lane-editor', 'match-qr', 'match-print', 'match-results-scope', 'match-participant', 'match-participant-edit', 'match-participant-replace', 'match-participant-scores', 'match-add-participants']
     selectedMatchId = matchScopedViews.includes(route.view) ? route.matchId ?? null : null
     if (selectedMatchId) loadSelectedMatch(selectedMatchId)
     else { selectedMatch = null; matchSourceList = null }
@@ -501,6 +502,11 @@
       {:else if view === 'match-devices' && selectedMatch}
         {@const currentMatch = selectedMatch}
         <MatchDevicesView {api} match={currentMatch} categories={$categories} {language} labels={t} headerHandlers={matchHeaderHandlers} onBack={() => navigate(`/matches/${currentMatch.id}`)} onChanged={refreshSelectedMatch} onOpenParticipant={openParticipant} />
+      {:else if view === 'match-lane-editor' && selectedMatch}
+        {@const currentMatch = selectedMatch}
+        {#key currentMatch.id}
+          <MatchLaneEditorView {api} match={currentMatch} categories={$categories} labels={t} onClose={() => navigate(matchDevicesPath(currentMatch.id))} onChanged={refreshSelectedMatch} />
+        {/key}
       {:else if view === 'match-participant' && selectedMatch && selectedParticipant}
         {@const currentMatch = selectedMatch}
         {@const currentParticipant = selectedParticipant}
