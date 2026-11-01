@@ -574,17 +574,41 @@ nav a.active:after {
   padding: 60px 0;
 }
 
-// Used only by the print-sheet step of MatchPrintView: full-bleed, no header, matching how this page
-// rendered before it gained the normal site chrome for its selection step.
-.app-shell.app-shell-bare {
-  min-height: 0;
-  background: none;
+// Printable pages (scorecards, results, QR codes, lane sheet) render inside the normal site chrome and
+// mark the part that gets printed with .print-output, a direct child of .content: printing such a page
+// prints only that part, without the header, page title or any on-screen controls. Within a page,
+// .screen-only / .print-only switch between the on-screen presentation and the paper layout.
+.print-only {
+  display: none !important;
 }
 
-.content.content-bare {
-  width: 100%;
-  margin: 0;
-  padding: 0;
+@media print {
+  .app-shell:has(.print-output) {
+    min-height: 0;
+    background: none;
+  }
+
+  .app-shell:has(.print-output) > header {
+    display: none;
+  }
+
+  .content:has(> .print-output) {
+    width: auto;
+    margin: 0;
+    padding: 0;
+  }
+
+  .content:has(> .print-output) > :not(.print-output) {
+    display: none !important;
+  }
+
+  .print-only {
+    display: block !important;
+  }
+
+  .screen-only {
+    display: none !important;
+  }
 }
 
 .page-intro {

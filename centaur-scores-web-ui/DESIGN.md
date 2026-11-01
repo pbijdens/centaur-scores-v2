@@ -155,6 +155,15 @@ The match metadata screen is like the match template screen also allows assignin
 
 The results function is a dropdown button, with a dropdown value per configured result scope, taking the user to the full results link for the match, including the scope.
 
+##### Printable pages
+
+Everything meant for paper - match results (per scope), the lane sheet (devices page), scorecards, scoring device QR codes and competition results - follows one pattern:
+- The page opens inside the normal site chrome and page navigation (never in a new tab), presenting its content in a way that suits the screen, on desktop and on mobile.
+- Next to the page's other header buttons there is one "🖨 Print this" button. When the page has print-only options it opens an options dialog whose "Print" button prints the current page with those options; the answers are remembered (per browser) for the next print of the same match/competition. Pages without options print straight away.
+- Printing prints only the printable content (no header, navigation or controls), in the paper layout, which follows the orientation chosen in the browser's print dialog. The lane sheet is the exception: it is always A4 portrait.
+- Match results (per scope) and competition results share one report format (see the competition results section below): the match's scope blocks become the groups, each row showing position (`*` when a tie-breaker is needed), name (★ above personal-best target), the scope's second line plus the per-arrow average as detail, and the score. Both offer the same print options - layout mode, an extra detail line, and a font size (100% to 200%; 141% prints an A4-proportioned report on A3) - remembered per match or competition.
+- Scorecards (options: categories to show, an extra line under the match name, one card per group of ends, all text and lines in pure black for low-quality printers (the logo keeps its colours), which archers - a collapsed list showing how many are selected) print four per page: a 2×2 grid in portrait, four side by side in landscape; in both the score grid grows to fill the card's height (rows up to 1.5 cm, larger digits when there is room). Each card shows the archer's lane (e.g. `3A`) in a box in the top-right corner (an empty box when no lane is assigned), thick lines frame the arrow columns, the two total columns and the edges of the grid, and below the grid boxes for the total score and the total number of 10s and 9s - filled in when the match already has scores.
+
 #### UC9 - Exporting matches
 
 Matches can be exported to CSV, where each row contains:
@@ -234,7 +243,7 @@ To calculate the result for a group:
  - If even the number of 1s is identical, the archers are in the same place in the competition.
  - Assign position numbers using the same algorithm we use for UC17 - Live scoring
 
-The results can be shown by pressing the "Results" button, which will navigate to a **printable** page in a new tab
+The results can be shown by pressing the "Results" button, which will navigate to a **printable** page (see "Printable pages" under UC8)
   - Results have a header with the current date, ideally on each printed page
   - Result-rows show the position and the name of the participant and an asterix when participants truly are in the same place
   - Result-rows show all scores for all participants (with an entry in the participants for the tenant) for all rounds
@@ -243,7 +252,7 @@ The results can be shown by pressing the "Results" button, which will navigate t
   - The printed layout is compact and always two columns, portrait or landscape (full requirements: [../documentation/COMPETITION-RESULT-SCREEN.md](../documentation/COMPETITION-RESULT-SCREEN.md)):
     - A report header with the tenant logo, competition name, competition start/end dates, and the print date: once at the top in notice-board mode, repeated on every page in PDF mode.
     - The body is a stream of equally high units: a group header, then its ranked participant rows. A row shows the rank (or `–` when disqualified/unranked) on the left, the total on the right, and in the middle the name (semibold) plus, in small print, one block per scoring rule: `name (rule total): value value …` listing the value the rule aggregated for each of its rounds (raw score, or f1 points for an f1 rule), `–` for no score, strikethrough for a score the rule did not count. Detail text that doesn't fit is truncated with `…`.
-    - The toolbar (never printed) picks the layout mode, kept in the URL query (`?layout=stream|pages&lines=2|3`): **notice board** (`stream`) splits the stream in half, left column = first half and right column = second half, each running down across pages, and a column never ends on a header; **PDF** (`pages`) is classic two-column pages read page by page, where a column ending on a header is tolerated. A checkbox gives every row one extra detail line (3 instead of 2).
+    - The print dialog picks the printed layout mode (remembered per competition; the screen always shows the notice-board stream, in one column on narrow screens): **notice board** (`stream`) splits the stream in half, left column = first half and right column = second half, each running down across pages, and a column never ends on a header; **PDF** (`pages`) is classic two-column pages read page by page, where a column ending on a header is tolerated. A checkbox gives every row one extra detail line (3 instead of 2). A font size option (100%–200%, 141% = the A4 layout on A3 paper) scales every printed size.
   - Results are ordered per group as defined
     - disqualified participants are put in a list-position as defined before; their total score is shown as 'n/a'
     - disqualified participants do not have a position number, it renders as '-'

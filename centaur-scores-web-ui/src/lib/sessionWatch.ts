@@ -1,9 +1,9 @@
 import type { View } from './types'
 
-// Views that render without ever requiring a fresh session: narrowcast displays and result
-// pages run unattended on kiosks/printers/public screens with no one there to dismiss a popup
-// or be redirected, and match-qr shares that "standalone, no chrome" treatment (see CLAUDE.md).
-const VIEWS_WITHOUT_SESSION_WATCH = new Set<View>(['narrowcast', 'match-qr', 'match-print', 'match-results-scope', 'competition-results'])
+// Views that render without ever requiring a fresh session: narrowcast displays run unattended on
+// public screens with no one there to dismiss a popup or be redirected. (The printable pages -
+// results, QR codes, scorecards - are normal management pages and do get the expiry warning.)
+const VIEWS_WITHOUT_SESSION_WATCH = new Set<View>(['narrowcast'])
 
 export type SessionWatchState = {
   token: string

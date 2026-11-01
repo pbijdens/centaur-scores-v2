@@ -5,7 +5,7 @@
   import type { Category, Language, Match, MatchParticipant, ScoreDevice } from './types'
 
   // The printable lane assignment sheet of MatchDevicesView: hidden on screen, it is the only thing
-  // printed from that page (see the print rules in MatchDevicesView). Six lane blocks per A4 portrait
+  // printed from that page (it is the page's .print-output, see app.scss). Six lane blocks per A4 portrait
   // page, grouped by device; each lane header shows its target configuration (the values of
   // `laneCategory` on that lane number) on a background colour per configuration, and each archer gets
   // a presence box plus the selected categories as tags.
@@ -76,7 +76,7 @@
   }
 </script>
 
-<div class="lane-sheet" style:--row-height="{rowHeightMm}mm">
+<div class="lane-sheet print-output" style:--row-height="{rowHeightMm}mm">
   {#each sheet.pages as page, pageIndex}
     <div class="lane-page">
       <div class="sheet-header">
@@ -147,6 +147,12 @@
     display: none;
     color: #111;
     font-size: 11pt;
+  }
+
+  @media print {
+    .lane-sheet {
+      display: block;
+    }
   }
 
   .lane-page {

@@ -1,10 +1,13 @@
 <script lang="ts">
+  import { tick } from 'svelte'
   import { formatLocalDate } from '../date'
   import { parseMatchKeyboardConfig } from '../matchConfig'
-  import { arrowsShotCount, endTotal, groupEndRanges, groupRunningTotal, hasGroups, runningTotal, scoreFor } from '../scorecard'
+  import { endTotal, groupEndRanges, groupRunningTotal, hasGroups, runningTotal, scoreFor } from '../scorecard'
   import type { ApiClient } from '../api'
   import MatchPageHeader from '../MatchPageHeader.svelte'
-  import type { MatchHeaderHandlers } from '../pageActions'
+  import { printAction, type MatchHeaderHandlers } from '../pageActions'
+  import PrintDialog from '../PrintDialog.svelte'
+  import { loadPrintOptions, printOptionsKey, savePrintOptions } from '../printOptions'
   import type { Category, Language, Match, MatchParticipant, MatchParticipantSignature } from '../types'
 
   export let api: ApiClient
@@ -14,14 +17,7 @@
   export let language: Language
   export let labels: Record<string, string>
   export let headerHandlers: MatchHeaderHandlers
-
-  // Bindable: App.svelte reads this to decide whether to show the normal site chrome (the 'select'
-  // configuration screen) or render full-width/standalone (the 'sheet' step, meant for printing).
-  type Step = 'select' | 'sheet'
-  export let step: Step = 'select'
-
-  type PrintLayout = 'standard' | 'fourColumn'
-  let printLayout: PrintLayout = 'standard'
+  export let onBack: () => void
 
   function chunk<T>(items: T[], size: number): T[][] {
     const result: T[][] = []
@@ -29,47 +25,30 @@
     return result
   }
 
-  // Remembers the organizer's category selection, print layout and extra line per match, so re-opening
-  // the print screen for the same match later starts from where they left off instead of every default
-  // resetting to "everything selected, standard layout, no extra line". Deliberately excludes the
-  // participant selection (who's present can differ each time) and lives in localStorage (not the API)
-  // since it's a per-browser convenience, not match data other organizers or devices need to see.
-  type PrintDraft = { categoryIds: string[]; printLayout: PrintLayout; freeText: string; splitByGroup: boolean }
+  // The print dialog's answers, remembered per match (see printOptions.ts). Categories and archers are
+  // stored as what was *left out*, so an archer or category added to the match later is included by
+  // default, and the selection never depends on the order in which the match and the tenant's categories
+  // finish loading.
+  // blackOnly prints all text and lines in pure black (only the logo keeps its colours), for low-quality printers.
+  type ScorecardPrintOptions = { excludedCategoryIds: string[]; excludedParticipantIds: string[]; freeText: string; splitByGroup: boolean; blackOnly: boolean }
 
-  function printDraftKey(matchId: string): string {
-    return `centaur-print-config-${matchId}`
-  }
-
-  function loadPrintDraft(matchId: string): PrintDraft | null {
-    try {
-      const raw = localStorage.getItem(printDraftKey(matchId))
-      if (!raw) return null
-      const parsed = JSON.parse(raw)
-      if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.categoryIds)) return null
-      return { categoryIds: parsed.categoryIds, printLayout: parsed.printLayout === 'fourColumn' ? 'fourColumn' : 'standard', freeText: typeof parsed.freeText === 'string' ? parsed.freeText : '', splitByGroup: parsed.splitByGroup === true }
-    } catch {
-      return null
+  function parseOptions(stored: Record<string, unknown> | null): ScorecardPrintOptions {
+    const ids = (value: unknown) => (Array.isArray(value) ? value.filter((id): id is string => typeof id === 'string') : [])
+    return {
+      excludedCategoryIds: ids(stored?.excludedCategoryIds),
+      excludedParticipantIds: ids(stored?.excludedParticipantIds),
+      freeText: typeof stored?.freeText === 'string' ? stored.freeText : '',
+      splitByGroup: stored?.splitByGroup === true,
+      blackOnly: stored?.blackOnly === true
     }
   }
 
-  function savePrintDraft(matchId: string, draft: PrintDraft) {
-    try {
-      localStorage.setItem(printDraftKey(matchId), JSON.stringify(draft))
-    } catch {
-      // localStorage unavailable (private browsing, quota) - the draft just won't persist.
-    }
-  }
-
-  let loadedDraftForMatchId: string | null = null
-  let pendingDraftCategoryIds: string[] | null = null
-  $: if (loadedDraftForMatchId !== match.id) {
-    loadedDraftForMatchId = match.id
-    const draft = loadPrintDraft(match.id)
-    printLayout = draft?.printLayout ?? 'standard'
-    freeText = draft?.freeText ?? ''
-    splitByGroup = draft?.splitByGroup ?? false
-    pendingDraftCategoryIds = draft?.categoryIds ?? null
-    categorySelectionInitialized = false
+  $: optionsKey = printOptionsKey('scorecards', match.id)
+  let options: ScorecardPrintOptions = parseOptions(null)
+  let loadedOptionsKey = ''
+  $: if (loadedOptionsKey !== optionsKey) {
+    loadedOptionsKey = optionsKey
+    options = loadPrintOptions(optionsKey, parseOptions)
   }
 
   $: participants = match.participants ?? []
@@ -77,74 +56,63 @@
   $: matchCategories = keyboardConfig.categoryOrder.map((id) => categories.find((category) => category.id === id)).filter((category): category is Category => !!category)
   $: tenKey = keyboardConfig.keyboard.find((key) => key.label === '10')
   $: nineKey = keyboardConfig.keyboard.find((key) => key.label === '9')
-  $: showTensNines = !!tenKey && !!nineKey
   $: groups = hasGroups(match)
 
-  // Both selections default to "everything" - the organizer narrows down from there. Seeded via the
-  // reactive blocks below (not here) - plain top-level `let` initializers run before any `$:` block on
-  // first execution in Svelte's legacy reactivity, so `matchCategories`/`participants` would still be
-  // undefined if read directly in this initializer.
-  //
-  // The two seedings are deliberately independent one-shot guards rather than a single combined one:
-  // on a direct/deep-link navigation to this view, `participants` (embedded in the `match` prop) and
-  // `matchCategories` (which also depends on the separately-loaded `categories` store) can become ready
-  // on different reactive ticks. A combined "either is non-empty" guard would latch as soon as just one
-  // of them arrived, permanently freezing the other's selection at empty.
-  let selectedCategoryIds = new Set<string>()
-  let selectedParticipantIds = new Set<string>()
-  let freeText = ''
-  // Only offered (and only honoured) when the match actually splits into multiple groups of ends.
-  let splitByGroup = false
-  let categorySelectionInitialized = false
-  let participantSelectionInitialized = false
-  // Ready once either the match's keyboard config references no categories at all (nothing to wait
-  // for - matchCategories will stay empty regardless of whether `categories` has loaded) or the
-  // tenant's category list has actually arrived. Using `matchCategories.length > 0` here instead would
-  // mean a match with zero configured categories never initializes, since matchCategories can never
-  // become non-empty for it - which also silently prevented the draft-saving reactive block below from
-  // ever running for such matches.
-  $: categoriesReady = keyboardConfig.categoryOrder.length === 0 || categories.length > 0
-  $: if (!categorySelectionInitialized && categoriesReady) {
-    const validIds = new Set(matchCategories.map((category) => category.id))
-    const draftIds = (pendingDraftCategoryIds ?? []).filter((id) => validIds.has(id))
-    selectedCategoryIds = new Set(draftIds.length > 0 ? draftIds : matchCategories.map((category) => category.id))
-    categorySelectionInitialized = true
-  }
-  $: if (!participantSelectionInitialized && participants.length > 0) {
-    selectedParticipantIds = new Set(participants.map((participant) => participant.id))
-    participantSelectionInitialized = true
-  }
+  $: selectedParticipants = participants.filter((participant) => !options.excludedParticipantIds.includes(participant.id))
+  $: printCategories = matchCategories.filter((category) => !options.excludedCategoryIds.includes(category.id)).sort((a, b) => a.name.localeCompare(b.name))
 
-  // Persist the draft once initial seeding (from a saved draft or the "everything selected" default) has
-  // happened - guarding on categorySelectionInitialized avoids overwriting a saved draft with the
-  // transient empty Set that selectedCategoryIds starts as before seeding runs.
-  $: if (categorySelectionInitialized) {
-    savePrintDraft(match.id, { categoryIds: Array.from(selectedCategoryIds), printLayout, freeText, splitByGroup })
-  }
+  // The dialog edits a copy of the options; only printing commits (and remembers) them.
+  let dialogOpen = false
+  let dialogExcludedCategoryIds = new Set<string>()
+  let dialogExcludedParticipantIds = new Set<string>()
+  let dialogFreeText = ''
+  let dialogSplitByGroup = false
+  let dialogBlackOnly = false
+  // The archer list starts collapsed every time the dialog opens; its summary shows how many are selected.
+  let participantsExpanded = false
 
-  $: allParticipantsSelected = participants.length > 0 && selectedParticipantIds.size === participants.length
-  $: noParticipantsSelected = selectedParticipantIds.size === 0
+  $: dialogSelectedCount = participants.filter((participant) => !dialogExcludedParticipantIds.has(participant.id)).length
+  $: allParticipantsSelected = participants.length > 0 && dialogSelectedCount === participants.length
+  $: noParticipantsSelected = dialogSelectedCount === 0
   $: participantsIndeterminate = !allParticipantsSelected && !noParticipantsSelected
 
-  function toggleCategory(categoryId: string) {
-    const next = new Set(selectedCategoryIds)
-    if (next.has(categoryId)) next.delete(categoryId)
-    else next.add(categoryId)
-    selectedCategoryIds = next
+  function openDialog() {
+    dialogExcludedCategoryIds = new Set(options.excludedCategoryIds)
+    dialogExcludedParticipantIds = new Set(options.excludedParticipantIds)
+    dialogFreeText = options.freeText
+    dialogSplitByGroup = options.splitByGroup
+    dialogBlackOnly = options.blackOnly
+    participantsExpanded = false
+    dialogOpen = true
   }
 
-  function toggleParticipant(participantId: string) {
-    const next = new Set(selectedParticipantIds)
-    if (next.has(participantId)) next.delete(participantId)
-    else next.add(participantId)
-    selectedParticipantIds = next
+  function toggled(set: Set<string>, id: string): Set<string> {
+    const next = new Set(set)
+    if (next.has(id)) next.delete(id)
+    else next.add(id)
+    return next
   }
 
   function toggleAllParticipants() {
-    selectedParticipantIds = allParticipantsSelected ? new Set() : new Set(participants.map((participant) => participant.id))
+    dialogExcludedParticipantIds = allParticipantsSelected ? new Set(participants.map((participant) => participant.id)) : new Set()
   }
 
-  $: selectedParticipants = participants.filter((participant) => selectedParticipantIds.has(participant.id))
+  async function print() {
+    // Only ids that still exist are remembered, so the stored lists don't grow with every removed archer.
+    const participantIds = new Set(participants.map((participant) => participant.id))
+    const categoryIds = new Set(matchCategories.map((category) => category.id))
+    options = {
+      excludedCategoryIds: [...dialogExcludedCategoryIds].filter((id) => categoryIds.has(id)),
+      excludedParticipantIds: [...dialogExcludedParticipantIds].filter((id) => participantIds.has(id)),
+      freeText: dialogFreeText,
+      splitByGroup: dialogSplitByGroup,
+      blackOnly: dialogBlackOnly
+    }
+    savePrintOptions(optionsKey, options)
+    dialogOpen = false
+    await tick()
+    window.print()
+  }
 
   // A single printed card: one participant over a range of ends. Normally that's the whole match; with
   // splitByGroup each participant gets one card per group of ends instead.
@@ -154,8 +122,7 @@
   // device ordered by their deviceOrder; participants without a device are grouped last, alphabetically.
   // With splitByGroup, each device group is repeated once per group of ends (all of a device's cards for
   // ends 1-10, then all of them for 11-20, ...). Between blocks, null placeholders pad the preceding block
-  // up to a multiple of 4 so each block always starts on a fresh page in both the standard
-  // (nth-of-type(4n) page-break) and four-column (chunk-of-4-per-sheet) layouts - see printPages below.
+  // up to a multiple of 4 so each block always starts on a fresh printed page - see printPages below.
   function buildPrintOrder(participantsToOrder: MatchParticipant[], devices: NonNullable<Match['devices']>, endRanges: [number, number][]): (PrintCard | null)[] {
     const byDevice = new Map<string, MatchParticipant[]>()
     const unassigned: MatchParticipant[] = []
@@ -200,78 +167,102 @@
     return result
   }
 
-  $: splitCards = groups && splitByGroup
+  $: splitCards = groups && options.splitByGroup
   $: endRanges = splitCards ? groupEndRanges(match) : ([[1, match.ends]] as [number, number][])
   $: printItems = buildPrintOrder(selectedParticipants, match.devices ?? [], endRanges)
+  $: printPages = chunk(printItems, 4)
   // Rows a single card's table needs: its ends, plus the "running total" carry-in row on later split cards.
   $: rowsPerCard = Math.max(...endRanges.map(([firstEnd, lastEnd]) => lastEnd - firstEnd + 1 + (firstEnd > 1 ? 1 : 0)))
 
-  // Signature images aren't part of the participant payloads, so they're fetched in bulk when the sheet
-  // opens - only for the selected, signed cards. Ids go in the query string, so they're chunked to keep
-  // each URL well under typical proxy header limits. Printing waits until they've loaded.
+  // Signature images aren't part of the participant payloads, so they're fetched in bulk for the match's
+  // signed participants. Ids go in the query string, so they're chunked to keep each URL well under
+  // typical proxy header limits. Printing waits until they've loaded.
   const signatureChunkSize = 50
   let signatures = new Map<string, MatchParticipantSignature>()
   let loadingSignatures = false
+  let signatureGeneration = 0
 
-  async function openSheet() {
-    step = 'sheet'
-    const ids = selectedParticipants.filter((participant) => participant.signed).map((participant) => participant.id)
-    signatures = new Map()
-    if (ids.length === 0) return
+  $: signedIdsKey = participants.filter((participant) => participant.signed).map((participant) => participant.id).sort().join(',')
+  $: void loadSignatures(match.id, signedIdsKey)
+
+  async function loadSignatures(matchId: string, idsKey: string) {
+    const generation = ++signatureGeneration
+    const ids = idsKey ? idsKey.split(',') : []
+    if (ids.length === 0) {
+      signatures = new Map()
+      loadingSignatures = false
+      return
+    }
     loadingSignatures = true
     try {
-      const chunks = await Promise.all(chunk(ids, signatureChunkSize).map((idChunk) => api.fetchMatchSignatures(match.id, idChunk)))
-      signatures = new Map(chunks.flat().map((signature) => [signature.matchParticipantId, signature]))
+      const chunks = await Promise.all(chunk(ids, signatureChunkSize).map((idChunk) => api.fetchMatchSignatures(matchId, idChunk)))
+      if (generation === signatureGeneration) signatures = new Map(chunks.flat().map((signature) => [signature.matchParticipantId, signature]))
     } catch {
       // Without images the cards still print, showing the "signed and final" placeholder instead.
     } finally {
-      loadingSignatures = false
+      if (generation === signatureGeneration) loadingSignatures = false
     }
   }
 
   function deviceNameFor(participant: MatchParticipant): string {
     if (!participant.deviceId) return '-'
-    const name = (match.devices ?? []).find((device) => device.id === participant.deviceId)?.name ?? '-'
-    return participant.deviceLane ? `${name} ${participant.deviceLane}` : name
+    return (match.devices ?? []).find((device) => device.id === participant.deviceId)?.name ?? '-'
   }
 
-  $: printCategories = matchCategories.filter((category) => selectedCategoryIds.has(category.id)).sort((a, b) => a.name.localeCompare(b.name))
-
-  // In the four-column layout the score table is a flex-grow child that stretches to fill the card's
-  // full page height (see .four-column-layout .score-table), but the browser's table row auto-stretch
-  // algorithm ignores `max-height` set on individual cells/rows - only a max-height on the <table> itself
-  // is respected as a clamp. This caps end-rows at ~1cm each regardless of how much space is available.
-  $: scoreTableMaxHeightMm = rowsPerCard * 10 + 6
-
-  // A portrait four-column card is only ~140.5mm tall (see the orientation:portrait CSS below) and the
-  // chrome around the table (header, participant line, categories, total line, two stacked signature
-  // boxes) empirically takes up ~78mm of that regardless of how many ends the match has. Without this,
-  // a match with enough ends makes the table's natural minimum height overflow the card, which pushes the
-  // whole grid row to the next page (and, worse, can corrupt the page's layout entirely rather than
-  // gracefully paginating - CSS Grid fragmentation in Chrome's print engine does not degrade gently).
-  // Sizing each row down to fit guarantees 4-up always; scoreTableMaxHeightMm above still lets rows
-  // stretch back up to 1cm when there's extra room (landscape, or a low end count).
+  // Printed sizes, only applied on paper (as CSS variables, see the print rules below), computed separately
+  // for each orientation so the score grid fills the card's height in both: a card is 140.5mm tall in
+  // portrait (2×2) and 198mm in landscape (4 across), see the orientation CSS below. Around the grid the card
+  // needs ~57mm regardless of the number of ends (header with lane box, participant line, two stacked
+  // signature boxes - measured in Chrome's print layout), plus the two-line categories block and the taller
+  // header of the optional free-text line when present. Every one of those lines is fixed in height (single
+  // lines with an ellipsis, the categories block clamped to two lines), so the same chrome holds for every
+  // card. CHROME_SAFETY_MM covers font-metric differences between browsers. The column headers and the totals
+  // rows take another TABLE_HEADER_ROW_MM + TOTALS_ROWS_MM. The rest is divided over the rows, up to
+  // MAX_ROW_HEIGHT_MM each.
+  //
+  // Without shrinking, a match with enough ends makes the table's natural minimum height overflow the card,
+  // which pushes the whole grid row to the next page (and, worse, can corrupt the page's layout entirely
+  // rather than gracefully paginating - CSS Grid fragmentation in Chrome's print engine does not degrade
+  // gently). The table is also a flex-grow child of the card, so any safety margin left over still goes to
+  // the rows; the browser's table row auto-stretch algorithm ignores `max-height` on cells/rows - only a
+  // max-height on the <table> itself clamps it, which keeps rows at MAX_ROW_HEIGHT_MM for short matches.
   //
   // A `height` on a table cell is only a suggestion the browser can grow past to fit its content's line
   // box - it cannot shrink a row below the line-height its font-size needs. So for high end counts the
   // requested row height must also shrink the font-size (with line-height:1 on .score-cell, a row's floor
   // is exactly its font-size), or rows silently clamp back to their normal ~13px minimum and overflow.
+  // The end-number cell must shrink along with them: table rows share one height, so a larger font there
+  // would make it the tallest cell and override every other cell's shrunk height.
   // No lower clamp on either value: forcing a legibility floor would silently reintroduce the overflow
   // this guards against for very high end counts.
-  const FOUR_COLUMN_PORTRAIT_CARD_HEIGHT_MM = 140.5
-  const FOUR_COLUMN_CHROME_HEIGHT_MM = 78
-  const FOUR_COLUMN_TABLE_HEADER_ROW_MM = 2
+  const CARD_HEIGHT_MM = { portrait: 140.5, landscape: 198 }
+  // The width inside a card's border and padding: two cards across in portrait, four in landscape. The table
+  // is laid out with equal-width columns (end number, arrows, score, subtotal, 10s, 9s), so this bounds the
+  // digit size too - a three-digit subtotal must fit its column on one line (6 arrows in landscape: ~5.8mm).
+  const CARD_INNER_WIDTH_MM = { portrait: 92, landscape: 64 }
+  const DIGITS_PER_CELL = 3
+  const DIGIT_WIDTH_EM = 0.62
+  const CARD_CHROME_HEIGHT_MM = 57
+  const CATEGORIES_BLOCK_MM = 5.2
+  const FREE_TEXT_LINE_MM = 1.5
+  const CHROME_SAFETY_MM = 2.5
+  const TABLE_HEADER_ROW_MM = 3.5
+  const TOTALS_ROWS_MM = 7.5
+  const MAX_ROW_HEIGHT_MM = 15
+  const MAX_CELL_FONT_PX = 13
   const MM_TO_PX = 96 / 25.4
-  $: fourColumnRowHeightMm = Math.min(10, (FOUR_COLUMN_PORTRAIT_CARD_HEIGHT_MM - FOUR_COLUMN_CHROME_HEIGHT_MM - FOUR_COLUMN_TABLE_HEADER_ROW_MM) / rowsPerCard)
-  $: fourColumnFontSizePx = Math.min(11, fourColumnRowHeightMm * MM_TO_PX * 0.85)
-  $: scoreCellStyle = printLayout === 'fourColumn' ? `height: ${fourColumnRowHeightMm}mm; font-size: ${fourColumnFontSizePx}px` : undefined
-  // The end-number cell (row 1, 2, 3...) isn't a .score-cell, but it's a sibling in the same <tr> and
-  // table rows share one height - left at its normal 8px font it silently became the tallest cell in the
-  // row (with the browser's default <td> padding compounding it further), overriding every other cell's
-  // shrunk height and reintroducing the exact overflow fourColumnRowHeightMm exists to prevent.
-  $: endNumberStyle = printLayout === 'fourColumn' ? `height: ${fourColumnRowHeightMm}mm; font-size: ${Math.min(8, fourColumnFontSizePx)}px` : undefined
 
-  $: printPages = chunk(printItems, 4)
+  function orientationSizes(orientation: keyof typeof CARD_HEIGHT_MM, rows: number, columns: number, chromeMm: number): string {
+    const rowHeightMm = Math.min(MAX_ROW_HEIGHT_MM, (CARD_HEIGHT_MM[orientation] - chromeMm - TABLE_HEADER_ROW_MM - TOTALS_ROWS_MM) / rows)
+    const columnWidthPx = (CARD_INNER_WIDTH_MM[orientation] / columns) * MM_TO_PX
+    const cellFontPx = Math.min(MAX_CELL_FONT_PX, rowHeightMm * MM_TO_PX * 0.8, columnWidthPx / (DIGITS_PER_CELL * DIGIT_WIDTH_EM + 0.3))
+    return `--row-height-${orientation}: ${rowHeightMm}mm; --cell-font-${orientation}: ${cellFontPx}px; --end-font-${orientation}: ${Math.min(9, cellFontPx)}px`
+  }
+
+  $: chromeMm = CARD_CHROME_HEIGHT_MM + (printCategories.length > 0 ? CATEGORIES_BLOCK_MM : 0) + (options.freeText ? FREE_TEXT_LINE_MM : 0) + CHROME_SAFETY_MM
+  // End number, arrows, score and subtotal, plus the 10s and 9s columns when the keyboard has those keys.
+  $: tableColumns = match.arrowsPerEnd + (tenKey && nineKey ? 5 : 3)
+  $: printSizes = `${orientationSizes('portrait', rowsPerCard, tableColumns, chromeMm)}; ${orientationSizes('landscape', rowsPerCard, tableColumns, chromeMm)}; --table-max-height: ${rowsPerCard * MAX_ROW_HEIGHT_MM + TABLE_HEADER_ROW_MM + TOTALS_ROWS_MM}mm`
 
   function categoryValueFor(participant: MatchParticipant, category: Category): string | null {
     const valueId = participant.categories[category.id]
@@ -303,6 +294,10 @@
     return (scores ?? []).filter((score) => score.end === end && score.keyId === keyId).length
   }
 
+  function countKeyThrough(scores: MatchParticipant['scores'], lastEnd: number, keyId: string): number {
+    return (scores ?? []).filter((score) => score.end <= lastEnd && score.keyId === keyId).length
+  }
+
   function formatSignedAt(signedAtUtc: string | null | undefined): string {
     if (!signedAtUtc) return ''
     try {
@@ -315,24 +310,23 @@
 
 <svelte:head>
   <title>{labels.printScorecards} - {match.name}</title>
-  {#if printLayout === 'standard'}
-    <style>
-      @page {
-        size: A4 landscape;
-      }
-    </style>
-  {/if}
+  <!-- No page size: the cards follow the orientation picked in the browser's print dialog. -->
+  <style>
+    @page {
+      margin: 6mm;
+    }
+  </style>
 </svelte:head>
 
-{#if step === 'select'}
-  <MatchPageHeader {api} {match} {language} {labels} handlers={headerHandlers} current="print" title={labels.printSelectionTitle} subtitle={match.name} backLabel={match.name} onBack={() => history.back()} />
+<MatchPageHeader {api} {match} {language} {labels} handlers={headerHandlers} current="print" title={labels.printScorecards} subtitle={match.name} backLabel={match.name} {onBack} pageActions={[printAction(labels, openDialog)]} />
 
-  <section class="panel">
-    <h2>{labels.printCategoriesLabel}</h2>
+<PrintDialog bind:open={dialogOpen} title={labels.printOptionsTitle} {labels} printDisabled={noParticipantsSelected || loadingSignatures} onPrint={print}>
+  <section>
+    <h3>{labels.printCategoriesLabel}</h3>
     <div class="checkbox-grid">
       {#each matchCategories as category}
         <label class="checkbox-label">
-          <input type="checkbox" checked={selectedCategoryIds.has(category.id)} on:change={() => toggleCategory(category.id)} />
+          <input type="checkbox" checked={!dialogExcludedCategoryIds.has(category.id)} on:change={() => (dialogExcludedCategoryIds = toggled(dialogExcludedCategoryIds, category.id))} />
           {category.name}
         </label>
       {/each}
@@ -340,34 +334,28 @@
     </div>
   </section>
 
-  <section class="panel section-gap">
-    <label>{labels.printFreeTextLabel}<input type="text" placeholder={labels.printFreeTextPlaceholder} bind:value={freeText} /></label>
-  </section>
+  <label>{labels.printFreeTextLabel}<input type="text" placeholder={labels.printFreeTextPlaceholder} bind:value={dialogFreeText} /></label>
 
-  <section class="panel section-gap">
-    <h2>{labels.printLayoutLabel}</h2>
-    <div class="layout-options">
-      <label class="checkbox-label">
-        <input type="radio" name="printLayout" value="standard" checked={printLayout === 'standard'} on:change={() => (printLayout = 'standard')} />
-        {labels.printLayoutStandardOption}
-      </label>
-      <label class="checkbox-label">
-        <input type="radio" name="printLayout" value="fourColumn" checked={printLayout === 'fourColumn'} on:change={() => (printLayout = 'fourColumn')} />
-        {labels.printLayoutFourColumnOption}
-      </label>
-    </div>
-    {#if printLayout === 'fourColumn'}<p class="muted layout-hint">{labels.printLayoutFourColumnHint}</p>{/if}
-    {#if groups}
-      <label class="checkbox-label split-option">
-        <input type="checkbox" bind:checked={splitByGroup} />
-        {labels.printSplitByGroupLabel.replace('{groupEnds}', String(match.groupEnds))}
-      </label>
-    {/if}
-  </section>
+  {#if groups}
+    <label class="checkbox-label">
+      <input type="checkbox" bind:checked={dialogSplitByGroup} />
+      {labels.printSplitByGroupLabel.replace('{groupEnds}', String(match.groupEnds))}
+    </label>
+  {/if}
 
-  <section class="panel section-gap">
+  <label class="checkbox-label">
+    <input type="checkbox" bind:checked={dialogBlackOnly} />
+    {labels.printBlackOnlyLabel}
+  </label>
+
+  <p class="muted layout-hint">{labels.printLayoutFourColumnHint}</p>
+
+  <details class="participants-details" bind:open={participantsExpanded}>
+    <summary>
+      <h3>{labels.printParticipantsLabel}</h3>
+      <span class="muted">{labels.printParticipantsSelectedSummary.replace('{selected}', String(dialogSelectedCount)).replace('{total}', String(participants.length))}</span>
+    </summary>
     <div class="participants-header">
-      <h2>{labels.printParticipantsLabel}</h2>
       <label class="checkbox-label">
         <input type="checkbox" checked={allParticipantsSelected} indeterminate={participantsIndeterminate} on:change={toggleAllParticipants} />
         {labels.printSelectAllLabel}
@@ -376,207 +364,209 @@
     <div class="list-panel">
       {#each participants as participant (participant.id)}
         <label class="list-row checkbox-row">
-          <input type="checkbox" checked={selectedParticipantIds.has(participant.id)} on:change={() => toggleParticipant(participant.id)} />
+          <input type="checkbox" checked={!dialogExcludedParticipantIds.has(participant.id)} on:change={() => (dialogExcludedParticipantIds = toggled(dialogExcludedParticipantIds, participant.id))} />
           <span class="participant-name">{participant.fullName || participant.lastName}</span>
           {#if participant.federationNumber}<span class="muted">{participant.federationNumber}</span>{/if}
         </label>
       {/each}
       {#if participants.length === 0}<p class="empty-state">{labels.emptyState}</p>{/if}
     </div>
-  </section>
+  </details>
+  {#if noParticipantsSelected}<p class="error">{labels.printNoParticipantsSelected}</p>{/if}
+</PrintDialog>
 
-  {#if noParticipantsSelected}<p class="error section-gap">{labels.printNoParticipantsSelected}</p>{/if}
-
-  <div class="sticky-actions">
-    <button class="primary" type="button" disabled={noParticipantsSelected} on:click={openSheet}>{labels.printPreviewButton}</button>
-  </div>
-{:else}
-  <div class="print-toolbar">
-    <button type="button" class="text-button" on:click={() => (step = 'select')}>← {labels.printBackToSelection}</button>
-    <button type="button" class="primary" disabled={loadingSignatures} on:click={() => window.print()}>{labels.printButton}</button>
-  </div>
-
-  {#snippet printCard(card: PrintCard)}
-    {@const participant = card.participant}
-    {@const lines = participantCategoryLines(participant)}
-    <div class="print-card">
-      <div class="card-header">
-        {#if tenantLogoUrl}<img class="card-logo" src={tenantLogoUrl} alt="" />{/if}
-        <div class="card-heading">
-          <p class="card-match-name">{match.name}</p>
-          <div class="card-date-line">
-            <span class="card-match-date">{formatLocalDate(match.date, language)}</span>
-            <span class="card-device-name">{deviceNameFor(participant)}</span>
-          </div>
-          {#if freeText}<p class="card-free-text">{freeText}</p>{/if}
+{#snippet printCard(card: PrintCard)}
+  {@const participant = card.participant}
+  {@const lines = participantCategoryLines(participant)}
+  {@const scores = participant.scores}
+  {@const totalsKnown = hasScoreBetween(scores, card.firstEnd, card.lastEnd)}
+  <div class="print-card">
+    <div class="card-header">
+      {#if tenantLogoUrl}<img class="card-logo" src={tenantLogoUrl} alt="" />{/if}
+      <div class="card-heading">
+        <p class="card-match-name">{match.name}</p>
+        <div class="card-date-line">
+          <span class="card-match-date">{formatLocalDate(match.date, language)}</span>
+          <span class="card-device-name">{deviceNameFor(participant)}</span>
         </div>
+        {#if options.freeText}<p class="card-free-text">{options.freeText}</p>{/if}
       </div>
-      <div class="card-participant-line">
-        <span>{participant.fullName || participant.lastName}</span>
-        {#if participant.federationNumber}<span>{labels.federationNumberLabel}: {participant.federationNumber}</span>{/if}
+      <!-- Always present: empty when the lane assignment doesn't give this archer a lane yet. -->
+      <div class="card-lane">
+        <span class="card-lane-caption">{labels.laneLabel}</span>
+        <strong class="card-lane-value">{participant.deviceLane ?? ''}</strong>
       </div>
-      {#if lines.length > 0}
-        <div class="card-categories">
-          {#each lines as line}<span>{line.name}: {line.value}</span>{/each}
-        </div>
-      {/if}
+    </div>
+    <div class="card-participant-line">
+      <span class="card-participant-name">{participant.fullName || participant.lastName}</span>
+      {#if participant.federationNumber}<span class="card-federation-number">{labels.federationNumberLabel}: {participant.federationNumber}</span>{/if}
+    </div>
+    <!-- Present on every card as soon as any category is printed, always exactly two lines high (see
+         CATEGORIES_BLOCK_MM), so long values can never push the grid down and every card's grid lines up. -->
+    {#if printCategories.length > 0}
+      <div class="card-categories">
+        {#each lines as line}<span class="card-category">{line.name}: {line.value}</span>{' '}{/each}
+      </div>
+    {/if}
 
-      <table class="score-table" style="max-height: {scoreTableMaxHeightMm}mm">
-        <thead>
+    <!-- Thick lines frame the arrow columns, the two total columns and the right edge of the grid. -->
+    <table class="score-table">
+      <thead>
+        <tr>
+          <th class="borderless"></th>
+          {#each Array(match.arrowsPerEnd) as _, arrowIndex}<th>{arrowIndex + 1}</th>{/each}
+          <th>{labels.printScoreHeader}</th>
+          <th>{labels.printSubtotalHeader}</th>
+          {#if tenKey && nineKey}
+            <th>{labels.printTensHeader}</th>
+            <th>{labels.printNinesHeader}</th>
+          {/if}
+        </tr>
+      </thead>
+      <tbody>
+        {#if card.firstEnd > 1}
+          {@const carryKnown = hasScoreBetween(scores, 1, card.firstEnd - 1)}
           <tr>
-            <th class="borderless"></th>
-            {#each Array(match.arrowsPerEnd) as _, arrowIndex}<th>{arrowIndex + 1}</th>{/each}
-            <th>{labels.printScoreHeader}</th>
-            <th>{labels.printSubtotalHeader}</th>
-            {#if showTensNines}
-              <th>{labels.printTensHeader}</th>
-              <th>{labels.printNinesHeader}</th>
+            <td class="borderless end-number"></td>
+            <td class="borderless running-total-label" colspan={match.arrowsPerEnd + 1}>{labels.printRunningTotalLabel}</td>
+            <td class="score-cell thick-right">{carryKnown ? runningTotal(scores, card.firstEnd - 1) : ''}</td>
+            {#if tenKey && nineKey}
+              <td class="score-cell">{carryKnown ? countKeyThrough(scores, card.firstEnd - 1, tenKey.keyId) : ''}</td>
+              <td class="score-cell thick-right">{carryKnown ? countKeyThrough(scores, card.firstEnd - 1, nineKey.keyId) : ''}</td>
             {/if}
           </tr>
-        </thead>
-        <tbody>
-          {#if card.firstEnd > 1}
-            <tr>
-              <td class="borderless" style={endNumberStyle}></td>
-              <td class="borderless running-total-label" colspan={match.arrowsPerEnd + 1}>{labels.printRunningTotalLabel}</td>
-              <td class="score-cell" style={scoreCellStyle}>{hasScoreBetween(participant.scores, 1, card.firstEnd - 1) ? runningTotal(participant.scores, card.firstEnd - 1) : ''}</td>
-              {#if showTensNines}<td class="borderless" colspan="2"></td>{/if}
-            </tr>
-          {/if}
-          {#each Array(card.lastEnd - card.firstEnd + 1) as _, index}
-            {@const end = card.firstEnd + index}
-            {@const hasScore = endHasAnyScore(participant.scores, end)}
-            <tr>
-              <td class="borderless end-number" style={endNumberStyle}>{end}</td>
-              {#each Array(match.arrowsPerEnd) as _, arrowIndex}
-                <td class="score-cell" style={scoreCellStyle}>{hasScore ? keyLabelFor(participant.scores, end, arrowIndex + 1) : ''}</td>
-              {/each}
-              <td class="score-cell" style={scoreCellStyle}>{hasScore ? endTotal(participant.scores, end) : ''}</td>
-              <td class="score-cell" style={scoreCellStyle}>{hasScore ? (groups && !splitCards ? groupRunningTotal(match, participant.scores, end) : runningTotal(participant.scores, end)) : ''}</td>
-              {#if showTensNines && tenKey && nineKey}
-                <td class="score-cell" style={scoreCellStyle}>{hasScore ? countKeyInEnd(participant.scores, end, tenKey.keyId) : ''}</td>
-                <td class="score-cell" style={scoreCellStyle}>{hasScore ? countKeyInEnd(participant.scores, end, nineKey.keyId) : ''}</td>
-              {/if}
-            </tr>
-          {/each}
-        </tbody>
-      </table>
-
-      <div class="card-total-line">
-        <span>{labels.printTotalLabel}:</span>
-        {#if splitCards ? hasScoreBetween(participant.scores, card.firstEnd, card.lastEnd) : arrowsShotCount(participant.scores) > 1}
-          <strong>{runningTotal(participant.scores, card.lastEnd)}</strong>
-        {:else}
-          <span class="fill-line"></span>
         {/if}
-      </div>
+        {#each Array(card.lastEnd - card.firstEnd + 1) as _, index}
+          {@const end = card.firstEnd + index}
+          {@const hasScore = endHasAnyScore(scores, end)}
+          <tr>
+            <td class="borderless end-number">{end}</td>
+            {#each Array(match.arrowsPerEnd) as _, arrowIndex}
+              <td class="score-cell" class:thick-left={arrowIndex === 0} class:thick-right={arrowIndex === match.arrowsPerEnd - 1}>{hasScore ? keyLabelFor(scores, end, arrowIndex + 1) : ''}</td>
+            {/each}
+            <td class="score-cell">{hasScore ? endTotal(scores, end) : ''}</td>
+            <td class="score-cell thick-right">{hasScore ? (groups && !splitCards ? groupRunningTotal(match, scores, end) : runningTotal(scores, end)) : ''}</td>
+            {#if tenKey && nineKey}
+              <td class="score-cell">{hasScore ? countKeyInEnd(scores, end, tenKey.keyId) : ''}</td>
+              <td class="score-cell thick-right">{hasScore ? countKeyInEnd(scores, end, nineKey.keyId) : ''}</td>
+            {/if}
+          </tr>
+        {/each}
+      </tbody>
+      <!-- The totals the archers add up themselves, a little apart from the grid; filled in when the
+           match already has scores for this card's ends. -->
+      <tfoot>
+        <tr class="totals-gap"><td class="borderless" colspan={match.arrowsPerEnd + 3 + (tenKey && nineKey ? 2 : 0)}></td></tr>
+        <tr class="totals-row">
+          <td class="borderless"></td>
+          <td class="borderless totals-label" colspan={match.arrowsPerEnd}>{labels.printTotalLabel}</td>
+          <td class="total-box" colspan="2">{totalsKnown ? runningTotal(scores, card.lastEnd) : ''}</td>
+          {#if tenKey && nineKey}
+            <td class="total-box">{totalsKnown ? countKeyThrough(scores, card.lastEnd, tenKey.keyId) : ''}</td>
+            <td class="total-box">{totalsKnown ? countKeyThrough(scores, card.lastEnd, nineKey.keyId) : ''}</td>
+          {/if}
+        </tr>
+      </tfoot>
+    </table>
 
-      <div class="card-signatures">
-        <div class="signature-block">
-          {#if signatures.get(participant.id)?.archerSignatureDataUrl}
-            <img class="signature-image" src={signatures.get(participant.id)?.archerSignatureDataUrl} alt={labels.archerSignatureLabel} />
-          {:else if participant.signed}
-            <div class="signature-placeholder"><span>{labels.scorecardSignedBanner}</span></div>
-          {:else if match.signatureMode === 'none'}
-            <div class="signature-placeholder muted-placeholder"><span>{labels.printSignatureNotNeeded}</span></div>
-          {:else}
-            <div class="signature-placeholder"></div>
-          {/if}
-          <p class="signature-caption">{labels.archerSignatureLabel}</p>
-        </div>
-        <div class="signature-block">
-          {#if signatures.get(participant.id)?.markerSignatureDataUrl}
-            <img class="signature-image" src={signatures.get(participant.id)?.markerSignatureDataUrl} alt={labels.markerSignatureLabel} />
-          {:else if participant.signed}
-            <div class="signature-placeholder"><span>{labels.scorecardSignedBanner}</span></div>
-          {:else if match.signatureMode === 'none'}
-            <div class="signature-placeholder muted-placeholder"><span>{labels.printSignatureNotNeeded}</span></div>
-          {:else}
-            <div class="signature-placeholder"></div>
-          {/if}
-          <p class="signature-caption">{labels.markerSignatureLabel}</p>
-        </div>
+    <div class="card-signatures">
+      <div class="signature-block">
+        {#if signatures.get(participant.id)?.archerSignatureDataUrl}
+          <img class="signature-image" src={signatures.get(participant.id)?.archerSignatureDataUrl} alt={labels.archerSignatureLabel} />
+        {:else if participant.signed}
+          <div class="signature-placeholder"><span>{labels.scorecardSignedBanner}</span></div>
+        {:else if match.signatureMode === 'none'}
+          <div class="signature-placeholder muted-placeholder"><span>{labels.printSignatureNotNeeded}</span></div>
+        {:else}
+          <div class="signature-placeholder"></div>
+        {/if}
+        <p class="signature-caption">{labels.archerSignatureLabel}</p>
       </div>
-      {#if participant.signedAtUtc}<p class="signed-at">{labels.printSignedOnLabel.replace('{date}', formatSignedAt(participant.signedAtUtc))}</p>{/if}
+      <div class="signature-block">
+        {#if signatures.get(participant.id)?.markerSignatureDataUrl}
+          <img class="signature-image" src={signatures.get(participant.id)?.markerSignatureDataUrl} alt={labels.markerSignatureLabel} />
+        {:else if participant.signed}
+          <div class="signature-placeholder"><span>{labels.scorecardSignedBanner}</span></div>
+        {:else if match.signatureMode === 'none'}
+          <div class="signature-placeholder muted-placeholder"><span>{labels.printSignatureNotNeeded}</span></div>
+        {:else}
+          <div class="signature-placeholder"></div>
+        {/if}
+        <p class="signature-caption">{labels.markerSignatureLabel}</p>
+      </div>
     </div>
-  {/snippet}
+    {#if participant.signedAtUtc}<p class="signed-at">{labels.printSignedOnLabel.replace('{date}', formatSignedAt(participant.signedAtUtc))}</p>{/if}
+  </div>
+{/snippet}
 
-  <div class="print-page" class:standard-layout={printLayout === 'standard'} class:four-column-layout={printLayout === 'fourColumn'}>
-    {#if printLayout === 'standard'}
-      {#each printItems as item, index (item ? `${item.participant.id}-${item.firstEnd}` : `placeholder-${index}`)}
-        {#if item}
-          {@render printCard(item)}
-        {:else}
-          <div class="print-card print-card-placeholder"></div>
-        {/if}
-      {/each}
-    {:else}
-      {#each printPages as pageItems, pageIndex (pageIndex)}
-        <div class="print-sheet">
-          {#each chunk(pageItems, 2) as halfRowItems, halfIndex (halfIndex)}
-            <div class="print-half-row">
-              {#each halfRowItems as item, itemIndex (item ? `${item.participant.id}-${item.firstEnd}` : `placeholder-${pageIndex}-${halfIndex}-${itemIndex}`)}
-                {#if item}
-                  {@render printCard(item)}
-                {:else}
-                  <div class="print-card print-card-placeholder"></div>
-                {/if}
-              {/each}
-            </div>
+<!-- On screen the cards form a responsive grid; on paper there are four per page, in a 2×2 grid in
+     portrait or side by side in landscape (see the print rules below). -->
+<div class="print-page print-output" class:black-only={options.blackOnly} style={printSizes}>
+  {#each printPages as pageItems, pageIndex (pageIndex)}
+    <div class="print-sheet">
+      {#each chunk(pageItems, 2) as halfRowItems, halfIndex (halfIndex)}
+        <div class="print-half-row">
+          {#each halfRowItems as item, itemIndex (item ? `${item.participant.id}-${item.firstEnd}` : `placeholder-${pageIndex}-${halfIndex}-${itemIndex}`)}
+            {#if item}
+              {@render printCard(item)}
+            {:else}
+              <div class="print-card print-card-placeholder"></div>
+            {/if}
           {/each}
         </div>
       {/each}
-    {/if}
-  </div>
-{/if}
+    </div>
+  {/each}
+  {#if selectedParticipants.length === 0}<p class="empty-state">{participants.length === 0 ? labels.emptyState : labels.printNoParticipantsSelected}</p>{/if}
+</div>
 
 <style>
-  :global(body) {
-    background: #fff;
-  }
-
-  @page {
-    margin: 6mm;
-  }
-
-  .section-gap {
-    margin-top: 24px;
-  }
-
   .checkbox-grid {
     display: flex;
     flex-wrap: wrap;
     gap: 8px 20px;
   }
 
-  .layout-options {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px 20px;
+  h3 {
+    margin: 0 0 10px;
+    font-size: 16px;
   }
 
   .layout-hint {
-    margin-top: 8px;
+    margin: 0;
     font-size: 13px;
   }
 
-  .split-option {
-    margin-top: 12px;
+  .participants-details summary {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+    cursor: pointer;
   }
 
-  .running-total-label {
-    text-align: right;
-    font-size: 8px;
+  .participants-details summary::before {
+    content: '›';
     font-weight: 700;
-    padding: 0 4px 0 0;
-    white-space: nowrap;
+    transition: transform 0.15s;
+  }
+
+  .participants-details[open] summary::before {
+    transform: rotate(90deg);
+  }
+
+  .participants-details summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .participants-details summary h3 {
+    margin: 0;
   }
 
   .participants-header {
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 16px;
+    justify-content: flex-end;
+    margin: 10px 0;
   }
 
   .checkbox-row {
@@ -590,26 +580,52 @@
     font-weight: 600;
   }
 
-  .print-toolbar {
-    display: flex;
-    justify-content: space-between;
-    gap: 12px;
-    padding: 16px;
+  .running-total-label {
+    text-align: right;
+    font-size: 8px;
+    font-weight: 700;
+    padding: 0 4px 0 0;
+    white-space: nowrap;
   }
 
-  .print-page {
-    display: flex;
-    flex-direction: column;
-    gap: 24px;
-    padding: 16px;
-    max-width: 900px;
-    margin: 0 auto;
+  /* On screen: one responsive grid of cards, enlarged from their paper size. The page and half-row
+     wrappers only matter on paper. */
+  @media screen {
+    .print-page {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr));
+      gap: 20px;
+      align-items: start;
+    }
+
+    .print-sheet,
+    .print-half-row {
+      display: contents;
+    }
+
+    .print-card {
+      zoom: 1.3;
+      background: #fff;
+    }
+
+    .print-card-placeholder {
+      display: none;
+    }
+  }
+
+  /* The "black only" print option: every text and line in pure black - no greys, no semi-transparent
+     borders - for printers that render grey poorly. Images (logo, signatures) keep their colours. */
+  .black-only .print-card,
+  .black-only .print-card :not(img) {
+    color: #000 !important;
+    border-color: #000 !important;
   }
 
   .print-card {
     border: 1.5px solid #000;
     padding: 8px;
     break-inside: avoid;
+    color: #000;
   }
 
   .print-card-placeholder {
@@ -629,6 +645,22 @@
     width: 20px;
     height: 20px;
     object-fit: contain;
+  }
+
+  .card-heading {
+    flex: 1;
+    min-width: 0;
+  }
+
+  /* Every line of the card's header is a single line (cut off with an ellipsis): a wrapped line would make
+     the card taller than the space its grid was sized for (see CARD_CHROME_HEIGHT_MM). */
+  .card-match-name,
+  .card-match-date,
+  .card-free-text,
+  .card-participant-name {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
   }
 
   .card-match-name {
@@ -662,23 +694,69 @@
     margin: 1px 0 0;
   }
 
+  .card-lane {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-width: 34px;
+    height: 25px;
+    padding: 1px 3px;
+    box-sizing: border-box;
+    border: 2px solid #000;
+  }
+
+  .card-lane-caption {
+    font-size: 5.5px;
+    line-height: 1;
+    text-transform: uppercase;
+    color: #555;
+  }
+
+  .card-lane-value {
+    font: 700 13px 'Space Grotesk', sans-serif;
+    line-height: 1;
+    white-space: nowrap;
+  }
+
   .card-participant-line {
     display: flex;
     justify-content: space-between;
+    gap: 6px;
     font-weight: 700;
     font-size: 10px;
     line-height: 1.1;
     margin-bottom: 1px;
   }
 
+  .card-participant-name,
+  .card-match-date {
+    min-width: 0;
+  }
+
+  .card-federation-number {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+
+  /* Exactly two lines, whatever the values: longer text is cut off after the second line. */
   .card-categories {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 1px 10px;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
+    height: 2.2em;
     font-size: 8px;
     line-height: 1.1;
     color: #333;
     margin-bottom: 2px;
+  }
+
+  .card-category {
+    margin-right: 6px;
+    white-space: nowrap;
   }
 
   .score-table {
@@ -711,6 +789,7 @@
   }
 
   .score-cell {
+    white-space: nowrap;
     border: 1px solid rgba(0, 0, 0, 0.5);
     text-align: center;
     height: 18px;
@@ -720,25 +799,40 @@
     overflow: hidden;
   }
 
-  .card-total-line {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    margin: 6px 0;
-    font-size: 10px;
-    font-weight: 700;
+  /* In a collapsed table the wider border wins, so these override the thin cell borders they meet. */
+  .score-cell.thick-left {
+    border-left: 2px solid #000;
   }
 
-  .fill-line {
-    flex: 0 0 80px;
-    border-bottom: 1px solid #000;
-    height: 1em;
+  .score-cell.thick-right {
+    border-right: 2px solid #000;
+  }
+
+  .totals-gap td {
+    height: 1.5mm;
+    padding: 0;
+  }
+
+  .totals-label {
+    text-align: right;
+    font-size: 9px;
+    font-weight: 700;
+    padding: 0 4px 0 0;
+  }
+
+  .total-box {
+    border: 2px solid #000;
+    height: 6mm;
+    padding: 0;
+    text-align: center;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1;
   }
 
   .card-signatures {
     display: flex;
-    flex-wrap: wrap;
-    align-items: flex-start;
+    flex-direction: column;
     gap: 8px;
     margin-top: 8px;
   }
@@ -748,30 +842,13 @@
     flex-direction: column;
     align-items: flex-start;
     gap: 1px;
-    flex: 1 1 100px;
-    max-width: 150px;
-  }
-
-  .four-column-layout .card-signatures {
-    flex-direction: column;
-  }
-
-  .four-column-layout .signature-block {
-    flex: 0 0 auto;
-    max-width: none;
     width: 100%;
-  }
-
-  .four-column-layout .signature-image,
-  .four-column-layout .signature-placeholder {
-    aspect-ratio: auto;
-    height: 15mm;
   }
 
   .signature-image,
   .signature-placeholder {
     width: 100%;
-    aspect-ratio: 5 / 1;
+    height: 15mm;
     box-sizing: border-box;
     border: 1px solid #000;
     background: #fff;
@@ -811,64 +888,42 @@
   }
 
   @media print {
-    .print-toolbar {
-      display: none;
-    }
-
     .print-page {
       display: block;
-      max-width: none;
-      padding: 0;
     }
 
-    .standard-layout {
-      font-size: 0;
-    }
-
-    .standard-layout .print-card {
-      display: inline-block;
-      vertical-align: top;
-      width: calc(50% - 2mm);
-      box-sizing: border-box;
-      font-size: 10px;
-      margin: 0 4mm 4mm 0;
-      break-inside: avoid;
-    }
-
-    .standard-layout .print-card:nth-of-type(2n) {
-      margin-right: 0;
-    }
-
-    .standard-layout .print-card:nth-of-type(4n) {
+    .print-sheet:not(:last-child) {
       break-after: page;
     }
 
-    .four-column-layout .print-sheet {
-      gap: 4mm;
-    }
-
-    .four-column-layout .print-sheet:not(:last-child) {
-      break-after: page;
-    }
-
-    .four-column-layout .print-card {
+    .print-card {
       display: flex;
       flex-direction: column;
       height: 100%;
       box-sizing: border-box;
       margin: 0;
-      /* Explicitly overrides the base .print-card's break-inside:avoid (unlike standard-layout, which
-         keeps it). Each card here is already sized to fit exactly within its grid cell (see
-         fourColumnRowHeightMm/scoreTableMaxHeightMm), so this should never need to break. But if that
-         sizing is ever slightly off, break-inside:avoid on an overflowing grid item makes Chrome's print
-         engine corrupt the whole page (rows disappearing/overlapping) instead of just letting the small
-         excess spill - a far safer failure mode. */
+      /* Overrides the base .print-card's break-inside:avoid. Each card is already sized to fit exactly
+         within its grid cell (see orientationSizes), so this should never need to break. But if that sizing is
+         ever slightly off, break-inside:avoid on an overflowing grid item makes Chrome's print engine
+         corrupt the whole page (rows disappearing/overlapping) instead of just letting the small excess
+         spill - a far safer failure mode. */
       break-inside: auto;
     }
 
-    .four-column-layout .score-table {
+    .score-table {
       flex: 1 1 auto;
       min-height: 0;
+      max-height: var(--table-max-height);
+    }
+
+    tbody .score-cell {
+      height: var(--row-height);
+      font-size: var(--cell-font);
+    }
+
+    .end-number {
+      height: var(--row-height);
+      font-size: var(--end-font);
     }
   }
 
@@ -880,25 +935,38 @@
      letting its cards join that grid directly), while portrait's "2x2" is built from two independent
      single-row grids stacked in normal flow instead of one two-row grid. */
   @media print and (orientation: landscape) {
-    .four-column-layout .print-sheet {
+    .print-page {
+      --row-height: var(--row-height-landscape);
+      --cell-font: var(--cell-font-landscape);
+      --end-font: var(--end-font-landscape);
+    }
+
+    .print-sheet {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
       grid-template-rows: 1fr;
+      gap: 4mm;
       height: 198mm;
     }
 
-    .four-column-layout .print-half-row {
+    .print-half-row {
       display: contents;
     }
   }
 
   @media print and (orientation: portrait) {
-    .four-column-layout .print-sheet {
+    .print-page {
+      --row-height: var(--row-height-portrait);
+      --cell-font: var(--cell-font-portrait);
+      --end-font: var(--end-font-portrait);
+    }
+
+    .print-sheet {
       display: block;
       height: 285mm;
     }
 
-    .four-column-layout .print-half-row {
+    .print-half-row {
       display: grid;
       grid-template-columns: repeat(2, 1fr);
       grid-template-rows: 1fr;
@@ -906,7 +974,7 @@
       height: 140.5mm;
     }
 
-    .four-column-layout .print-half-row:first-child {
+    .print-half-row:first-child {
       margin-bottom: 4mm;
     }
   }

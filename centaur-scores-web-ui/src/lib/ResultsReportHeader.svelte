@@ -2,9 +2,11 @@
   import { formatLocalDate } from './date'
   import type { Language } from './types'
 
-  export let competitionName: string
+  // The heading of a printed results report (see resultsLayout.ts); every size follows the inherited --font-scale.
+  export let title: string
   export let startDate: string
-  export let endDate: string
+  // Omitted for a single-day report (a match).
+  export let endDate: string | null | undefined = undefined
   export let logoUrl: string | null | undefined = undefined
   export let language: Language
   export let labels: Record<string, string>
@@ -16,9 +18,9 @@
 <!-- A div, not <header>: the global header rule in app.scss (the app bar) would add padding, height and stickiness. -->
 <div class="report-header">
   {#if logoUrl}<img class="report-logo" src={logoUrl} alt="" />{/if}
-  <h1 class="report-title">{competitionName}</h1>
+  <h1 class="report-title">{title}</h1>
   <div class="report-dates">
-    <p>{formatLocalDate(startDate, language)} – {formatLocalDate(endDate, language)}</p>
+    <p>{formatLocalDate(startDate, language)}{endDate ? ` – ${formatLocalDate(endDate, language)}` : ''}</p>
     <p class="report-date">{labels.resultsPrintedOnLabel} {formatLocalDate(today, language)}</p>
   </div>
 </div>
@@ -27,15 +29,15 @@
   .report-header {
     display: flex;
     align-items: center;
-    gap: 3mm;
+    gap: calc(3mm * var(--font-scale, 1));
     border-bottom: 2px solid #000;
-    padding-bottom: 2mm;
-    margin-bottom: 3mm;
+    padding-bottom: calc(2mm * var(--font-scale, 1));
+    margin-bottom: calc(3mm * var(--font-scale, 1));
     color: #000;
   }
 
   .report-logo {
-    height: 14mm;
+    height: calc(14mm * var(--font-scale, 1));
     width: auto;
     flex: 0 0 auto;
   }
@@ -43,7 +45,7 @@
   .report-title {
     flex: 1;
     min-width: 0;
-    font-size: 20pt;
+    font-size: calc(20pt * var(--font-scale, 1));
     line-height: 1.1;
     margin: 0;
   }
@@ -56,7 +58,7 @@
 
   p {
     margin: 0;
-    font-size: 8pt;
+    font-size: calc(8pt * var(--font-scale, 1));
     white-space: nowrap;
   }
 
