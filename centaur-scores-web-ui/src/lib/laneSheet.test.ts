@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildLaneSheet, contrastingForeground, mixedLaneNumbers, parseLane, tagColor, uniformDeviceValue } from './laneSheet'
+import { buildLaneSheet, contrastingForeground, paginateLaneSheet, mixedLaneNumbers, parseLane, tagColor, uniformDeviceValue } from './laneSheet'
 import type { Category, MatchParticipant, ScoreDevice } from './types'
 
 function participant(id: string, deviceId: string | null, lane: string | null, categories: Record<string, number> = {}): MatchParticipant {
@@ -66,29 +66,52 @@ describe('buildLaneSheet', () => {
       participant('5c', 'd2', '5C'),
       participant('6a', 'd2', '6A'), participant('6b', 'd2', '6B')
     ]
-    const { pages, slotCount } = buildLaneSheet(devices, participants)
-    expect(slotCount).toBe(3)
-    expect(pages).toHaveLength(1)
-    const blocks = pages[0].blocks
+    const { blocks, slotCount } = buildLaneSheet(devices, participants)
+    expect(slotCount).toBe(4)
     expect(blocks.map((block) => block.laneNumber)).toEqual([1, 2, 3, 4, 5, 6])
     expect(blocks.map((block) => block.kind)).toEqual(['lane', 'empty', 'lane', 'empty', 'lane', 'lane'])
-    expect(blocks.map((block) => block.rows.map((row) => row.slot).join(' '))).toEqual(['1A 1B 1C', '2A 2B 2C', '3A 3B 3C', '4A 4B 4C', '5A 5B 5C', '6A 6B 6C'])
-    expect(blocks[4].rows.map((row) => row.participant?.id ?? null)).toEqual([null, null, '5c'])
+    expect(blocks.map((block) => block.rows.map((row) => row.slot).join(' '))).toEqual(['1A 1B 1C 1D', '2A 2B 2C 2D', '3A 3B 3C 3D', '4A 4B 4C 4D', '5A 5B 5C 5D', '6A 6B 6C 6D'])
+    expect(blocks[4].rows.map((row) => row.participant?.id ?? null)).toEqual([null, null, '5c', null])
     expect(blocks[3].deviceId).toBe('d1')
   })
 
   it('lists archers without a lane number per device, and archers without a device last', () => {
     const participants = [participant('a', 'd1', '1A'), participant('b', 'd1', null), participant('c', null, null), participant('d', 'd1', '1')]
-    const blocks = buildLaneSheet(devices, participants).pages[0].blocks
+    const { blocks } = buildLaneSheet(devices, participants)
     expect(blocks.map((block) => block.kind)).toEqual(['lane', 'noLane', 'noDevice'])
-    expect(blocks[0].rows.map((row) => row.participant?.id)).toEqual(['a', 'd'])
+    expect(blocks[0].rows.map((row) => row.participant?.id)).toEqual(['a', 'd', undefined, undefined])
+    expect(blocks[1].rows).toHaveLength(4)
     expect(blocks[1].participants.map((item) => item.id)).toEqual(['b'])
     expect(blocks[2].participants.map((item) => item.id)).toEqual(['c'])
   })
+})
 
-  it('splits into pages of six blocks', () => {
-    const participants = Array.from({ length: 12 }, (_, index) => participant(`p${index}`, 'd1', `${index + 1}A`))
-    const { pages } = buildLaneSheet(devices, participants)
-    expect(pages.map((page) => page.blocks.length)).toEqual([6, 6])
+describe('paginateLaneSheet', () => {
+  const ids = (page: { segments: { block: { laneNumber: number | null }; rows: unknown[]; continued: boolean }[] }) =>
+    page.segments.map((segment) => `${segment.block.laneNumber ?? '-'}:${segment.rows.length}${segment.continued ? '+' : ''}`)
+
+  it('gives lanes with five archers five rows, so four of them share a page', () => {
+    const participants = Array.from({ length: 5 }, (_, lane) => ['A', 'B', 'C', 'D', 'E'].map((letter) => participant(`${lane}${letter}`, 'd1', `${lane + 1}${letter}`))).flat()
+    const pages = paginateLaneSheet(buildLaneSheet(devices, participants).blocks, 24)
+    expect(pages.map(ids)).toEqual([['1:5', '2:5', '3:5', '4:5'], ['5:5']])
+  })
+
+  it('fits six lanes of four archers on a page and never splits a lane', () => {
+    const participants = Array.from({ length: 7 }, (_, lane) => ['A', 'B', 'C', 'D'].map((letter) => participant(`${lane}${letter}`, lane < 6 ? 'd1' : 'd2', `${lane + 1}${letter}`))).flat()
+    const { blocks } = buildLaneSheet(devices, participants)
+    const pages = paginateLaneSheet(blocks, 24)
+    expect(pages.map(ids)).toEqual([['1:4', '2:4', '3:4', '4:4', '5:4', '6:4'], ['7:4']])
+  })
+
+  it('moves a lane that does not fit to the next page', () => {
+    const participants = Array.from({ length: 3 }, (_, lane) => ['A', 'B', 'C'].map((letter) => participant(`${lane}${letter}`, 'd1', `${lane + 1}${letter}`))).flat()
+    const pages = paginateLaneSheet(buildLaneSheet(devices, participants).blocks, 10)
+    expect(pages.map(ids)).toEqual([['1:4', '2:4'], ['3:4']])
+  })
+
+  it('continues a block taller than a page on the next page', () => {
+    const participants = [participant('a', 'd1', '1A'), ...Array.from({ length: 9 }, (_, index) => participant(`x${index}`, null, null))]
+    const pages = paginateLaneSheet(buildLaneSheet(devices, participants).blocks, 5)
+    expect(pages.map(ids)).toEqual([['1:4', '-:1'], ['-:5+'], ['-:3+']])
   })
 })
