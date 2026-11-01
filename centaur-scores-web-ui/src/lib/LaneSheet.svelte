@@ -233,8 +233,9 @@
     width: 7mm;
   }
 
+  /* Room for the widest slot label up to lane 88: "88W" is 8.5mm in bold 11pt, plus 2 x 2mm padding. */
   .slot-col {
-    width: 10mm;
+    width: 14mm;
   }
 
   .federation-col {
