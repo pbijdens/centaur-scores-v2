@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { flattenMatchResults, flattenResults, parseLayoutOptions, rankLabel, ruleBlocks, splitInTwo, type ResultUnit } from './resultsLayout'
+import { flattenMatchResults, flattenResults, paginate, parseLayoutOptions, rankLabel, ruleBlocks, splitInTwo, unitsPerColumn, type ResultUnit } from './resultsLayout'
 import type { CompetitionResultEntry, LiveScoringEntry } from './types'
 
 function entry(name: string, overrides: Partial<CompetitionResultEntry> = {}): CompetitionResultEntry {
@@ -56,6 +56,35 @@ describe('splitInTwo', () => {
 
   it('handles an empty stream', () => {
     expect(splitInTwo([])).toEqual([[], []])
+  })
+})
+
+describe('paginate', () => {
+  it('fills two columns per page, left column first', () => {
+    const pages = paginate([header('A'), row('a1'), row('a2'), row('a3'), row('a4'), row('a5'), row('a6')], 3)
+    expect(pages.map((page) => page.map(shape))).toEqual([
+      [['H:A', 'a1', 'a2'], ['a3', 'a4', 'a5']],
+      [['a6']],
+    ])
+  })
+
+  it('never ends a column on a header', () => {
+    const pages = paginate([header('A'), row('a1'), header('B'), row('b1'), row('b2')], 3)
+    expect(pages.map((page) => page.map(shape))).toEqual([[['H:A', 'a1'], ['H:B', 'b1', 'b2']]])
+  })
+
+  it('returns no pages for an empty report', () => {
+    expect(paginate([], 3)).toEqual([])
+  })
+})
+
+describe('unitsPerColumn', () => {
+  it('fits fewer units in landscape and with larger fonts', () => {
+    const options = { mode: 'pages', detailLines: 2, fontScale: 1 } as const
+    expect(unitsPerColumn('portrait', options)).toBe(23)
+    expect(unitsPerColumn('landscape', options)).toBe(15)
+    expect(unitsPerColumn('portrait', { ...options, detailLines: 3 })).toBeLessThan(23)
+    expect(unitsPerColumn('portrait', { ...options, fontScale: 2 })).toBeLessThan(12)
   })
 })
 

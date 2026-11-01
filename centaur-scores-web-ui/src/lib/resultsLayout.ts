@@ -44,6 +44,42 @@ export function splitInTwo(units: ResultUnit[]): [ResultUnit[], ResultUnit[]] {
   return [units.slice(0, cut), units.slice(cut)]
 }
 
+// PDF mode lays out its pages explicitly instead of with CSS multi-column: Safari ignores `columns` when printing
+// and prints a single column. Every unit has a fixed height (ResultUnit.svelte), so the units per column follow from
+// the printable height of an A4 page (10mm @page margins on 297 x 210mm) minus the report header repeated on every
+// page (ResultsReportHeader.svelte, title clamped to two lines) and a safety margin for rounding.
+export type PrintOrientation = 'portrait' | 'landscape'
+export const printableHeightMm: Record<PrintOrientation, number> = { portrait: 277, landscape: 190 }
+const MM_PER_PT = 25.4 / 72
+const HEADER_MM = 21.5
+const SAFETY_MM = 4
+
+export function unitHeightMm(options: ResultsLayoutOptions): number {
+  // name line 11pt + detail lines of 8pt + 2 x 1.5pt padding, all scaled
+  return (11 + options.detailLines * 8 + 3) * options.fontScale * MM_PER_PT
+}
+
+export function unitsPerColumn(orientation: PrintOrientation, options: ResultsLayoutOptions): number {
+  const available = printableHeightMm[orientation] - HEADER_MM * options.fontScale - SAFETY_MM
+  return Math.max(2, Math.floor(available / unitHeightMm(options)))
+}
+
+// Fills pages of two columns of at most `perColumn` units, left column first. Like splitInTwo, a column never ends on
+// a header: such a header moves on to the next column.
+export function paginate(units: ResultUnit[], perColumn: number): ResultUnit[][][] {
+  const columns: ResultUnit[][] = []
+  let start = 0
+  while (start < units.length) {
+    let end = Math.min(start + perColumn, units.length)
+    while (end > start + 1 && end < units.length && units[end - 1].kind === 'header') end--
+    columns.push(units.slice(start, end))
+    start = end
+  }
+  const pages: ResultUnit[][][] = []
+  for (let i = 0; i < columns.length; i += 2) pages.push(columns.slice(i, i + 2))
+  return pages
+}
+
 export function rankLabel(entry: CompetitionResultEntry): string {
   if (entry.disqualified || !entry.position || entry.position === '-') return '–'
   return entry.needsTieBreaker ? `${entry.position}*` : entry.position
