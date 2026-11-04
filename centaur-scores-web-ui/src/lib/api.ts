@@ -137,6 +137,12 @@ export class ApiClient {
     return this.request(`/api/competitions/${competitionId}/results`)
   }
 
+  async downloadCompetitionExport(competitionId: string, language: Language): Promise<{ blob: Blob; filename: string }> {
+    const response = await fetch(`${apiBase}/api/competitions/${competitionId}/export.xlsx?language=${language}`, { headers: this.headers() })
+    if (!response.ok) throw await readApiError(response)
+    return { blob: await response.blob(), filename: filenameFromDisposition(response.headers.get('content-disposition'), 'competition.xlsx') }
+  }
+
   updateMatch(id: string, body: MatchUpdateInput) {
     return this.request(`/api/matches/${id}`, { method: 'PUT', body: JSON.stringify(body) })
   }

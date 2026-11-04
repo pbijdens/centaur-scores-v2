@@ -546,11 +546,11 @@
       {:else if view === 'competition-results' && selectedCompetitionId}
         {@const currentCompetitionId = selectedCompetitionId}
         {#key currentCompetitionId}
-          <CompetitionResultsView {api} competitionId={currentCompetitionId} tenantLogoUrl={$currentTenant?.logoUrl} {language} labels={t} onBack={() => navigate(competitionPath(currentCompetitionId))} />
+          <CompetitionResultsView {api} competitionId={currentCompetitionId} tenantLogoUrl={$currentTenant?.logoUrl} {canManage} {language} labels={t} onBack={() => navigate(competitionPath(currentCompetitionId))} />
         {/key}
       {:else if view === 'competition' && selectedCompetition}
         {@const currentCompetition = selectedCompetition}
-        <CompetitionDetailView {api} competition={currentCompetition} categories={$categories} matches={$matches} {language} labels={t} onBack={() => navigate('/competitions')} onChanged={onCompetitionChanged} onDeleted={onCompetitionDeleted} onCopied={(copy) => { loadCompetitionsList(); openCompetition(copy) }} onViewResults={() => navigate(competitionResultsPath(currentCompetition.id))} />
+        <CompetitionDetailView {api} competition={currentCompetition} categories={$categories} matches={$matches} {canManage} {language} labels={t} onBack={() => navigate('/competitions')} onChanged={onCompetitionChanged} onDeleted={onCompetitionDeleted} onCopied={(copy) => { loadCompetitionsList(); openCompetition(copy) }} onViewResults={() => navigate(competitionResultsPath(currentCompetition.id))} />
       {:else if view === 'profile'}
         <ProfileView {api} labels={t} onBack={() => navigate('/')} />
       {:else if view === 'select-tenant'}
