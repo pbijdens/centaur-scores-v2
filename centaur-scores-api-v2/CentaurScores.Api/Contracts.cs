@@ -75,7 +75,7 @@ public sealed record CompetitionResultScore(int Value, bool Used);
 // actually aggregates for that round (raw score, or f1 points for an f1 rule; null when no score) and whether it counted.
 public sealed record CompetitionResultRuleRound(Guid RoundId, int? Value, bool Used);
 public sealed record CompetitionResultRule(string Name, string Aggregation, int Total, IReadOnlyList<CompetitionResultRuleRound> Rounds);
-public sealed record CompetitionResultEntry(string? Position, bool NeedsTieBreaker, string Name, bool Disqualified, int? Total, IReadOnlyDictionary<Guid, CompetitionResultScore> RoundScores, IReadOnlyDictionary<string, int> RuleScores, IReadOnlyList<CompetitionResultRule> Rules);
+public sealed record CompetitionResultEntry(string? Position, bool NeedsTieBreaker, string Name, bool Disqualified, int? Total, IReadOnlyDictionary<Guid, CompetitionResultScore> RoundScores, IReadOnlyDictionary<string, int> RuleScores, IReadOnlyList<CompetitionResultRule> Rules, Guid? ParticipantId = null);
 public sealed record CompetitionResultGroup(string Name, IReadOnlyList<CompetitionResultEntry> Entries);
 public sealed record CompetitionResultRound(Guid Id, string ShortName, string LongName, int Order);
 public sealed record CompetitionResultsDocument(string CompetitionName, DateOnly StartDate, DateOnly EndDate, IReadOnlyList<CompetitionResultRound> Rounds, IReadOnlyList<CompetitionResultGroup> Groups);

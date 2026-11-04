@@ -2,7 +2,9 @@
   import { onMount, tick } from 'svelte'
   import type { ApiClient } from '../api'
   import PageHeader from '../PageHeader.svelte'
-  import { printAction } from '../pageActions'
+  import { labelForError } from '../errors'
+  import { saveBlob } from '../matchActions'
+  import { printAction, type PageAction } from '../pageActions'
   import { loadPaperSize, savePaperSize, type PaperSize } from '../paperSize'
   import { loadPrintOptions, printOptionsKey, savePrintOptions } from '../printOptions'
   import ResultsPrintDialog from '../ResultsPrintDialog.svelte'
@@ -13,6 +15,8 @@
   export let api: ApiClient
   export let competitionId: string
   export let tenantLogoUrl: string | null | undefined = undefined
+  // The Excel export includes the full participant list, so (like the participant list export) only managers get it.
+  export let canManage = false
   export let language: Language
   export let labels: Record<string, string>
   export let onBack: () => void
@@ -26,6 +30,26 @@
   // The paper is remembered once for every printable page (see paperSize.ts).
   let paper: PaperSize = loadPaperSize()
   let dialogOpen = false
+  let exportError = ''
+  let exporting = false
+
+  $: actions = [
+    printAction(labels, () => (dialogOpen = true), !document_),
+    ...(canManage ? [{ label: labels.exportCompetitionResults, onClick: exportExcel, disabled: !document_ || exporting } satisfies PageAction] : [])
+  ]
+
+  async function exportExcel() {
+    exportError = ''
+    exporting = true
+    try {
+      const { blob, filename } = await api.downloadCompetitionExport(competitionId, language)
+      saveBlob(blob, filename)
+    } catch (error) {
+      exportError = labelForError(error, labels, 'exportCompetitionResultsError')
+    } finally {
+      exporting = false
+    }
+  }
 
   $: units = document_ ? flattenResults(document_.groups) : []
 
@@ -57,7 +81,9 @@
   </style>
 </svelte:head>
 
-<PageHeader eyebrow={labels.competitions} title={labels.resultsPageTitle} subtitle={document_?.competitionName} backLabel={document_?.competitionName ?? labels.competitions} {onBack} actions={[printAction(labels, () => (dialogOpen = true), !document_)]} />
+<PageHeader eyebrow={labels.competitions} title={labels.resultsPageTitle} subtitle={document_?.competitionName} backLabel={document_?.competitionName ?? labels.competitions} {onBack} {actions} />
+
+{#if exportError}<p class="error screen-only">{exportError}</p>{/if}
 
 <ResultsPrintDialog bind:open={dialogOpen} {options} {paper} {labels} onPrint={print} />
 

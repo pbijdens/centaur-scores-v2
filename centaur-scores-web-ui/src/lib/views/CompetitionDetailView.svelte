@@ -2,6 +2,7 @@
   import type { ApiClient } from '../api'
   import { formatLocalDate } from '../date'
   import { labelForError } from '../errors'
+  import { saveBlob } from '../matchActions'
   import type { PageAction } from '../pageActions'
   import PageHeader from '../PageHeader.svelte'
   import { competitionResultsPath } from '../router'
@@ -19,6 +20,8 @@
   export let onDeleted: () => void
   export let onCopied: (competition: Competition) => void
   export let onViewResults: () => void
+  // The Excel export includes the full participant list, so (like the participant list export) only managers get it.
+  export let canManage = false
 
   let name = competition.name
   let startDate = competition.startDate.slice(0, 10)
@@ -30,6 +33,8 @@
   let roundError = ''
   let ruleError = ''
   let copyError = ''
+  let exportError = ''
+  let exporting = false
 
   let showAddRound = false
   let newRoundShortName = ''
@@ -63,10 +68,24 @@
   ]
   $: headerActions = [
     { label: labels.viewResults, header: 'primary', href: competitionResultsPath(competition.id), onClick: onViewResults },
+    ...(canManage ? [{ label: labels.exportCompetitionResults, separatorBefore: true, onClick: exportExcel, disabled: exporting }] : []),
     { label: labels.saveCopy, separatorBefore: true, onClick: copyCompetition },
     { label: labels.deleteCompetition, danger: true, separatorBefore: true, onClick: deleteCompetition }
   ] satisfies PageAction[]
   $: eligibleMatches = matches.filter((match) => match.date >= startDate && match.date <= endDate)
+
+  async function exportExcel() {
+    exportError = ''
+    exporting = true
+    try {
+      const { blob, filename } = await api.downloadCompetitionExport(competition.id, language)
+      saveBlob(blob, filename)
+    } catch (error) {
+      exportError = labelForError(error, labels, 'exportCompetitionResultsError')
+    } finally {
+      exporting = false
+    }
+  }
 
   function toggleGroupCategory(categoryId: string) {
     groupByCategoryIds = groupByCategoryIds.includes(categoryId)
@@ -301,6 +320,7 @@
 
 <PageHeader eyebrow={labels.competitions} title={competition.name} subtitle={`${formatLocalDate(competition.startDate, language)} – ${formatLocalDate(competition.endDate, language)}`} backLabel={labels.competitions} {onBack} actions={headerActions} menuLabel={labels.matchActions} />
 {#if copyError}<p class="error">{copyError}</p>{/if}
+{#if exportError}<p class="error">{exportError}</p>{/if}
 {#if deleteError}<p class="error">{deleteError}</p>{/if}
 
 <section class="panel section-gap">

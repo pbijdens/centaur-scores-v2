@@ -183,8 +183,38 @@ public sealed class CompetitionsController(ApplicationDbContext db, ITenantConte
     [HttpGet("{id:guid}/results")]
     public async Task<IActionResult> Results(Guid id, CancellationToken cancellationToken)
     {
+        var loaded = await LoadResultsInputAsync(id, cancellationToken);
+        if (loaded is null) return NotFound();
+        return Ok(competitionService.BuildResults(loaded.Value.Competition, loaded.Value.Categories, loaded.Value.MatchesByRound));
+    }
+
+    // All-in-one Excel export (see CompetitionExcelExport). Includes the full participant list(s) used by the competition's
+    // matches - also archers that did not take part - so, like the participant list export, it is restricted to managers.
+    [HttpGet("{id:guid}/export.xlsx")]
+    public async Task<IActionResult> Export(Guid id, [FromQuery] string language = "en", CancellationToken cancellationToken = default)
+    {
+        if (!CanManage) return Forbid();
+        var loaded = await LoadResultsInputAsync(id, cancellationToken);
+        if (loaded is null) return NotFound();
+        var (competition, categories, matchesByRound) = loaded.Value;
+
+        var matches = matchesByRound.Values.SelectMany(item => item).DistinctBy(item => item.Id).ToList();
+        var listIds = matches.Select(item => item.ParticipantListId)
+            .Concat(matches.SelectMany(item => item.Participants).Select(item => item.ParticipantListMember?.ParticipantListId))
+            .Where(item => item is not null).Select(item => item!.Value).Distinct().ToList();
+        var members = await db.ParticipantListMembers.AsNoTracking()
+            .Where(item => listIds.Contains(item.ParticipantListId) && item.TenantId == TenantId)
+            .ToListAsync(cancellationToken);
+
+        var data = competitionService.BuildExport(competition, categories, matchesByRound);
+        var bytes = CompetitionExcelExport.Build(data, categories, members, language);
+        return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"{competition.Name}.xlsx");
+    }
+
+    private async Task<(Competition Competition, List<Category> Categories, Dictionary<Guid, IReadOnlyList<Match>> MatchesByRound)?> LoadResultsInputAsync(Guid id, CancellationToken cancellationToken)
+    {
         var competition = await db.Competitions.AsNoTracking().Include(item => item.Rounds).ThenInclude(item => item.Matches).Include(item => item.ScoringRules).SingleOrDefaultAsync(item => item.Id == id && item.TenantId == TenantId, cancellationToken);
-        if (competition is null) return NotFound();
+        if (competition is null) return null;
         var categories = await db.Categories.AsNoTracking().Include(item => item.Values).Where(item => item.TenantId == TenantId).ToListAsync(cancellationToken);
         var matchIds = competition.Rounds.SelectMany(item => item.Matches).Select(item => item.MatchId).Distinct().ToList();
         var matches = await db.Matches.AsNoTracking()
@@ -195,6 +225,6 @@ public sealed class CompetitionsController(ApplicationDbContext db, ITenantConte
         var matchesByRound = competition.Rounds.ToDictionary(
             round => round.Id,
             round => (IReadOnlyList<Match>)round.Matches.Select(item => matchesById.GetValueOrDefault(item.MatchId)).Where(item => item is not null).Cast<Match>().ToList());
-        return Ok(competitionService.BuildResults(competition, categories, matchesByRound));
+        return (competition, categories, matchesByRound);
     }
 }

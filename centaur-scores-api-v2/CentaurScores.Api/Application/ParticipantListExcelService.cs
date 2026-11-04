@@ -18,6 +18,9 @@ public sealed record ParticipantListExcelLabels(string Number, string Name, stri
     public static readonly IReadOnlyList<ParticipantListExcelLabels> All = [For("en"), For("nl")];
 }
 
+/// <summary>An extra column appended to the right of the standard participant list export columns.</summary>
+public sealed record ParticipantListExtraColumn(string Header, Func<ParticipantListMember, XLCellValue> Value, string? NumberFormat = null);
+
 public sealed record ParticipantListImportRow(string? FederationNumber, string FullName, string LastName, bool IsActive, IReadOnlyDictionary<Guid, int> Categories);
 
 public sealed record ParticipantListImportParseResult(IReadOnlyList<ParticipantListImportRow> Rows, IReadOnlyList<string> Warnings);
@@ -39,26 +42,46 @@ public sealed class ParticipantListExcelService : IParticipantListExcelService
 {
     public byte[] Export(ParticipantList list, IReadOnlyList<Category> categories, string? language)
     {
+        using var workbook = new XLWorkbook();
+        WriteParticipantSheets(workbook, list.Members, categories, language);
+
+        using var stream = new MemoryStream();
+        workbook.SaveAs(stream);
+        return stream.ToArray();
+    }
+
+    /// <summary>
+    /// Writes the "Data" (members) and "Metadata" (category values) sheets of the participant list export into
+    /// <paramref name="workbook"/>. Other exports (e.g. the competition export) reuse this so their participant
+    /// sheets are identical to - and importable as - a participant list export; they can append their own columns
+    /// to the right of the standard ones via <paramref name="extraColumns"/>. Table names already used elsewhere in
+    /// the workbook must be passed in <paramref name="usedTableNames"/>; the names used here are added to it.
+    /// </summary>
+    public static void WriteParticipantSheets(XLWorkbook workbook, IEnumerable<ParticipantListMember> members, IReadOnlyList<Category> categories, string? language, IReadOnlyList<ParticipantListExtraColumn>? extraColumns = null, HashSet<string>? usedTableNames = null)
+    {
         var labels = ParticipantListExcelLabels.For(language);
         var orderedCategories = categories.OrderBy(category => category.Name, StringComparer.CurrentCultureIgnoreCase).ToList();
+        extraColumns ??= [];
+        usedTableNames ??= new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        using var workbook = new XLWorkbook();
         var dataSheet = workbook.Worksheets.Add("Data");
 
         var headers = new List<string> { labels.Number, labels.Name, labels.LastName, labels.Active };
         headers.AddRange(orderedCategories.Select(category => category.Name));
+        headers.AddRange(extraColumns.Select(column => column.Header));
         for (var column = 0; column < headers.Count; column++)
         {
             dataSheet.Cell(1, column + 1).Value = headers[column];
         }
 
         // Active=false sorts last, then last name, then full name - matches the participant list screen's own ordering rule.
-        var sortedMembers = list.Members
+        var sortedMembers = members
             .OrderBy(member => member.IsActive ? 0 : 1)
             .ThenBy(member => member.LastName, StringComparer.CurrentCultureIgnoreCase)
             .ThenBy(member => member.FullName, StringComparer.CurrentCultureIgnoreCase)
             .ToList();
 
+        var firstExtraColumn = 5 + orderedCategories.Count;
         for (var row = 0; row < sortedMembers.Count; row++)
         {
             var member = sortedMembers[row];
@@ -71,14 +94,27 @@ public sealed class ParticipantListExcelService : IParticipantListExcelService
             {
                 dataSheet.Cell(excelRow, 5 + column).Value = CategoryValueLabel(member, orderedCategories[column], labels.Unknown);
             }
+            for (var column = 0; column < extraColumns.Count; column++)
+            {
+                dataSheet.Cell(excelRow, firstExtraColumn + column).Value = extraColumns[column].Value(member);
+            }
+        }
+
+        for (var column = 0; column < extraColumns.Count; column++)
+        {
+            if (extraColumns[column].NumberFormat is { } numberFormat)
+            {
+                dataSheet.Column(firstExtraColumn + column).Style.NumberFormat.Format = numberFormat;
+            }
         }
 
         var lastDataRow = Math.Max(sortedMembers.Count + 1, 1);
         var dataRange = dataSheet.Range(1, 1, lastDataRow, headers.Count);
-        dataRange.CreateTable("Data");
+        var dataTableName = SanitizeTableName("Data", usedTableNames);
+        usedTableNames.Add(dataTableName);
+        dataRange.CreateTable(dataTableName);
 
         var metadataSheet = workbook.Worksheets.Add("Metadata");
-        var usedTableNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var column2 = 1;
         for (var categoryIndex = 0; categoryIndex < orderedCategories.Count; categoryIndex++)
         {
@@ -121,10 +157,6 @@ public sealed class ParticipantListExcelService : IParticipantListExcelService
 
             column2 += 2;
         }
-
-        using var stream = new MemoryStream();
-        workbook.SaveAs(stream);
-        return stream.ToArray();
     }
 
     public ParticipantListImportParseResult Import(Stream fileStream, IReadOnlyList<Category> categories)
@@ -259,7 +291,7 @@ public sealed class ParticipantListExcelService : IParticipantListExcelService
         return !string.Equals(text, "FALSE", StringComparison.OrdinalIgnoreCase) && text != "0";
     }
 
-    private static string SanitizeTableName(string name, HashSet<string> used)
+    internal static string SanitizeTableName(string name, HashSet<string> used)
     {
         var builder = new StringBuilder();
         foreach (var character in name)

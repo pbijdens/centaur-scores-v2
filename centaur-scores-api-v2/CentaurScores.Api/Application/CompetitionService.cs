@@ -6,10 +6,44 @@ namespace CentaurScores.Api.Application;
 
 public sealed record CompetitionParticipantResult(Guid ParticipantId, string Name, int Total, bool Disqualified, IReadOnlyDictionary<string, int> RuleScores, IReadOnlyDictionary<string, IReadOnlySet<Guid>>? UsedRoundIdsByRule = null, IReadOnlyList<CompetitionResultRule>? Rules = null);
 
+/// <summary>One match a participant shot in a competition round (a participant can be in several matches of one round; only one is used for the round).</summary>
+public sealed record CompetitionExportMatchEntry(Guid RoundId, Match Match, MatchParticipant Participant, int Score, int Arrows, int F1Points, bool UsedForRound);
+
+/// <summary>The result that counts for a participant in one round: the raw match score, the arrows shot and the f1-style points.</summary>
+public sealed record CompetitionExportRoundScore(Guid MatchId, int Score, int Arrows, int F1Points);
+
+/// <summary>
+/// One participant's figures for one competition scoring rule. "All" figures cover every round of the rule the participant shot;
+/// "counting" figures only the rounds the rule actually used (the N best by the rule's own aggregation). Points is what the rule
+/// contributes to the competition total - the sum of the counting match scores, or of the counting f1 points for f1 rules.
+/// </summary>
+public sealed record CompetitionExportRuleSummary(int RoundsShot, int AllScore, int AllArrows, int CountingRounds, int Points, int CountingScore, int CountingArrows, bool MinimumMet, IReadOnlySet<Guid> CountingRoundIds);
+
+public sealed record CompetitionExportParticipant(
+    Guid ParticipantId,
+    string Name,
+    string LastName,
+    string? FederationNumber,
+    IReadOnlyDictionary<Guid, int> Categories,
+    string Group,
+    string Position,
+    bool Qualified,
+    int Total,
+    IReadOnlyDictionary<Guid, CompetitionExportRoundScore> Rounds,
+    IReadOnlyList<CompetitionExportRuleSummary> Rules,
+    IReadOnlySet<Guid> CountingRoundIds,
+    int CountingScore,
+    int CountingArrows,
+    IReadOnlyList<CompetitionExportMatchEntry> Matches);
+
+/// <summary>Everything the competition Excel export needs; Rules are in SortOrder and line up with each participant's Rules.</summary>
+public sealed record CompetitionExportData(Competition Competition, IReadOnlyList<CompetitionResultRound> Rounds, IReadOnlyList<CompetitionScoreRule> Rules, IReadOnlyList<CompetitionExportParticipant> Participants);
+
 public interface ICompetitionService
 {
     IReadOnlyList<CompetitionParticipantResult> Calculate(Competition competition, IReadOnlyDictionary<Guid, IReadOnlyList<ParticipantResult>> totalResultsByRound, IReadOnlyDictionary<Guid, IReadOnlyList<ParticipantResult>>? f1ResultsByRound = null);
     CompetitionResultsDocument BuildResults(Competition competition, IReadOnlyList<Category> categories, IReadOnlyDictionary<Guid, IReadOnlyList<Match>> matchesByRound);
+    CompetitionExportData BuildExport(Competition competition, IReadOnlyList<Category> categories, IReadOnlyDictionary<Guid, IReadOnlyList<Match>> matchesByRound);
 }
 
 public sealed class CompetitionService(IScoringService scoringService) : ICompetitionService
@@ -18,7 +52,7 @@ public sealed class CompetitionService(IScoringService scoringService) : ICompet
     private static readonly int[] F1PointsTable = [12, 10, 8, 7, 6, 5, 4, 3, 2];
 
     // Tie-break precedence for the final competition standings: count of X, then 10, then 9, ... down to 1.
-    private static readonly string[] TieBreakKeyOrder = ["X", "10", "9", "8", "7", "6", "5", "4", "3", "2", "1"];
+    internal static readonly string[] TieBreakKeyOrder = ["X", "10", "9", "8", "7", "6", "5", "4", "3", "2", "1"];
 
     public IReadOnlyList<CompetitionParticipantResult> Calculate(Competition competition, IReadOnlyDictionary<Guid, IReadOnlyList<ParticipantResult>> totalResultsByRound, IReadOnlyDictionary<Guid, IReadOnlyList<ParticipantResult>>? f1ResultsByRound = null)
     {
@@ -55,7 +89,118 @@ public sealed class CompetitionService(IScoringService scoringService) : ICompet
         }).OrderByDescending(item => item.Disqualified ? int.MinValue : item.Total).ThenByDescending(item => item.Total).ThenBy(item => item.Name).ToList();
     }
 
-    public CompetitionResultsDocument BuildResults(Competition competition, IReadOnlyList<Category> categories, IReadOnlyDictionary<Guid, IReadOnlyList<Match>> matchesByRound)
+    public CompetitionResultsDocument BuildResults(Competition competition, IReadOnlyList<Category> categories, IReadOnlyDictionary<Guid, IReadOnlyList<Match>> matchesByRound) =>
+        Compute(competition, categories, matchesByRound).Document;
+
+    public CompetitionExportData BuildExport(Competition competition, IReadOnlyList<Category> categories, IReadOnlyDictionary<Guid, IReadOnlyList<Match>> matchesByRound)
+    {
+        var computed = Compute(competition, categories, matchesByRound);
+        var groupCategoryIds = JsonIds(competition.GroupByCategoryIdsJson).ToList();
+        var orderedRules = competition.ScoringRules.OrderBy(item => item.SortOrder).ToList();
+        var ruleResultsById = computed.RuleResults.ToDictionary(item => item.ParticipantId);
+        var f1PointsByRound = computed.F1ResultsByRound.ToDictionary(pair => pair.Key, pair => pair.Value.ToDictionary(item => item.ParticipantId, item => item.Total));
+
+        // The match chosen for each participant in each round (see ChooseRoundMatches), plus every match they shot, for the detail sheet.
+        var chosenByRound = matchesByRound.ToDictionary(pair => pair.Key, pair => ChooseRoundMatches(pair.Value));
+        var f1PointsByMatch = new Dictionary<Guid, Dictionary<Guid, int>>();
+        var matchEntriesByParticipant = new Dictionary<Guid, List<CompetitionExportMatchEntry>>();
+        var roundOrder = computed.Document.Rounds.Select((round, index) => (round.Id, index)).ToDictionary(item => item.Id, item => item.index);
+        foreach (var (roundId, matches) in matchesByRound.OrderBy(pair => roundOrder.GetValueOrDefault(pair.Key, int.MaxValue)))
+        {
+            var chosen = chosenByRound[roundId];
+            foreach (var match in matches.OrderBy(item => item.Date).ThenBy(item => item.Name))
+            {
+                if (!f1PointsByMatch.TryGetValue(match.Id, out var matchPoints))
+                {
+                    matchPoints = ComputeMatchF1Points(match, groupCategoryIds);
+                    f1PointsByMatch[match.Id] = matchPoints;
+                }
+                foreach (var participant in match.Participants.Where(item => item.ParticipantListMemberId is not null))
+                {
+                    var participantId = participant.ParticipantListMemberId!.Value;
+                    var result = scoringService.Calculate(participant, match.ArrowsPerEnd, match.GroupEnds);
+                    var used = chosen.TryGetValue(participantId, out var pick) && ReferenceEquals(pick.Participant, participant);
+                    if (!matchEntriesByParticipant.TryGetValue(participantId, out var list))
+                    {
+                        list = [];
+                        matchEntriesByParticipant[participantId] = list;
+                    }
+                    list.Add(new CompetitionExportMatchEntry(roundId, match, participant, result.Total, participant.Scores.Count, matchPoints.GetValueOrDefault(participantId), used));
+                }
+            }
+        }
+
+        var participants = new List<CompetitionExportParticipant>();
+        foreach (var group in computed.Document.Groups)
+        {
+            foreach (var entry in group.Entries)
+            {
+                var participantId = entry.ParticipantId!.Value;
+                var ruleResult = ruleResultsById[participantId];
+                var rounds = new Dictionary<Guid, CompetitionExportRoundScore>();
+                foreach (var (roundId, chosen) in chosenByRound)
+                {
+                    if (!chosen.TryGetValue(participantId, out var pick)) continue;
+                    var f1Points = f1PointsByRound.GetValueOrDefault(roundId)?.GetValueOrDefault(participantId) ?? 0;
+                    rounds[roundId] = new CompetitionExportRoundScore(pick.Match.Id, pick.Result.Total, pick.Participant.Scores.Count, f1Points);
+                }
+
+                var ruleSummaries = new List<CompetitionExportRuleSummary>();
+                var countingRoundIds = new HashSet<Guid>();
+                for (var index = 0; index < orderedRules.Count; index++)
+                {
+                    var rule = orderedRules[index];
+                    var ruleRoundIds = JsonIds(rule.RoundIdsJson);
+                    var shot = rounds.Where(pair => ruleRoundIds.Contains(pair.Key)).Select(pair => pair.Value).ToList();
+                    var ruleRounds = ruleResult.Rules is { } resultRules && index < resultRules.Count ? resultRules[index] : null;
+                    var counting = (ruleRounds?.Rounds ?? []).Where(item => item.Used && rounds.ContainsKey(item.RoundId)).Select(item => item.RoundId).ToList();
+                    countingRoundIds.UnionWith(counting);
+                    var countingScores = counting.Select(roundId => rounds[roundId]).ToList();
+                    ruleSummaries.Add(new CompetitionExportRuleSummary(
+                        shot.Count,
+                        shot.Sum(item => item.Score),
+                        shot.Sum(item => item.Arrows),
+                        counting.Count,
+                        ruleRounds?.Total ?? 0,
+                        countingScores.Sum(item => item.Score),
+                        countingScores.Sum(item => item.Arrows),
+                        shot.Count >= rule.MinimumScores,
+                        counting.ToHashSet()));
+                }
+
+                // A round used by more than one rule is still a single match: count it once for the overall averages.
+                var countingRounds = countingRoundIds.Select(roundId => rounds[roundId]).ToList();
+                var matchEntries = matchEntriesByParticipant.GetValueOrDefault(participantId) ?? [];
+                var firstParticipant = matchEntries.FirstOrDefault()?.Participant;
+                participants.Add(new CompetitionExportParticipant(
+                    participantId,
+                    entry.Name,
+                    firstParticipant?.LastName ?? "",
+                    firstParticipant?.FederationNumber,
+                    computed.CategoriesByParticipant.GetValueOrDefault(participantId) ?? new Dictionary<Guid, int>(),
+                    group.Name,
+                    entry.Position ?? "-",
+                    !entry.Disqualified,
+                    entry.Total ?? 0,
+                    rounds,
+                    ruleSummaries,
+                    countingRoundIds,
+                    countingRounds.Sum(item => item.Score),
+                    countingRounds.Sum(item => item.Arrows),
+                    matchEntries));
+            }
+        }
+
+        return new CompetitionExportData(competition, computed.Document.Rounds, orderedRules, participants);
+    }
+
+    private sealed record ResultsComputation(
+        CompetitionResultsDocument Document,
+        IReadOnlyList<CompetitionParticipantResult> RuleResults,
+        IReadOnlyDictionary<Guid, IReadOnlyList<ParticipantResult>> F1ResultsByRound,
+        IReadOnlyDictionary<Guid, IReadOnlyDictionary<Guid, int>> CategoriesByParticipant);
+
+    private ResultsComputation Compute(Competition competition, IReadOnlyList<Category> categories, IReadOnlyDictionary<Guid, IReadOnlyList<Match>> matchesByRound)
     {
         var groupCategoryIds = JsonIds(competition.GroupByCategoryIdsJson).ToList();
         var totalResultsByRound = matchesByRound.ToDictionary(pair => pair.Key, pair => BuildRoundTotals(pair.Value));
@@ -87,28 +232,39 @@ public sealed class CompetitionService(IScoringService scoringService) : ICompet
             .Select(group => new CompetitionResultGroup(group.Key, BuildGroupEntries(group.ToList(), totalResultsByRound, keyCountsByParticipant, rounds)))
             .ToList();
 
-        return new CompetitionResultsDocument(competition.Name, competition.StartDate, competition.EndDate, rounds, groups);
+        var document = new CompetitionResultsDocument(competition.Name, competition.StartDate, competition.EndDate, rounds, groups);
+        return new ResultsComputation(
+            document,
+            ruleResults,
+            f1ResultsByRound.ToDictionary(pair => pair.Key, pair => (IReadOnlyList<ParticipantResult>)pair.Value),
+            categoriesByParticipant);
     }
 
     private IReadOnlyList<ParticipantResult> BuildRoundTotals(IReadOnlyList<Match> matches)
     {
+        return ChooseRoundMatches(matches)
+            .Select(pair =>
+            {
+                var chosen = pair.Value;
+                var name = chosen.Participant.FullName;
+                var displayName = string.IsNullOrWhiteSpace(name) ? chosen.Participant.LastName : name;
+                return new ParticipantResult(pair.Key, displayName, chosen.Result.Total, chosen.Result.Average, new Dictionary<int, int>());
+            }).ToList();
+    }
+
+    private Dictionary<Guid, (Match Match, MatchParticipant Participant, ParticipantResult Result)> ChooseRoundMatches(IReadOnlyList<Match> matches)
+    {
+        // A participant is only scored once per round even if assigned to multiple matches in it: take the
+        // earliest-dated match (archers cannot improve an already-recorded result later), and on a tie use
+        // the lower score.
         return matches
             .SelectMany(match => match.Participants.Where(item => item.ParticipantListMemberId is not null).Select(item => (Match: match, Participant: item)))
             .GroupBy(item => item.Participant.ParticipantListMemberId!.Value)
-            .Select(group =>
-            {
-                // A participant is only scored once per round even if assigned to multiple matches in it: take the
-                // earliest-dated match (archers cannot improve an already-recorded result later), and on a tie use
-                // the lower score.
-                var chosen = group
-                    .Select(item => (item.Match, item.Participant, Result: scoringService.Calculate(item.Participant, item.Match.ArrowsPerEnd, item.Match.GroupEnds)))
-                    .OrderBy(item => item.Match.Date)
-                    .ThenBy(item => item.Result.Total)
-                    .First();
-                var name = chosen.Participant.FullName;
-                var displayName = string.IsNullOrWhiteSpace(name) ? chosen.Participant.LastName : name;
-                return new ParticipantResult(group.Key, displayName, chosen.Result.Total, chosen.Result.Average, new Dictionary<int, int>());
-            }).ToList();
+            .ToDictionary(group => group.Key, group => group
+                .Select(item => (item.Match, item.Participant, Result: scoringService.Calculate(item.Participant, item.Match.ArrowsPerEnd, item.Match.GroupEnds)))
+                .OrderBy(item => item.Match.Date)
+                .ThenBy(item => item.Result.Total)
+                .First());
     }
 
     private IReadOnlyList<ParticipantResult> BuildRoundF1Points(IReadOnlyList<Match> matches, IReadOnlyList<Guid> groupCategoryIds)
@@ -213,7 +369,7 @@ public sealed class CompetitionService(IScoringService scoringService) : ICompet
             var used = participant.UsedRoundIdsByRule is null || participant.UsedRoundIdsByRule.Values.Any(set => set.Contains(round.Id));
             roundScores[round.Id] = new CompetitionResultScore(entry.Total, used);
         }
-        return new CompetitionResultEntry(participant.Disqualified ? "-" : position, needsTieBreaker, participant.Name, participant.Disqualified, participant.Total, roundScores, participant.RuleScores, participant.Rules ?? []);
+        return new CompetitionResultEntry(participant.Disqualified ? "-" : position, needsTieBreaker, participant.Name, participant.Disqualified, participant.Total, roundScores, participant.RuleScores, participant.Rules ?? [], participant.ParticipantId);
     }
 
     private static int[] TieBreakKey(Guid participantId, IReadOnlyDictionary<Guid, Dictionary<string, int>> keyCountsByParticipant)
