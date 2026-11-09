@@ -40,6 +40,22 @@ public sealed class CompetitionsController(ApplicationDbContext db, ITenantConte
         return Ok(competition);
     }
 
+    // Publishes (or stops publishing) the results anonymously at /results/{slug}. Kept apart from the metadata PUT so a
+    // taken or invalid slug is rejected without saving anything, and so other edits can never clear the publication.
+    [HttpPut("{id:guid}/publication")]
+    public async Task<IActionResult> SetPublication(Guid id, UpdatePublicationRequest request, CancellationToken cancellationToken)
+    {
+        if (!CanManage) return Forbid();
+        var competition = await db.Competitions.SingleOrDefaultAsync(item => item.Id == id && item.TenantId == TenantId, cancellationToken);
+        if (competition is null) return NotFound();
+        var (slug, error) = await PublishedSlugs.ResolveAsync(db, request, null, id, cancellationToken);
+        if (error is not null) return error.Code == PublishedSlugs.TakenCode ? Conflict(error) : BadRequest(error);
+        competition.PublishedSlug = slug;
+        competition.PublishedIncludesActiveMatches = request.IncludeActiveMatches;
+        await db.SaveChangesAsync(cancellationToken);
+        return Ok(new PublicationResponse(slug, competition.PublishedIncludesActiveMatches));
+    }
+
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
     {
@@ -211,20 +227,6 @@ public sealed class CompetitionsController(ApplicationDbContext db, ITenantConte
         return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"{competition.Name}.xlsx");
     }
 
-    private async Task<(Competition Competition, List<Category> Categories, Dictionary<Guid, IReadOnlyList<Match>> MatchesByRound)?> LoadResultsInputAsync(Guid id, CancellationToken cancellationToken)
-    {
-        var competition = await db.Competitions.AsNoTracking().Include(item => item.Rounds).ThenInclude(item => item.Matches).Include(item => item.ScoringRules).SingleOrDefaultAsync(item => item.Id == id && item.TenantId == TenantId, cancellationToken);
-        if (competition is null) return null;
-        var categories = await db.Categories.AsNoTracking().Include(item => item.Values).Where(item => item.TenantId == TenantId).ToListAsync(cancellationToken);
-        var matchIds = competition.Rounds.SelectMany(item => item.Matches).Select(item => item.MatchId).Distinct().ToList();
-        var matches = await db.Matches.AsNoTracking()
-            .Include(item => item.Participants).ThenInclude(item => item.Scores)
-            .Include(item => item.Participants).ThenInclude(item => item.ParticipantListMember)
-            .Where(item => matchIds.Contains(item.Id) && item.TenantId == TenantId).ToListAsync(cancellationToken);
-        var matchesById = matches.ToDictionary(item => item.Id);
-        var matchesByRound = competition.Rounds.ToDictionary(
-            round => round.Id,
-            round => (IReadOnlyList<Match>)round.Matches.Select(item => matchesById.GetValueOrDefault(item.MatchId)).Where(item => item is not null).Cast<Match>().ToList());
-        return (competition, categories, matchesByRound);
-    }
+    private Task<(Competition Competition, List<Category> Categories, Dictionary<Guid, IReadOnlyList<Match>> MatchesByRound)?> LoadResultsInputAsync(Guid id, CancellationToken cancellationToken) =>
+        CompetitionResultsLoader.LoadAsync(db, id, TenantId, cancellationToken);
 }

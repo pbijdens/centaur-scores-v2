@@ -10,6 +10,8 @@
   The all-in-one competition Excel export: its sheets and what every column means
 - [INTEGRATION-FIND-MATCHES.nl.md](INTEGRATION-FIND-MATCHES.nl.md) / [INTEGRATION-FIND-MATCHES.en.md](INTEGRATION-FIND-MATCHES.en.md)
   Integration guide (Dutch / English) for external systems importing match scores, from match set-up to fetching results
+- [PUBLISHED-RESULTS.nl.md](PUBLISHED-RESULTS.nl.md) / [PUBLISHED-RESULTS.en.md](PUBLISHED-RESULTS.en.md)
+  Admin guide (Dutch / English) to publishing match and competition results on a public `/results/{slug}` page
 
 
 # Index to project documentation

@@ -58,6 +58,16 @@ server {
         alias ${CENTAUR_BASE_DIR}/android/;
     }
 
+    # Published results (/results/{slug}) are public but must never be indexed: send X-Robots-Tag before any
+    # JavaScript runs. "rewrite ... break" (rather than try_files) serves the SPA's index.html from THIS location,
+    # so its headers apply; an add_header here also stops the server-level ones being inherited, hence the
+    # slot cookie is repeated.
+    location ^~ /results/ {
+        add_header Set-Cookie "csv_slot=$centaur_scores_variant; Path=/; Max-Age=2592000; SameSite=Lax" always;
+        add_header X-Robots-Tag "noindex, nofollow, noarchive" always;
+        rewrite ^ /index.html break;
+    }
+
     location / {
         try_files $uri $uri/ /index.html;
     }

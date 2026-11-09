@@ -1,4 +1,4 @@
-import type { Account, Category, Competition, CompetitionResultsDocument, CompetitionRound, CompetitionScoreRule, DefaultScopeSettings, Language, LiveScoringMatch, LiveScoringPage, Match, MatchListItem, MatchParticipant, MatchParticipantSignature, MatchTemplate, ParticipantList, ParticipantListSummary, PersonalBestAvailableValue, PersonalBestConflictResolution, PersonalBestDiscipline, PersonalBestDisciplineValueRef, PersonalBestExportConfig, PersonalBestExportField, PersonalBestExportMode, PersonalBestDateFormat, PersonalBestImportConfig, PersonalBestImportResult, PersonalBestLogRow, PersonalBestStatus, Profile, RestoreBackupResult, ScopeConflict, ScoreDevice, Tenant } from './types'
+import type { Account, Category, Competition, CompetitionResultsDocument, CompetitionRound, CompetitionScoreRule, DefaultScopeSettings, Language, LiveScoringMatch, LiveScoringPage, Match, MatchListItem, MatchParticipant, MatchParticipantSignature, MatchTemplate, ParticipantList, ParticipantListSummary, PersonalBestAvailableValue, PersonalBestConflictResolution, PersonalBestDiscipline, PersonalBestDisciplineValueRef, PersonalBestExportConfig, PersonalBestExportField, PersonalBestExportMode, PersonalBestDateFormat, PersonalBestImportConfig, PersonalBestImportResult, PersonalBestLogRow, PersonalBestStatus, Profile, PublishedResults, RestoreBackupResult, ScopeConflict, ScoreDevice, Tenant } from './types'
 import { filenameFromDisposition } from './contentDisposition'
 
 export const apiBase = import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:5080'
@@ -26,9 +26,11 @@ export type MatchUpdateInput = Omit<MatchInput, 'isOpen'>
 // Carries the API's stable error `code` so callers can map it to a translated message instead of showing server text.
 export class ApiRequestError extends Error {
   code?: string
-  constructor(message: string, code?: string) {
+  status?: number
+  constructor(message: string, code?: string, status?: number) {
     super(message)
     this.code = code
+    this.status = status
   }
 }
 
@@ -41,7 +43,7 @@ async function readApiError(response: Response): Promise<ApiRequestError> {
     if (typeof body?.code === 'string') code = body.code
     if (typeof body?.message === 'string') message = body.message
   } catch { /* response body was not JSON */ }
-  return new ApiRequestError(message, code)
+  return new ApiRequestError(message, code, response.status)
 }
 
 export class ApiClient {
@@ -141,6 +143,17 @@ export class ApiClient {
     const response = await fetch(`${apiBase}/api/competitions/${competitionId}/export.xlsx?language=${language}`, { headers: this.headers() })
     if (!response.ok) throw await readApiError(response)
     return { blob: await response.blob(), filename: filenameFromDisposition(response.headers.get('content-disposition'), 'competition.xlsx') }
+  }
+
+  // Publishes (published=true) or unpublishes the results at /results/{slug}; the API normalizes the slug and rejects a
+  // taken or empty one (error codes PUBLISHED_SLUG_TAKEN / PUBLISHED_SLUG_INVALID) without saving anything.
+  // includeActiveMatches: whether the published results already show matches that are still open (active).
+  setMatchPublication(id: string, published: boolean, slug: string, includeActiveMatches: boolean): Promise<{ publishedSlug: string | null; includeActiveMatches: boolean }> {
+    return this.request(`/api/matches/${id}/publication`, { method: 'PUT', body: JSON.stringify({ published, slug, includeActiveMatches }) })
+  }
+
+  setCompetitionPublication(id: string, published: boolean, slug: string, includeActiveMatches: boolean): Promise<{ publishedSlug: string | null; includeActiveMatches: boolean }> {
+    return this.request(`/api/competitions/${id}/publication`, { method: 'PUT', body: JSON.stringify({ published, slug, includeActiveMatches }) })
   }
 
   updateMatch(id: string, body: MatchUpdateInput) {
@@ -510,6 +523,14 @@ export class ApiClient {
 
 export async function login(username: string, password: string): Promise<{ token: string }> {
   const response = await fetch(`${apiBase}/api/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password }) })
+  if (!response.ok) throw await readApiError(response)
+  return response.json()
+}
+
+// Anonymous: published results need no login. Returns null when nothing is published under the slug.
+export async function fetchPublishedResults(slug: string): Promise<PublishedResults | null> {
+  const response = await fetch(`${apiBase}/published-results/${encodeURIComponent(slug)}`)
+  if (response.status === 404) return null
   if (!response.ok) throw await readApiError(response)
   return response.json()
 }

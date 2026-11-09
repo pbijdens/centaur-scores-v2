@@ -68,6 +68,7 @@
   import PersonalBestLogView from './lib/views/PersonalBestLogView.svelte'
   import PersonalBestView from './lib/views/PersonalBestView.svelte'
   import ProfileView from './lib/views/ProfileView.svelte'
+  import PublishedResultsView from './lib/views/PublishedResultsView.svelte'
   import SelectTenantView from './lib/views/SelectTenantView.svelte'
   import SessionExpiryWatcher from './lib/SessionExpiryWatcher.svelte'
   import TemplateEditView from './lib/views/TemplateEditView.svelte'
@@ -101,6 +102,7 @@
   let selectedCompetitionId: string | null = null
   let selectedCompetition: Competition | null = null
   let narrowcastScope: string | null = null
+  let publishedSlug: string | null = null
   let selectedResultsScope: string | null = null
   // Set by beginAddParticipantToList() when a free match participant's "Add to {list}" button
   // detours into the add-member screen, and by beginEditSharedDetails() when a linked participant's
@@ -137,7 +139,8 @@
   $: selectedMember = selectedMemberId && selectedMemberId !== 'new' ? selectedList?.members.find((member) => member.id === selectedMemberId) ?? null : null
   $: selectedTemplate = $templates.find((template) => template.id === selectedTemplateId) ?? null
   $: selectedParticipant = selectedMatch?.participants?.find((participant) => participant.id === selectedParticipantId) ?? null
-  $: document.title = loggedIn && $currentTenant?.name ? `CentaurScores - ${$currentTenant.name}` : 'CentaurScores'
+  // The public results page sets its own title (results name and tenant).
+  $: if (view !== 'published-results') document.title = loggedIn && $currentTenant?.name ? `CentaurScores - ${$currentTenant.name}` : 'CentaurScores'
 
   const api = new ApiClient(() => token, signOut)
 
@@ -424,6 +427,7 @@
     if (route.invalid) { navigate('/', true); return }
     view = route.view
     narrowcastScope = route.view === 'narrowcast' ? route.scope ?? null : null
+    publishedSlug = route.view === 'published-results' ? route.slug ?? null : null
     selectedResultsScope = route.view === 'match-results-scope' ? route.scope ?? null : null
     const matchScopedViews: View[] = ['match', 'match-metadata', 'match-devices', 'match-lane-editor', 'match-qr', 'match-print', 'match-results-scope', 'match-participant', 'match-participant-edit', 'match-participant-replace', 'match-participant-scores', 'match-add-participants']
     selectedMatchId = matchScopedViews.includes(route.view) ? route.matchId ?? null : null
@@ -451,7 +455,8 @@
     const handlePopState = () => applyRoute()
     window.addEventListener('popstate', handlePopState)
     applyRoute()
-    if (view !== 'narrowcast') {
+    // Narrowcast displays and published results are anonymous: they never redirect to the login page.
+    if (view !== 'narrowcast' && view !== 'published-results') {
       if (loggedIn) bootstrapSession()
       else if (location.pathname !== '/login') history.replaceState({}, '', '/login')
     }
@@ -465,6 +470,10 @@
 
 {#if view === 'narrowcast' && narrowcastScope}
   <LiveScoringView scope={narrowcastScope} />
+{:else if view === 'published-results' && publishedSlug}
+  {#key publishedSlug}
+    <PublishedResultsView slug={publishedSlug} {language} labels={t} onLanguageChange={setLanguage} />
+  {/key}
 {:else if !loggedIn}
   <LoginView bind:username bind:password {loginError} {language} labels={t} onSubmit={signIn} onLanguageChange={setLanguage} />
 {:else if tenantAccessError}

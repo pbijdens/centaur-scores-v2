@@ -5,6 +5,8 @@
   import { saveBlob } from '../matchActions'
   import type { PageAction } from '../pageActions'
   import PageHeader from '../PageHeader.svelte'
+  import PublicationSetting from '../PublicationSetting.svelte'
+  import { normalizeSlug } from '../publishedResults'
   import { competitionResultsPath } from '../router'
   import RowActions from '../RowActions.svelte'
   import type { Category, Competition, CompetitionRound, CompetitionScoreRule, Language, MatchListItem } from '../types'
@@ -35,6 +37,11 @@
   let copyError = ''
   let exportError = ''
   let exporting = false
+  let published = !!competition.publishedSlug
+  let publishedSlug = competition.publishedSlug ?? ''
+  let includeActiveMatches = competition.publishedIncludesActiveMatches ?? true
+  let publicationError = ''
+  let publicationMessage = ''
 
   let showAddRound = false
   let newRoundShortName = ''
@@ -110,6 +117,24 @@
       saveMessage = labels.competitionSaved
     } catch (error) {
       saveError = labelForError(error, labels, 'competitionSaveError')
+    }
+  }
+
+  // Saved on its own (PUT .../publication): a taken or empty slug is rejected without changing anything.
+  async function savePublication() {
+    publicationError = ''
+    publicationMessage = ''
+    if (published && !normalizeSlug(publishedSlug)) {
+      publicationError = labels.publicationSlugEmpty
+      return
+    }
+    try {
+      const publication = await api.setCompetitionPublication(competition.id, published, publishedSlug, includeActiveMatches)
+      publishedSlug = publication.publishedSlug ?? publishedSlug
+      await onChanged()
+      publicationMessage = labels.publicationSaved
+    } catch (error) {
+      publicationError = labelForError(error, labels, 'publicationSaveError')
     }
   }
 
@@ -498,6 +523,14 @@
     {/each}
   </div>
   {#if ruleError}<p class="error">{ruleError}</p>{/if}
+</section>
+
+<section class="panel section-gap">
+  <h2>{labels.publicationTitle}</h2>
+  <p class="muted">{labels.publicationHint}</p>
+  <PublicationSetting bind:published bind:slug={publishedSlug} bind:includeActiveMatches bind:error={publicationError} {labels} />
+  <button class="primary save-button" on:click={savePublication}>{labels.save}</button>
+  {#if publicationMessage}<p class="success">{publicationMessage}</p>{/if}
 </section>
 
 <style>

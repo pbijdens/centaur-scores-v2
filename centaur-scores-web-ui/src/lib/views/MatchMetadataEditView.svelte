@@ -3,6 +3,8 @@
   import { labelForError } from '../errors'
   import { parseMatchKeyboardConfig, parseMatchScoringRules } from '../matchConfig'
   import MatchPageHeader from '../MatchPageHeader.svelte'
+  import PublicationSetting from '../PublicationSetting.svelte'
+  import { normalizeSlug } from '../publishedResults'
   import type { MatchHeaderHandlers } from '../pageActions'
   import RowActions from '../RowActions.svelte'
   import { deviceSelectionModes, keyboardColors, signatureModes } from '../templateConfig'
@@ -41,6 +43,10 @@
     displayCategoryIds: parseGroupByCategoryIds(scope.displayCategoryIdsJson)
   }))
   let personalBestClassifier = match.personalBestClassifier ?? ''
+  let published = !!match.publishedSlug
+  let publishedSlug = match.publishedSlug ?? ''
+  let includeActiveMatches = match.publishedIncludesActiveMatches ?? true
+  let publicationError = ''
   let personalBestClassifiers: string[] = []
 
   async function loadPersonalBestClassifiers() {
@@ -173,6 +179,21 @@
   }
 
   async function save() {
+    // The publication goes first: a taken or empty slug must stop the whole save, so nothing is half-saved.
+    publicationError = ''
+    if (published && !normalizeSlug(publishedSlug)) {
+      publicationError = labels.publicationSlugEmpty
+      alert(publicationError)
+      return
+    }
+    try {
+      const publication = await api.setMatchPublication(match.id, published, publishedSlug, includeActiveMatches)
+      publishedSlug = publication.publishedSlug ?? publishedSlug
+    } catch (error) {
+      publicationError = labelForError(error, labels, 'publicationSaveError')
+      alert(publicationError)
+      return
+    }
     try {
       await api.updateMatch(match.id, {
         name,
@@ -406,6 +427,12 @@
     </div>
   {/each}
   <button class="primary" on:click={addLiveScope}>+ {labels.addLiveScope}</button>
+</section>
+
+<section class="panel section-gap">
+  <h2>{labels.publicationTitle}</h2>
+  <p class="muted">{labels.publicationHint}</p>
+  <PublicationSetting bind:published bind:slug={publishedSlug} bind:includeActiveMatches bind:error={publicationError} {labels} />
 </section>
 
 <div class="sticky-actions">
