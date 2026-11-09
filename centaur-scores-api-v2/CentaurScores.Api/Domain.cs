@@ -101,6 +101,11 @@ public sealed class Match : TenantOwnedEntity
     public string KeyboardJson { get; set; } = MatchDefaults.KeyboardJson;
     public string ScoringRulesJson { get; set; } = "[]";
     public string? PersonalBestClassifier { get; set; }
+    // Normalized slug under which the results are published anonymously at /results/{slug}; null = not published.
+    // Unique across matches and competitions (see PublishedSlugs).
+    public string? PublishedSlug { get; set; }
+    // Whether the published results already show this match while it is still open (active); otherwise only once closed.
+    public bool PublishedIncludesActiveMatches { get; set; } = true;
     public List<MatchParticipant> Participants { get; set; } = [];
     public List<ScoreDevice> Devices { get; set; } = [];
     public List<LiveScoreScope> LiveScopes { get; set; } = [];
@@ -207,6 +212,10 @@ public sealed class Competition : TenantOwnedEntity
     public DateOnly StartDate { get; set; }
     public DateOnly EndDate { get; set; }
     public string GroupByCategoryIdsJson { get; set; } = "[]";
+    // Normalized slug under which the results are published anonymously at /results/{slug}; null = not published.
+    public string? PublishedSlug { get; set; }
+    // Whether the published results include matches that are still open (active); otherwise only closed matches count.
+    public bool PublishedIncludesActiveMatches { get; set; } = true;
     public List<CompetitionRound> Rounds { get; set; } = [];
     public List<CompetitionScoreRule> ScoringRules { get; set; } = [];
 }

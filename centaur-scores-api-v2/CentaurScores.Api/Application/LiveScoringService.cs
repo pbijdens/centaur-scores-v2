@@ -7,15 +7,22 @@ namespace CentaurScores.Api.Application;
 public interface ILiveScoringService
 {
     IReadOnlyList<LiveScoringBlock> BuildBlocks(Match match, LiveScoreScope scope, IReadOnlyList<Category> categories, IReadOnlyDictionary<Guid, PersonalBestSnapshot>? personalBests = null);
+
+    /// <summary>
+    /// The anonymous published-results equivalent of BuildBlocks: same grouping, ordering and ranking (match scoring rules included),
+    /// but plain result rows instead of narrowcast lines. An empty groupByCategoryIds yields a single block with every participant.
+    /// </summary>
+    IReadOnlyList<PublishedMatchBlock> BuildPublishedBlocks(Match match, IReadOnlyList<Guid> groupByCategoryIds, IReadOnlyList<Category> categories);
+
+    /// <summary>The scope's group-by categories in the match's category order - what BuildBlocks groups on.</summary>
+    IReadOnlyList<Guid> OrderedGroupCategoryIds(Match match, IReadOnlyList<Guid> groupByCategoryIds);
 }
 
 public sealed class LiveScoringService(IScoringService scoringService) : ILiveScoringService
 {
     public IReadOnlyList<LiveScoringBlock> BuildBlocks(Match match, LiveScoreScope scope, IReadOnlyList<Category> categories, IReadOnlyDictionary<Guid, PersonalBestSnapshot>? personalBests = null)
     {
-        var categoryIds = Deserialize<List<Guid>>(scope.GroupByCategoryIdsJson) ?? [];
-        var categoryOrder = Deserialize<KeyboardConfiguration>(match.KeyboardJson)?.CategoryOrder ?? [];
-        var orderedCategoryIds = categoryOrder.Where(categoryIds.Contains).Concat(categoryIds.Where(id => !categoryOrder.Contains(id))).ToList();
+        var orderedCategoryIds = OrderedGroupCategoryIds(match, Deserialize<List<Guid>>(scope.GroupByCategoryIdsJson) ?? []);
         var categoryById = categories.ToDictionary(item => item.Id);
         var personalBestByParticipant = personalBests ?? new Dictionary<Guid, PersonalBestSnapshot>();
 
@@ -29,7 +36,39 @@ public sealed class LiveScoringService(IScoringService scoringService) : ILiveSc
             .ToList();
     }
 
-    private IReadOnlyList<LiveScoringEntry> Rank(IEnumerable<MatchParticipant> participants, Match match, LiveScoreScope scope, IReadOnlyDictionary<Guid, PersonalBestSnapshot> personalBests, IReadOnlyDictionary<Guid, Category> categoryById)
+    public IReadOnlyList<Guid> OrderedGroupCategoryIds(Match match, IReadOnlyList<Guid> groupByCategoryIds)
+    {
+        var categoryOrder = Deserialize<KeyboardConfiguration>(match.KeyboardJson)?.CategoryOrder ?? [];
+        return categoryOrder.Where(groupByCategoryIds.Contains).Concat(groupByCategoryIds.Where(id => !categoryOrder.Contains(id))).Distinct().ToList();
+    }
+
+    public IReadOnlyList<PublishedMatchBlock> BuildPublishedBlocks(Match match, IReadOnlyList<Guid> groupByCategoryIds, IReadOnlyList<Category> categories)
+    {
+        var orderedCategoryIds = OrderedGroupCategoryIds(match, groupByCategoryIds);
+        var categoryById = categories.ToDictionary(item => item.Id);
+        return match.Participants
+            .GroupBy(participant => GroupKey(participant, orderedCategoryIds))
+            .Select(group => new PublishedMatchBlock(
+                GroupName(group.First(), orderedCategoryIds, categoryById),
+                RankRows(group, match).Select(item => new PublishedMatchEntry(
+                    item.Position,
+                    item.NeedsTieBreaker,
+                    DisplayName(item.Row.Participant),
+                    item.Row.Participant.FederationNumber,
+                    Math.Round(item.Row.Result.Average, 2),
+                    item.Row.Participant.Scores.Count,
+                    item.Row.Result.Total)).ToList()))
+            .Where(block => block.Entries.Count > 0)
+            .OrderBy(block => block.Name)
+            .ToList();
+    }
+
+    private IReadOnlyList<LiveScoringEntry> Rank(IEnumerable<MatchParticipant> participants, Match match, LiveScoreScope scope, IReadOnlyDictionary<Guid, PersonalBestSnapshot> personalBests, IReadOnlyDictionary<Guid, Category> categoryById) =>
+        RankRows(participants, match).Select(item => CreateEntry(item.Row, item.Position, item.NeedsTieBreaker, scope, personalBests, categoryById)).ToList();
+
+    // Ranks by the match's scoring rules (total first, then any countKey equalizers); participants still tied after the
+    // last rule share a position and are flagged as needing a tie-breaker.
+    private List<(RankedParticipant Row, int Position, bool NeedsTieBreaker)> RankRows(IEnumerable<MatchParticipant> participants, Match match)
     {
         var rows = participants.Select(participant => new RankedParticipant(participant, scoringService.Calculate(participant, match.ArrowsPerEnd, match.GroupEnds))).ToList();
         var rules = Deserialize<List<ScoringRule>>(match.ScoringRulesJson) ?? [];
@@ -58,19 +97,21 @@ public sealed class LiveScoringService(IScoringService scoringService) : ILiveSc
             buckets = nextBuckets;
         }
 
-        var entries = new List<LiveScoringEntry>();
+        var ranked = new List<(RankedParticipant Row, int Position, bool NeedsTieBreaker)>();
         var position = 1;
         foreach (var bucket in buckets)
         {
             var needsTieBreaker = bucket.Count > 1;
             foreach (var row in bucket.OrderBy(item => item.Result.Name))
             {
-                entries.Add(CreateEntry(row, position, needsTieBreaker, scope, personalBests, categoryById));
+                ranked.Add((row, position, needsTieBreaker));
             }
             position += bucket.Count;
         }
-        return entries;
+        return ranked;
     }
+
+    private static string DisplayName(MatchParticipant participant) => string.IsNullOrWhiteSpace(participant.FullName) ? participant.LastName : participant.FullName;
 
     private static LiveScoringEntry CreateEntry(RankedParticipant row, int position, bool needsTieBreaker, LiveScoreScope scope, IReadOnlyDictionary<Guid, PersonalBestSnapshot> personalBests, IReadOnlyDictionary<Guid, Category> categoryById)
     {
@@ -97,7 +138,7 @@ public sealed class LiveScoringService(IScoringService scoringService) : ILiveSc
         return new LiveScoringEntry(
             position,
             needsTieBreaker,
-            string.IsNullOrWhiteSpace(row.Participant.FullName) ? row.Participant.LastName : row.Participant.FullName,
+            DisplayName(row.Participant),
             details.Count == 0 ? null : string.Join(" | ", details),
             scope.IncludeAverage ? Math.Round(row.Result.Average, 2) : null,
             row.Participant.Scores.Count,

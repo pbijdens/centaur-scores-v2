@@ -1,6 +1,6 @@
 import type { View } from './types'
 
-export type Route = { view: View; matchId?: string; tenantId?: string; scope?: string; accountId?: string; categoryId?: string; listId?: string; memberId?: string; templateId?: string; participantId?: string; competitionId?: string; invalid?: boolean }
+export type Route = { view: View; matchId?: string; tenantId?: string; scope?: string; accountId?: string; categoryId?: string; listId?: string; memberId?: string; templateId?: string; participantId?: string; competitionId?: string; slug?: string; invalid?: boolean }
 
 export function matchPath(matchId: string): string { return `/matches/${matchId}` }
 export function matchEditPath(matchId: string): string { return `/matches/${matchId}/edit` }
@@ -22,6 +22,7 @@ export function categoryPath(categoryId: string): string { return `/categories/$
 export function participantListPath(listId: string): string { return `/participants/${listId}` }
 export function participantMemberPath(listId: string, memberId: string): string { return `/participants/${listId}/members/${memberId}` }
 export function templatePath(templateId: string): string { return `/templates/${templateId}` }
+export function publishedResultsPath(slug: string): string { return `/results/${encodeURIComponent(slug)}` }
 export function narrowcastPath(scope: string): string { return `/narrowcast/${encodeURIComponent(scope)}` }
 export function selectTenantPath(): string { return '/select-tenant' }
 
@@ -47,6 +48,9 @@ export function resolveRoute(path = location.pathname): Route {
   if (section === 'login') return { view: 'home' }
   if (section === 'narrowcast') {
     return segments[1] ? { view: 'narrowcast', scope: decodeURIComponent(segments[1]) } : { view: 'home', invalid: true }
+  }
+  if (section === 'results') {
+    return segments[1] ? { view: 'published-results', slug: decodeURIComponent(segments[1]) } : { view: 'home', invalid: true }
   }
   if (section === 'matches') {
     if (!segments[1]) return { view: 'matches' }

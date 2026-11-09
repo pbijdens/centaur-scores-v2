@@ -78,6 +78,25 @@ public sealed record CompetitionResultRule(string Name, string Aggregation, int 
 public sealed record CompetitionResultEntry(string? Position, bool NeedsTieBreaker, string Name, bool Disqualified, int? Total, IReadOnlyDictionary<Guid, CompetitionResultScore> RoundScores, IReadOnlyDictionary<string, int> RuleScores, IReadOnlyList<CompetitionResultRule> Rules, Guid? ParticipantId = null);
 public sealed record CompetitionResultGroup(string Name, IReadOnlyList<CompetitionResultEntry> Entries);
 public sealed record CompetitionResultRound(Guid Id, string ShortName, string LongName, int Order);
+// Results publication (anonymous /results/{slug} pages)
+public sealed record UpdatePublicationRequest(bool Published, string? Slug, bool IncludeActiveMatches = true);
+public sealed record PublicationResponse(string? PublishedSlug, bool IncludeActiveMatches);
+public sealed record PublishedMatchEntry(int Position, bool NeedsTieBreaker, string Name, string? FederationNumber, double Average, int Arrows, int Score);
+public sealed record PublishedMatchBlock(string Name, IReadOnlyList<PublishedMatchEntry> Entries);
+// One distinct narrowcast-profile grouping: the names of the categories grouped on, and one block per value combination.
+public sealed record PublishedMatchGrouping(IReadOnlyList<string> CategoryNames, IReadOnlyList<PublishedMatchBlock> Blocks);
+public sealed record PublishedMatchResults(int Ends, int ArrowsPerEnd, IReadOnlyList<PublishedMatchEntry> Ungrouped, IReadOnlyList<PublishedMatchGrouping> Groupings);
+public sealed record PublishedCompetitionRound(Guid Id, string ShortName, string LongName);
+// Score null = did not shoot that round. Counts = the score is part of the competition total. F1Points only for rounds an f1 rule covers.
+public sealed record PublishedCompetitionRoundScore(Guid RoundId, int? Score, int? F1Points, bool Counts);
+// Total is the competition total (what ranks); MatchScoreTotal the sum of the counting match scores; F1Points the f1 points gathered (null without f1 rules).
+public sealed record PublishedCompetitionEntry(string Position, string? FederationNumber, string Name, double? Average, int Total, int MatchScoreTotal, int? F1Points, IReadOnlyList<PublishedCompetitionRoundScore> Rounds);
+public sealed record PublishedCompetitionGroup(string Name, IReadOnlyList<PublishedCompetitionEntry> Entries);
+public sealed record PublishedCompetitionResults(bool UsesF1, bool IsGrouped, IReadOnlyList<PublishedCompetitionRound> Rounds, IReadOnlyList<PublishedCompetitionGroup> Groups, IReadOnlyList<PublishedCompetitionEntry> Ungrouped);
+// Kind is "match" or "competition"; at most one of Match/Competition is set (neither for a match that is still active while
+// active matches are excluded). EndDate equals StartDate for a match. ActiveMatchCount: open matches behind these results -
+// included (provisional) when IncludesActiveMatches, otherwise left out.
+public sealed record PublishedResults(string Kind, string Tenant, string? Logo, string Name, DateOnly StartDate, DateOnly EndDate, bool IncludesActiveMatches, int ActiveMatchCount, PublishedMatchResults? Match, PublishedCompetitionResults? Competition);
 public sealed record CompetitionResultsDocument(string CompetitionName, DateOnly StartDate, DateOnly EndDate, IReadOnlyList<CompetitionResultRound> Rounds, IReadOnlyList<CompetitionResultGroup> Groups);
 
 // Backup and restore

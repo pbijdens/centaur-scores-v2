@@ -1,4 +1,4 @@
-export type View = 'home' | 'matches' | 'match' | 'match-metadata' | 'match-devices' | 'match-lane-editor' | 'match-qr' | 'match-print' | 'match-results-scope' | 'match-participant' | 'match-participant-edit' | 'match-participant-replace' | 'match-participant-scores' | 'match-add-participants' | 'competitions' | 'competition' | 'competition-results' | 'participants' | 'participant-list' | 'participant' | 'categories' | 'category' | 'templates' | 'template' | 'accounts' | 'account' | 'profile' | 'tenants' | 'tenant' | 'tenant-settings' | 'select-tenant' | 'narrowcast' | 'personal-best' | 'personal-best-classifiers' | 'personal-best-disciplines' | 'personal-best-export-config' | 'personal-best-import-config' | 'personal-best-log' | 'backup-restore'
+export type View = 'home' | 'matches' | 'match' | 'match-metadata' | 'match-devices' | 'match-lane-editor' | 'match-qr' | 'match-print' | 'match-results-scope' | 'match-participant' | 'match-participant-edit' | 'match-participant-replace' | 'match-participant-scores' | 'match-add-participants' | 'competitions' | 'competition' | 'competition-results' | 'participants' | 'participant-list' | 'participant' | 'categories' | 'category' | 'templates' | 'template' | 'accounts' | 'account' | 'profile' | 'tenants' | 'tenant' | 'tenant-settings' | 'select-tenant' | 'narrowcast' | 'personal-best' | 'personal-best-classifiers' | 'personal-best-disciplines' | 'personal-best-export-config' | 'personal-best-import-config' | 'personal-best-log' | 'backup-restore' | 'published-results'
 export type Language = 'en' | 'nl'
 export type Tenant = { id: string; name: string; logoUrl?: string | null; defaultNarrowcastScope?: string | null; scorekeeperBaseUrl?: string | null }
 export type DefaultScopeSettings = { tenantValue: string | null; effectiveValue: string }
@@ -19,6 +19,10 @@ export type Match = {
   keyboardJson: string
   scoringRulesJson: string
   personalBestClassifier?: string | null
+  // Normalized slug the results are published under at /results/{slug}; null/absent = not published.
+  publishedSlug?: string | null
+  // Whether the published results show this match while it is still open; absent = true (the default).
+  publishedIncludesActiveMatches?: boolean
   participants?: MatchParticipant[]
   devices?: ScoreDevice[]
   liveScopes?: LiveScoreScope[]
@@ -71,7 +75,7 @@ export type LiveScoringPage = { timeout: number; logo?: string | null; tenant: s
 export type CompetitionRoundMatch = { id: string; competitionRoundId: string; matchId: string }
 export type CompetitionRound = { id: string; competitionId: string; order: number; shortName: string; longName: string; matches?: CompetitionRoundMatch[] }
 export type CompetitionScoreRule = { id: string; competitionId: string; name: string; roundIdsJson: string; highestScores: number; minimumScores: number; aggregation: 'total' | 'f1'; sortOrder?: number }
-export type Competition = { id: string; name: string; startDate: string; endDate: string; groupByCategoryIdsJson: string; rounds?: CompetitionRound[]; scoringRules?: CompetitionScoreRule[] }
+export type Competition = { id: string; name: string; startDate: string; endDate: string; groupByCategoryIdsJson: string; publishedSlug?: string | null; publishedIncludesActiveMatches?: boolean; rounds?: CompetitionRound[]; scoringRules?: CompetitionScoreRule[] }
 export type CompetitionResultScore = { value: number; used: boolean }
 export type CompetitionResultRuleRound = { roundId: string; value: number | null; used: boolean }
 export type CompetitionResultRule = { name: string; aggregation: string; total: number; rounds: CompetitionResultRuleRound[] }
@@ -137,3 +141,18 @@ export type PersonalBestLogRow = { federationNumber: string; name: string; disci
 // Backup and restore
 export type RestoreBackupResult = { newTenantId: string; newTenantName: string; warnings: string[] }
 
+
+// Anonymous published results (GET /published-results/{slug}, shown at /results/{slug})
+export type PublishedMatchEntry = { position: number; needsTieBreaker: boolean; name: string; federationNumber?: string | null; average: number; arrows: number; score: number }
+export type PublishedMatchBlock = { name: string; entries: PublishedMatchEntry[] }
+export type PublishedMatchGrouping = { categoryNames: string[]; blocks: PublishedMatchBlock[] }
+export type PublishedMatchResults = { ends: number; arrowsPerEnd: number; ungrouped: PublishedMatchEntry[]; groupings: PublishedMatchGrouping[] }
+export type PublishedCompetitionRound = { id: string; shortName: string; longName: string }
+// score null = did not shoot that round; counts = part of the competition total; f1Points only for rounds an f1 rule covers.
+export type PublishedCompetitionRoundScore = { roundId: string; score: number | null; f1Points: number | null; counts: boolean }
+export type PublishedCompetitionEntry = { position: string; federationNumber?: string | null; name: string; average: number | null; total: number; matchScoreTotal: number; f1Points: number | null; rounds: PublishedCompetitionRoundScore[] }
+export type PublishedCompetitionGroup = { name: string; entries: PublishedCompetitionEntry[] }
+export type PublishedCompetitionResults = { usesF1: boolean; isGrouped: boolean; rounds: PublishedCompetitionRound[]; groups: PublishedCompetitionGroup[]; ungrouped: PublishedCompetitionEntry[] }
+// activeMatchCount: open matches behind these results - shown provisionally when includesActiveMatches, otherwise left out
+// (a still-active match published without active results has neither match nor competition).
+export type PublishedResults = { kind: 'match' | 'competition'; tenant: string; logo?: string | null; name: string; startDate: string; endDate: string; includesActiveMatches: boolean; activeMatchCount: number; match?: PublishedMatchResults | null; competition?: PublishedCompetitionResults | null }

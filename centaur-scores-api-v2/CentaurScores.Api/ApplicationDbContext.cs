@@ -72,6 +72,12 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
         // exceeds MySQL's 3072-byte max key length.
         modelBuilder.Entity<Category>().Property(item => item.ApiName).HasMaxLength(CategoryApiNames.MaxLength);
         modelBuilder.Entity<PersonalBestClassifier>().Property(item => item.Name).HasMaxLength(100);
+        // Published results slugs are unique per table here; uniqueness across matches AND competitions is
+        // enforced by PublishedSlugs.IsTakenAsync before saving. Multiple NULLs (= unpublished) are allowed.
+        modelBuilder.Entity<Match>().Property(item => item.PublishedSlug).HasMaxLength(PublishedSlugs.MaxLength);
+        modelBuilder.Entity<Match>().HasIndex(item => item.PublishedSlug).IsUnique();
+        modelBuilder.Entity<Competition>().Property(item => item.PublishedSlug).HasMaxLength(PublishedSlugs.MaxLength);
+        modelBuilder.Entity<Competition>().HasIndex(item => item.PublishedSlug).IsUnique();
         modelBuilder.Entity<PersonalBestDiscipline>().Property(item => item.Name).HasMaxLength(100);
         modelBuilder.Entity<PersonalBestArcherName>().Property(item => item.FederationNumber).HasMaxLength(32);
         modelBuilder.Entity<PersonalBestLogEntry>().Property(item => item.FederationNumber).HasMaxLength(32);

@@ -1,9 +1,10 @@
 import type { View } from './types'
 
 // Views that render without ever requiring a fresh session: narrowcast displays run unattended on
-// public screens with no one there to dismiss a popup or be redirected. (The printable pages -
+// public screens with no one there to dismiss a popup or be redirected, and published results are
+// anonymous pages for anyone with the link. (The printable pages -
 // results, QR codes, scorecards - are normal management pages and do get the expiry warning.)
-const VIEWS_WITHOUT_SESSION_WATCH = new Set<View>(['narrowcast'])
+const VIEWS_WITHOUT_SESSION_WATCH = new Set<View>(['narrowcast', 'published-results'])
 
 export type SessionWatchState = {
   token: string

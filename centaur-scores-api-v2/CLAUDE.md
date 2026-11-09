@@ -36,6 +36,8 @@ Run `dotnet build` and `dotnet test CentaurScores.Api.Tests/CentaurScores.Api.Te
 
 **External results** (`POST /api/matches/find`, [../documentation/FIND-MATCHES.md](../documentation/FIND-MATCHES.md)): logic lives in `Application/MatchFindService.cs`. Its `MatchFindController` is the one authenticated controller that does not derive from `ApiControllerBase`, because external systems call it with the tenant-less login token; it scopes data by the account's authorized tenants instead. `Category.ApiName` is used only there and in the category editor.
 
+**Published results** (`GET /published-results/{slug}`, anonymous; set via `PUT /api/{matches|competitions}/{id}/publication`): slug rules and the cross-table uniqueness check live in `Application/PublishedSlugs.cs` (`Normalize` must match `normalizeSlug` in the web UI), the response is built by `Application/PublishedResultsService.cs` (match ranking via `ILiveScoringService.BuildPublishedBlocks`, competition figures from `ICompetitionService.BuildExport`, cached 15s per slug). The endpoint sends `X-Robots-Tag` via `[NoIndex]` and is rate limited per client by `Application/PublicRateLimiting.cs` - put any new expensive anonymous endpoint behind the same policy.
+
 **Scorekeeper contract**: implemented in `Application/ScorekeeperService.cs` — keep all participant policy, ordering, projection, and optimistic score conflict logic there, with `PublicScoresController` limited to anonymous routing, active-match checks, logging, and response status mapping. Preserve the public live-score and scorekeeper endpoints described in the specification.
 
 ## Conventions

@@ -427,6 +427,15 @@ The `/live-scoring/match/{scope}/{match-id}` endpoint should be built in such a 
 
 This way we should end up with a good looking results page that we can lightweight narrow-cast to the smart TV screens that we have for displaying the live scores.
 
+#### UC18 - Publishing results
+
+On the settings page of a match (below the narrowcasting options) and at the bottom of a competition page, a manager can choose to "Publish the results at slug ____". The slug is normalized (lowercase, letters and digits, other characters become dashes) and the resulting public link is shown below the setting while it is enabled. A slug already used by another match or competition (of any tenant) is rejected with a validation error and nothing is saved. A second option, "Include results of matches that are still active" (on by default), decides whether the public page already shows results of open matches - marked as provisional - or only of closed ones (an open match then shows that it is still in progress).
+
+Published results are shown at `/results/{slug}` to anyone, without logging in, and must never be indexed by search engines (robots meta tag plus `X-Robots-Tag` from the API and nginx). The API endpoint behind it is rate limited per caller and briefly cached.
+
+- Match: the results without grouping, or grouped as configured in the match's narrowcast profiles. Profile names are not shown, only the category values; profiles using the same categories are shown once.
+- Competition: grouped as the competition defines, or one list of everyone (ordered on average per arrow descending, then federation number, then full name). Columns: position (if any), federation number, name, average per arrow over all counting matches, all match scores (`-` when the archer did not take part, struck through when the score does not count towards the total; stacked on mobile, aligned in columns on desktop) and the total. With F1 scoring the total shows the total match score followed by the F1 points in brackets, and match scores show their F1 points in brackets too - in the ungrouped view as well.
+
 ### Advanced use cases, future work
 
 #### UCA1

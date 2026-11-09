@@ -24,6 +24,7 @@ builder.Services.AddScoped<IScoringService, ScoringService>();
 builder.Services.AddScoped<IMatchFindService, MatchFindService>();
 builder.Services.AddScoped<ILiveScoringService, LiveScoringService>();
 builder.Services.AddScoped<ICompetitionService, CompetitionService>();
+builder.Services.AddScoped<IPublishedResultsService, PublishedResultsService>();
 builder.Services.AddScoped<IScorekeeperService, ScorekeeperService>();
 builder.Services.AddScoped<IParticipantListExcelService, ParticipantListExcelService>();
 builder.Services.AddScoped<IPersonalBestContext, PersonalBestContext>();
@@ -73,6 +74,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJw
     ClockSkew = TimeSpan.FromMinutes(1)
 });
 builder.Services.AddAuthorization();
+builder.Services.AddPublicRateLimiting();
 
 var app = builder.Build();
 await using (var scope = app.Services.CreateAsyncScope())
@@ -82,6 +84,7 @@ await using (var scope = app.Services.CreateAsyncScope())
 app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseRateLimiter();
 app.UseSwagger();
 app.UseSwaggerUI(options => options.SwaggerEndpoint("/swagger/v1/swagger.json", "Centaur Scores API v1"));
 app.MapGet("/health", async (ApplicationDbContext db) => Results.Ok(new { status = await db.Database.CanConnectAsync() ? "ok" : "database_unavailable", utc = DateTimeOffset.UtcNow }));

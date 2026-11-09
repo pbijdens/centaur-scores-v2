@@ -195,6 +195,15 @@ namespace CentaurScores.Api.Infrastructure.Migrations
                         .HasColumnType("longtext")
                         .HasColumnName("name");
 
+                    b.Property<bool>("PublishedIncludesActiveMatches")
+                        .HasColumnType("tinyint(1)")
+                        .HasColumnName("published_includes_active_matches");
+
+                    b.Property<string>("PublishedSlug")
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)")
+                        .HasColumnName("published_slug");
+
                     b.Property<DateOnly>("StartDate")
                         .HasColumnType("date")
                         .HasColumnName("start_date");
@@ -205,6 +214,10 @@ namespace CentaurScores.Api.Infrastructure.Migrations
 
                     b.HasKey("Id")
                         .HasName("pk_competitions");
+
+                    b.HasIndex("PublishedSlug")
+                        .IsUnique()
+                        .HasDatabaseName("ix_competitions_published_slug");
 
                     b.ToTable("competitions", (string)null);
                 });
@@ -437,6 +450,15 @@ namespace CentaurScores.Api.Infrastructure.Migrations
                         .HasColumnType("longtext")
                         .HasColumnName("personal_best_classifier");
 
+                    b.Property<bool>("PublishedIncludesActiveMatches")
+                        .HasColumnType("tinyint(1)")
+                        .HasColumnName("published_includes_active_matches");
+
+                    b.Property<string>("PublishedSlug")
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)")
+                        .HasColumnName("published_slug");
+
                     b.Property<string>("ScoringRulesJson")
                         .IsRequired()
                         .HasColumnType("longtext")
@@ -457,6 +479,10 @@ namespace CentaurScores.Api.Infrastructure.Migrations
 
                     b.HasKey("Id")
                         .HasName("pk_matches");
+
+                    b.HasIndex("PublishedSlug")
+                        .IsUnique()
+                        .HasDatabaseName("ix_matches_published_slug");
 
                     b.ToTable("matches", (string)null);
                 });

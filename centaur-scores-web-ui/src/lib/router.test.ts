@@ -9,6 +9,14 @@ describe('resolveRoute', () => {
     })
   })
 
+  it('resolves a published results route with a slug', () => {
+    expect(resolveRoute('/results/winter-cup')).toEqual({ view: 'published-results', slug: 'winter-cup' })
+  })
+
+  it('rejects a published results route without a slug', () => {
+    expect(resolveRoute('/results')).toEqual({ view: 'home', invalid: true })
+  })
+
   it('rejects a narrowcast route without a scope', () => {
     expect(resolveRoute('/narrowcast')).toEqual({ view: 'home', invalid: true })
   })

@@ -78,6 +78,22 @@ public sealed class MatchesController(ApplicationDbContext db, ITenantContext te
         return Ok(match);
     }
 
+    // Publishes (or stops publishing) the results anonymously at /results/{slug}. Kept apart from the metadata PUT so a
+    // taken or invalid slug is rejected without saving anything, and so other edits can never clear the publication.
+    [HttpPut("{id:guid}/publication")]
+    public async Task<IActionResult> SetPublication(Guid id, UpdatePublicationRequest request, CancellationToken cancellationToken)
+    {
+        if (!CanManage) return Forbid();
+        var match = await db.Matches.SingleOrDefaultAsync(item => item.Id == id && item.TenantId == TenantId, cancellationToken);
+        if (match is null) return NotFound();
+        var (slug, error) = await PublishedSlugs.ResolveAsync(db, request, id, null, cancellationToken);
+        if (error is not null) return error.Code == PublishedSlugs.TakenCode ? Conflict(error) : BadRequest(error);
+        match.PublishedSlug = slug;
+        match.PublishedIncludesActiveMatches = request.IncludeActiveMatches;
+        await db.SaveChangesAsync(cancellationToken);
+        return Ok(new PublicationResponse(slug, match.PublishedIncludesActiveMatches));
+    }
+
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
     {

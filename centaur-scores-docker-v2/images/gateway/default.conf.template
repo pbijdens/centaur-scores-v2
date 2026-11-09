@@ -21,6 +21,14 @@ server {
         try_files $uri $uri/ ${PUBLIC_APP_VDIR}index.html;
     }
 
+    # Published results (/results/{slug}) are public but must never be indexed: send X-Robots-Tag before any
+    # JavaScript runs. "rewrite ... break" (rather than try_files) serves the SPA's index.html from THIS location,
+    # so the header applies.
+    location ^~ /results/ {
+        add_header X-Robots-Tag "noindex, nofollow, noarchive" always;
+        rewrite ^ /index.html break;
+    }
+
     location / {
         try_files $uri $uri/ /index.html;
     }
