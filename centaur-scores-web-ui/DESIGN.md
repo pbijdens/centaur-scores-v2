@@ -261,7 +261,7 @@ The results can be shown by pressing the "Results" button, which will navigate t
   - Result-rows show all scores for all participants (with an entry in the participants for the tenant) for all rounds
   - Result-rows show the total score for each element in the scoring rules per participant
   - Results are grouped by the categories defined, the groups are presented sorted alphabetically
-  - The printed layout is compact and always two columns, portrait or landscape (full requirements: [../documentation/COMPETITION-RESULT-SCREEN.md](../documentation/COMPETITION-RESULT-SCREEN.md)):
+  - The printed layout is compact and always two columns, portrait or landscape:
     - A report header with the tenant logo, competition name, competition start/end dates, and the print date: repeated on every printed page.
     - The body is a stream of equally high units: a group header, then its ranked participant rows. A row shows the rank (or `–` when disqualified/unranked) on the left, the total on the right, and in the middle the name (semibold) plus, in small print, one block per scoring rule: `name (rule total): value value …` listing the value the rule aggregated for each of its rounds (raw score, or f1 points for an f1 rule), `–` for no score, strikethrough for a score the rule did not count. Detail text that doesn't fit is truncated with `…`.
     - The printed report is pages of two columns, read page by page; a column never ends on a header. The pages are computed for the paper size picked in the print dialog (A4, A3, A5, Letter, Legal; remembered for all printable pages), for both orientations. On screen the stream is split in half over two columns instead (one column on narrow screens). The print dialog (remembered per competition) also has a checkbox that gives every row one extra detail line (3 instead of 2), and a font size option (100%–200%, 141% = the A4 layout on A3 paper) that scales every printed size.
@@ -368,8 +368,7 @@ The result-page rendering:
      assignment is computed explicitly (not via native CSS multi-column/`column-count`), since
      the browser's own column-breaking heuristics do not reliably agree with this arithmetic -
      they can strand a header alone or place a row in an area the page never reveals via scroll.
-     See `../documentation/NARROWCASTING-DEFINITION.md` for the original grid-sizing spec and
-     `LiveScoringView.svelte`'s script for the implementation constants (font/glyph-width
+     See `LiveScoringView.svelte`'s script for the implementation constants (font/glyph-width
      calibration in particular is font-specific and was tuned against the app's actual font).
  - A data model sample for the score endpoint therefore is:
    ```JSON

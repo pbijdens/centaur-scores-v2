@@ -1,7 +1,7 @@
 import { printableArea, type PaperSize, type PrintOrientation } from './paperSize'
 import type { CompetitionResultEntry, CompetitionResultGroup, LiveScoringBlock, LiveScoringEntry } from './types'
 
-// Printed results - competition results (see ../documentation/COMPETITION-RESULT-SCREEN.md) and a match's results per
+// Printed results - competition results (see DESIGN.md, UC13) and a match's results per
 // scope share one report format. The report is a stream of equally high units - a group header or a participant row -
 // printed as pages of two columns, read left column, right column, next page (paginate). On screen the stream is
 // split in half over two columns instead (splitInTwo).

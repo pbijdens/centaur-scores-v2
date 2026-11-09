@@ -37,6 +37,12 @@ Both shortcodes accept an optional `tenant` attribute (defaults to the tenant co
 
 The same two embeds are also available as block-editor blocks - "Centaur Scores Match Result" and "Centaur Scores Competition Result" - which preview live in the editor and support the standard block margin/padding controls plus a choice of 1, 2 or 3 result columns.
 
+= Styling =
+
+Every embed renders the same markup: an outer `centaur-scores-embed` wrapper (plus your optional `class`), containing a `centaur-scores centaur-scores-columns-{1,2,3}` block with one `centaur-scores-group` per category group (a heading followed by one `centaur-scores-row` per result).
+
+CSS entered in the **Custom CSS** field on the settings page is included with every embed and scoped to that embed only (via `@scope`), so it never affects the rest of the page.
+
 == Installation ==
 
 1. Upload the plugin to the `/wp-content/plugins/` directory, or install it through the Plugins screen.
