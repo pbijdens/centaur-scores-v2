@@ -11,7 +11,10 @@
 #      (/etc/nginx/sites-available/centaur-scores-alias-<hostname>.conf)
 #   2. requests certbot to add the alias hostname as a SAN on the existing
 #      PUBLIC_HOSTNAME certificate (--expand), which also edits both site
-#      confs in place to add "listen 443 ssl;" and an http->https redirect
+#      confs in place to add "listen 443 ssl;" and an http->https redirect.
+#      Names already on the certificate (earlier aliases) are kept.
+#
+# Run it once per alias; any number of aliases can be added this way.
 #
 # Usage: update/add-alias-hostname.sh <alias-hostname>
 #
@@ -50,9 +53,24 @@ ln -sf "${site_conf}" "/etc/nginx/sites-enabled/centaur-scores-alias-${alias_hos
 
 nginx_test_and_reload
 
+# With --cert-name, certbot treats the -d list as the certificate's complete
+# set of names, so any alias added earlier must be passed again or it would
+# be dropped from the certificate. Read the current names and append the new
+# one (deduplicated, PUBLIC_HOSTNAME first).
+existing_domains="$(certbot certificates --cert-name "${PUBLIC_HOSTNAME}" 2>/dev/null \
+    | sed -n 's/^[[:space:]]*Domains:[[:space:]]*//p' | head -n 1)"
+domain_args=(-d "${PUBLIC_HOSTNAME}")
+seen=" ${PUBLIC_HOSTNAME} "
+for d in ${existing_domains} "${alias_hostname}"; do
+    [[ "${seen}" == *" ${d} "* ]] && continue
+    domain_args+=(-d "${d}")
+    seen+="${d} "
+done
+
 log "requesting certbot to add ${alias_hostname} to the ${PUBLIC_HOSTNAME} certificate..."
+log "certificate names after this run:${seen% }"
 certbot --nginx \
-    -d "${PUBLIC_HOSTNAME}" -d "${alias_hostname}" \
+    "${domain_args[@]}" \
     --cert-name "${PUBLIC_HOSTNAME}" --expand \
     --non-interactive --agree-tos --redirect \
     -m "${LETSENCRYPT_EMAIL}"
