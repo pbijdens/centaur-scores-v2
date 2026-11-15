@@ -32,13 +32,14 @@ public sealed class PersonalBestLiveLookupTests
             Ends = 5,
             ArrowsPerEnd = 6,
             PersonalBestClassifier = "Outdoor",
-            Participants = [new MatchParticipant { Id = participantId, TenantId = tenantId, MatchId = matchId, OwnFederationNumber = "123", OwnFullName = "Robin Archer", OwnLastName = "Archer", OwnCategories = new Dictionary<Guid, int> { [categoryId] = 7 } }]
+            Participants = [LinkedParticipant(participantId, tenantId, matchId, categoryId, "123")]
         };
         db.AddRange(
             new Tenant { Id = tenantId, Name = "Tenant", PersonalBestEnabled = true },
             new PersonalBestDiscipline { Id = disciplineId, TenantId = tenantId, Name = "Recurve" },
             new PersonalBestDisciplineMapping { Id = Guid.NewGuid(), TenantId = tenantId, DisciplineId = disciplineId, SourceTenantId = tenantId, CategoryId = categoryId, ValueId = 7 },
             new PersonalBestLogEntry { Id = Guid.NewGuid(), TenantId = tenantId, FederationNumber = "123", Discipline = "Recurve", MatchClassifier = "Outdoor", Score = 270, Date = new DateOnly(2026, 1, 1), RecordedAt = DateTime.UtcNow },
+            new ParticipantList { Id = match.Participants[0].ParticipantListMember!.ParticipantListId, TenantId = tenantId, Name = "List" },
             match);
         await db.SaveChangesAsync();
 
@@ -87,7 +88,11 @@ public sealed class PersonalBestLiveLookupTests
 
         // A new participant joins the match after the cache was already populated.
         var newParticipantId = Guid.NewGuid();
-        match.Participants.Add(new MatchParticipant { Id = newParticipantId, TenantId = tenantId, MatchId = matchId, OwnFederationNumber = "123", OwnFullName = "Robin Archer", OwnLastName = "Archer", OwnCategories = new Dictionary<Guid, int> { [categoryId] = 7 } });
+        var joining = LinkedParticipant(newParticipantId, tenantId, matchId, categoryId, "123");
+        db.ParticipantLists.Add(new ParticipantList { Id = joining.ParticipantListMember!.ParticipantListId, TenantId = tenantId, Name = "List" });
+        db.ParticipantListMembers.Add(joining.ParticipantListMember);
+        await db.SaveChangesAsync();
+        match.Participants.Add(joining);
 
         var stillCached = await lookup.BuildAsync(match, scope, CancellationToken.None);
         Assert.Empty(stillCached);
@@ -96,5 +101,50 @@ public sealed class PersonalBestLiveLookupTests
 
         var afterInvalidate = await lookup.BuildAsync(match, scope, CancellationToken.None);
         Assert.Equal(new PersonalBestSnapshot(270, 270.0 / 30), Assert.Contains(newParticipantId, afterInvalidate));
+    }
+
+    // A participant linked to a (new) participant list member with the given federation number.
+    private static MatchParticipant LinkedParticipant(Guid participantId, Guid tenantId, Guid matchId, Guid categoryId, string federationNumber)
+    {
+        var member = new ParticipantListMember { Id = Guid.NewGuid(), TenantId = tenantId, ParticipantListId = Guid.NewGuid(), LastName = "Archer", FullName = "Robin Archer", FederationNumber = federationNumber, Categories = new Dictionary<Guid, int> { [categoryId] = 7 } };
+        return new MatchParticipant { Id = participantId, TenantId = tenantId, MatchId = matchId, ParticipantListMemberId = member.Id, ParticipantListMember = member };
+    }
+
+    [Fact]
+    public async Task BuildAsync_ignores_free_participants_even_when_they_enter_an_archers_number()
+    {
+        await using var connection = new SqliteConnection("Filename=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>().UseSqlite(connection).Options;
+        await using var db = new ApplicationDbContext(options);
+        await db.Database.EnsureCreatedAsync();
+
+        var tenantId = Guid.NewGuid();
+        var categoryId = Guid.NewGuid();
+        var matchId = Guid.NewGuid();
+        var participantId = Guid.NewGuid();
+        var disciplineId = Guid.NewGuid();
+        var match = new Match
+        {
+            Id = matchId,
+            TenantId = tenantId,
+            Name = "Open",
+            Ends = 5,
+            ArrowsPerEnd = 6,
+            PersonalBestClassifier = "Outdoor",
+            Participants = [new MatchParticipant { Id = participantId, TenantId = tenantId, MatchId = matchId, OwnFederationNumber = "123", OwnFullName = "Someone Else", OwnLastName = "Else", OwnCategories = new Dictionary<Guid, int> { [categoryId] = 7 } }]
+        };
+        db.AddRange(
+            new Tenant { Id = tenantId, Name = "Tenant", PersonalBestEnabled = true },
+            new PersonalBestDiscipline { Id = disciplineId, TenantId = tenantId, Name = "Recurve" },
+            new PersonalBestDisciplineMapping { Id = Guid.NewGuid(), TenantId = tenantId, DisciplineId = disciplineId, SourceTenantId = tenantId, CategoryId = categoryId, ValueId = 7 },
+            new PersonalBestLogEntry { Id = Guid.NewGuid(), TenantId = tenantId, FederationNumber = "123", Discipline = "Recurve", MatchClassifier = "Outdoor", Score = 270, Date = new DateOnly(2026, 1, 1), RecordedAt = DateTime.UtcNow },
+            match);
+        await db.SaveChangesAsync();
+
+        var scope = new LiveScoreScope { Id = Guid.NewGuid(), TenantId = tenantId, MatchId = matchId, IncludePersonalBest = true };
+        var lookup = new PersonalBestLiveLookup(db, new PersonalBestContext(db), new PersonalBestEngine(db), new MemoryCache(new MemoryCacheOptions()));
+
+        Assert.Empty(await lookup.BuildAsync(match, scope, CancellationToken.None));
     }
 }

@@ -596,7 +596,7 @@ public sealed class MatchesControllerTests
         // Edit the roster entry via a separate DbContext/request, as ParticipantListsController.UpdateMember would.
         await using (var editDb = new ApplicationDbContext(options))
         {
-            var editController = new ParticipantListsController(editDb, new TestTenantContext(tenantId), new ParticipantListExcelService());
+            var editController = new ParticipantListsController(editDb, new TestTenantContext(tenantId), new ParticipantListExcelService(), new FederationNumberService(editDb), new PersonalBestNumberChanges(editDb, new PersonalBestContext(editDb)));
             var request = new CreateParticipantRequest("Archer", "New Name", null, [], true);
             Assert.IsType<OkObjectResult>(await editController.UpdateMember(listId, memberId, request, CancellationToken.None));
         }
@@ -811,6 +811,8 @@ public sealed class MatchesControllerTests
             DeactivatedMatchIds.Add(match.Id);
             return Task.CompletedTask;
         }
+
+        public Task ReprocessParticipantAsync(Match match, Guid participantId, PersonalBestParticipantSnapshot? previous, CancellationToken cancellationToken) => Task.CompletedTask;
     }
 
     [Fact]

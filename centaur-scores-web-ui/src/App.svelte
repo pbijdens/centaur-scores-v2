@@ -583,7 +583,7 @@
       {:else if view === 'participant-list' && selectedList}
         <ParticipantListDetailView {api} list={selectedList} categories={$categories} {language} {canManage} labels={t} onOpenMember={openMember} onAddMember={addMember} onChanged={onParticipantListChanged} onDeleted={onParticipantListDeleted} onBack={() => navigate('/participants')} />
       {:else if view === 'participant' && selectedListId}
-        <ParticipantMemberView {api} listId={selectedListId} member={selectedMember} prefill={memberPrefill} categories={$categories} labels={t} onBack={onMemberBack} onSaved={onMemberSaved} onDeleted={onMemberDeleted} />
+        <ParticipantMemberView {api} listId={selectedListId} member={selectedMember} prefill={memberPrefill} categories={$categories} labels={t} {language} onBack={onMemberBack} onSaved={onMemberSaved} onDeleted={onMemberDeleted} />
       {:else if view === 'templates'}
         <TemplatesView {api} templates={$templates} participantLists={$participantLists} defaultNarrowcastScope={effectiveDefaultNarrowcastScope} labels={t} onOpenTemplate={openTemplate} onChanged={refreshTemplates} onBack={() => navigate('/')} />
       {:else if view === 'template' && selectedTemplate}

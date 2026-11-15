@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 namespace CentaurScores.Api.Controllers;
 
 [Route("api/participant-lists")]
-public sealed class ParticipantListsController(ApplicationDbContext db, ITenantContext tenantContext, IParticipantListExcelService excelService) : ApiControllerBase(tenantContext)
+public sealed class ParticipantListsController(ApplicationDbContext db, ITenantContext tenantContext, IParticipantListExcelService excelService, IFederationNumberService federationNumbers, IPersonalBestNumberChanges personalBestNumberChanges) : ApiControllerBase(tenantContext)
 {
     // Lists never send the (potentially huge) Members collection - callers get member counts here and fetch
     // the full roster for one list via Get(listId) when they actually need to show/edit its members.
@@ -21,6 +21,18 @@ public sealed class ParticipantListsController(ApplicationDbContext db, ITenantC
             .OrderByDescending(item => item.IsActive).ThenBy(item => item.Name)
             .Select(item => new ParticipantListSummary(item.Id, item.TenantId, item.Name, item.IsActive, item.Members.Count, item.Members.Count(member => member.IsActive)))
             .ToListAsync(cancellationToken));
+    }
+
+    // Number of personal-best entries the web UI shows as a sample when a member's federation number changes.
+    private const int PersonalBestPreviewLimit = 50;
+
+    // A fresh temporary "CS" + 10 digits number for the member editor's "generate" button. It is not reserved
+    // until the member is saved; with 10^10 candidates a collision in between is practically impossible.
+    [HttpPost("federation-numbers/generate")]
+    public async Task<IActionResult> GenerateFederationNumber(CancellationToken cancellationToken)
+    {
+        if (!CanManage) return Forbid();
+        return Ok(new GeneratedFederationNumber(await federationNumbers.GenerateAsync(cancellationToken)));
     }
 
     [HttpGet("{listId:guid}")]
@@ -42,7 +54,8 @@ public sealed class ParticipantListsController(ApplicationDbContext db, ITenantC
     {
         if (!CanManage) return Forbid();
         if (!await db.ParticipantLists.AnyAsync(item => item.Id == listId && item.TenantId == TenantId, cancellationToken)) return NotFound();
-        var member = new ParticipantListMember { Id = Guid.NewGuid(), TenantId = TenantId, ParticipantListId = listId, LastName = request.LastName, FullName = request.FullName, FederationNumber = request.FederationNumber, Categories = request.Categories, IsActive = request.IsActive };
+        var federationNumber = await federationNumbers.EnsureAsync(request.FederationNumber, cancellationToken);
+        var member = new ParticipantListMember { Id = Guid.NewGuid(), TenantId = TenantId, ParticipantListId = listId, LastName = request.LastName, FullName = request.FullName, FederationNumber = federationNumber, Categories = request.Categories, IsActive = request.IsActive };
         db.ParticipantListMembers.Add(member);
         await db.SaveChangesAsync(cancellationToken);
         return Created($"api/participant-lists/{listId}/members/{member.Id}", member);
@@ -77,11 +90,21 @@ public sealed class ParticipantListsController(ApplicationDbContext db, ITenantC
     }
 
     [HttpPut("{listId:guid}/members/{memberId:guid}")]
-    public async Task<IActionResult> UpdateMember(Guid listId, Guid memberId, CreateParticipantRequest request, CancellationToken cancellationToken)
+    public async Task<IActionResult> UpdateMember(Guid listId, Guid memberId, CreateParticipantRequest request, CancellationToken cancellationToken, [FromQuery] bool updatePersonalBests = false)
     {
         if (!CanManage) return Forbid();
         var member = await db.ParticipantListMembers.SingleOrDefaultAsync(item => item.Id == memberId && item.ParticipantListId == listId && item.TenantId == TenantId, cancellationToken);
         if (member is null) return NotFound();
+        // Opt-in only (the web UI asks the admin first): moving personal-best entries along with a changed
+        // number is never a side effect of a plain API update - API callers keep those lists right themselves.
+        var previousNumber = member.FederationNumber;
+        if (updatePersonalBests
+            && !string.IsNullOrWhiteSpace(previousNumber)
+            && !string.IsNullOrWhiteSpace(request.FederationNumber)
+            && previousNumber != request.FederationNumber)
+        {
+            await personalBestNumberChanges.RenumberAsync(TenantId, previousNumber, request.FederationNumber, cancellationToken);
+        }
         member.LastName = request.LastName;
         member.FullName = request.FullName;
         member.FederationNumber = request.FederationNumber;
@@ -89,6 +112,17 @@ public sealed class ParticipantListsController(ApplicationDbContext db, ITenantC
         member.IsActive = request.IsActive;
         await db.SaveChangesAsync(cancellationToken);
         return Ok(member);
+    }
+
+    // The personal-best entries (in the owning tenant's lists) recorded under the member's current federation
+    // number: the total plus the most recent ones, shown before a number change is saved.
+    [HttpGet("{listId:guid}/members/{memberId:guid}/personal-bests")]
+    public async Task<IActionResult> MemberPersonalBests(Guid listId, Guid memberId, CancellationToken cancellationToken)
+    {
+        if (!CanManage) return Forbid();
+        var member = await db.ParticipantListMembers.AsNoTracking().SingleOrDefaultAsync(item => item.Id == memberId && item.ParticipantListId == listId && item.TenantId == TenantId, cancellationToken);
+        if (member is null) return NotFound();
+        return Ok(await personalBestNumberChanges.PreviewAsync(TenantId, member.FederationNumber, PersonalBestPreviewLimit, cancellationToken));
     }
 
     [HttpDelete("{listId:guid}/members/{memberId:guid}")]
@@ -141,8 +175,9 @@ public sealed class ParticipantListsController(ApplicationDbContext db, ITenantC
 
         // Reconcile by federation number: a matching number updates the existing member, anything else is
         // added as new. Members missing from the file are left untouched - import never deletes.
+        // A missing (blank or zero) number never matches: such a row is a new archer and gets a temporary number.
         var membersByNumber = list.Members
-            .Where(member => !string.IsNullOrWhiteSpace(member.FederationNumber))
+            .Where(member => !FederationNumberService.IsMissing(member.FederationNumber))
             .GroupBy(member => member.FederationNumber!, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
 
@@ -150,7 +185,7 @@ public sealed class ParticipantListsController(ApplicationDbContext db, ITenantC
         var updated = 0;
         foreach (var row in parsed.Rows)
         {
-            var existing = row.FederationNumber is not null && membersByNumber.TryGetValue(row.FederationNumber, out var found) ? found : null;
+            var existing = !FederationNumberService.IsMissing(row.FederationNumber) && membersByNumber.TryGetValue(row.FederationNumber!, out var found) ? found : null;
             if (existing is not null)
             {
                 existing.FullName = row.FullName;
@@ -169,7 +204,7 @@ public sealed class ParticipantListsController(ApplicationDbContext db, ITenantC
                     ParticipantListId = listId,
                     FullName = row.FullName,
                     LastName = row.LastName,
-                    FederationNumber = row.FederationNumber,
+                    FederationNumber = await federationNumbers.EnsureAsync(row.FederationNumber, cancellationToken),
                     Categories = new Dictionary<Guid, int>(row.Categories),
                     IsActive = row.IsActive
                 });

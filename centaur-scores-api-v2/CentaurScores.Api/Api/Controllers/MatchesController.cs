@@ -209,12 +209,18 @@ public sealed class MatchesController(ApplicationDbContext db, ITenantContext te
     public async Task<IActionResult> UpdateParticipant(Guid id, Guid participantId, CreateMatchParticipantRequest request, CancellationToken cancellationToken)
     {
         if (!CanManage) return Forbid();
-        var participant = await db.MatchParticipants.SingleOrDefaultAsync(item => item.Id == participantId && item.MatchId == id && item.TenantId == TenantId, cancellationToken);
+        var participant = await db.MatchParticipants
+            .Include(item => item.Scores)
+            .Include(item => item.ParticipantListMember)
+            .SingleOrDefaultAsync(item => item.Id == participantId && item.MatchId == id && item.TenantId == TenantId, cancellationToken);
         if (participant is null) return NotFound();
         if (request.ParticipantListMemberId is { } memberId && await db.MatchParticipants.AnyAsync(item => item.MatchId == id && item.Id != participantId && item.ParticipantListMemberId == memberId, cancellationToken)) return Conflict(new { message = "Participant is already assigned." });
+        var match = await db.Matches.AsNoTracking().SingleAsync(item => item.Id == id && item.TenantId == TenantId, cancellationToken);
+        // Captured before the change: once relinked, what the previous member got from this match is unreachable.
+        var previousMemberId = participant.ParticipantListMemberId;
+        var previous = PersonalBestParticipantSnapshot.Capture(participant);
         if (request.ParticipantListMemberId is { } newMemberId)
         {
-            var match = await db.Matches.AsNoTracking().SingleAsync(item => item.Id == id && item.TenantId == TenantId, cancellationToken);
             var member = await db.ParticipantListMembers.SingleOrDefaultAsync(item => item.Id == newMemberId && item.ParticipantListId == match.ParticipantListId && item.TenantId == TenantId, cancellationToken);
             if (member is null) return NotFound();
             participant.ParticipantListMemberId = member.Id;
@@ -234,6 +240,10 @@ public sealed class MatchesController(ApplicationDbContext db, ITenantContext te
             participant.OwnCategories = request.Categories;
         }
         await db.SaveChangesAsync(cancellationToken);
+        // Personal bests were registered when the match closed; linking this result to a different archer
+        // afterwards (or linking a previously free participant) must move that registration along.
+        if (!match.IsOpen && previousMemberId != participant.ParticipantListMemberId)
+            await personalBestRegistrationService.ReprocessParticipantAsync(match, participant.Id, previous, cancellationToken);
         personalBestLiveLookup.Invalidate(id);
         return Ok(participant);
     }

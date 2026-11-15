@@ -121,4 +121,8 @@ public sealed record PersonalBestImportConflictView(string FederationNumber, str
 public sealed record PersonalBestImportResult(int NewArchers, int NewRegistrations, IReadOnlyList<string> Warnings, Guid? BatchId, IReadOnlyList<PersonalBestImportConflictView> Conflicts);
 public sealed record PersonalBestConflictResolution(string FederationNumber, string Discipline, string MatchClassifier, string Action);
 public sealed record ResolvePersonalBestConflictsRequest(List<PersonalBestConflictResolution> Resolutions);
+// Participant list member federation numbers (temporary CS numbers, personal-best entries under a member's current number)
+public sealed record GeneratedFederationNumber(string FederationNumber);
+public sealed record PersonalBestEntryPreview(DateOnly Date, int Score, string Discipline, string MatchClassifier);
+public sealed record MemberPersonalBestEntries(string? FederationNumber, int TotalCount, IReadOnlyList<PersonalBestEntryPreview> Recent);
 public sealed record PersonalBestLogRow(string FederationNumber, string Name, string Discipline, string MatchClassifier, DateOnly Date, int Score);
