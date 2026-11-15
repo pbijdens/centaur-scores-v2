@@ -42,7 +42,7 @@ public sealed class ParticipantListsControllerTests
             list);
         await db.SaveChangesAsync();
 
-        var controller = new ParticipantListsController(db, new TestTenantContext(tenantId), new ParticipantListExcelService());
+        var controller = new ParticipantListsController(db, new TestTenantContext(tenantId), new ParticipantListExcelService(), new FederationNumberService(db), new PersonalBestNumberChanges(db, new PersonalBestContext(db)));
 
         var result = Assert.IsType<FileContentResult>(await controller.Export(list.Id, "nl", CancellationToken.None));
         Assert.Equal("Club members.xlsx", result.FileDownloadName);
@@ -79,7 +79,7 @@ public sealed class ParticipantListsControllerTests
         await using var db = new ApplicationDbContext(options);
         await db.Database.EnsureCreatedAsync();
 
-        var controller = new ParticipantListsController(db, new TestTenantContext(Guid.NewGuid(), canManage: false), new ParticipantListExcelService());
+        var controller = new ParticipantListsController(db, new TestTenantContext(Guid.NewGuid(), canManage: false), new ParticipantListExcelService(), new FederationNumberService(db), new PersonalBestNumberChanges(db, new PersonalBestContext(db)));
         Assert.IsType<ForbidResult>(await controller.Export(Guid.NewGuid(), "en", CancellationToken.None));
     }
 
@@ -129,7 +129,7 @@ public sealed class ParticipantListsControllerTests
         fileStream.Position = 0;
         var file = new FormFile(fileStream, 0, fileStream.Length, "file", "import.xlsx");
 
-        var controller = new ParticipantListsController(db, new TestTenantContext(tenantId), new ParticipantListExcelService());
+        var controller = new ParticipantListsController(db, new TestTenantContext(tenantId), new ParticipantListExcelService(), new FederationNumberService(db), new PersonalBestNumberChanges(db, new PersonalBestContext(db)));
         var result = Assert.IsType<OkObjectResult>(await controller.Import(list.Id, file, CancellationToken.None));
         var summary = Assert.IsType<ImportParticipantListResult>(result.Value);
         Assert.Equal(1, summary.Created);
@@ -167,7 +167,7 @@ public sealed class ParticipantListsControllerTests
         fileStream.Position = 0;
         var file = new FormFile(fileStream, 0, fileStream.Length, "file", "import.xlsx");
 
-        var controller = new ParticipantListsController(db, new TestTenantContext(tenantId), new ParticipantListExcelService());
+        var controller = new ParticipantListsController(db, new TestTenantContext(tenantId), new ParticipantListExcelService(), new FederationNumberService(db), new PersonalBestNumberChanges(db, new PersonalBestContext(db)));
         var result = Assert.IsType<BadRequestObjectResult>(await controller.Import(list.Id, file, CancellationToken.None));
         var error = Assert.IsType<ApiError>(result.Value);
         Assert.Equal("IMPORT_UNRECOGNIZED_HEADERS", error.Code);
@@ -197,7 +197,7 @@ public sealed class ParticipantListsControllerTests
         db.AddRange(new Tenant { Id = tenantId, Name = "Tenant" }, list);
         await db.SaveChangesAsync();
 
-        var controller = new ParticipantListsController(db, new TestTenantContext(tenantId), new ParticipantListExcelService());
+        var controller = new ParticipantListsController(db, new TestTenantContext(tenantId), new ParticipantListExcelService(), new FederationNumberService(db), new PersonalBestNumberChanges(db, new PersonalBestContext(db)));
         var result = Assert.IsType<OkObjectResult>(await controller.List(true, CancellationToken.None));
         var items = Assert.IsAssignableFrom<IReadOnlyList<ParticipantListSummary>>(result.Value);
         var summary = Assert.Single(items);
@@ -226,7 +226,7 @@ public sealed class ParticipantListsControllerTests
         db.AddRange(new Tenant { Id = tenantId, Name = "Tenant" }, list);
         await db.SaveChangesAsync();
 
-        var controller = new ParticipantListsController(db, new TestTenantContext(tenantId), new ParticipantListExcelService());
+        var controller = new ParticipantListsController(db, new TestTenantContext(tenantId), new ParticipantListExcelService(), new FederationNumberService(db), new PersonalBestNumberChanges(db, new PersonalBestContext(db)));
         var result = Assert.IsType<OkObjectResult>(await controller.Get(list.Id, CancellationToken.None));
         var returned = Assert.IsType<ParticipantList>(result.Value);
 
@@ -247,7 +247,7 @@ public sealed class ParticipantListsControllerTests
         db.AddRange(new Tenant { Id = otherTenantId, Name = "Tenant" }, list);
         await db.SaveChangesAsync();
 
-        var controller = new ParticipantListsController(db, new TestTenantContext(Guid.NewGuid()), new ParticipantListExcelService());
+        var controller = new ParticipantListsController(db, new TestTenantContext(Guid.NewGuid()), new ParticipantListExcelService(), new FederationNumberService(db), new PersonalBestNumberChanges(db, new PersonalBestContext(db)));
         Assert.IsType<NotFoundResult>(await controller.Get(list.Id, CancellationToken.None));
     }
 
@@ -271,7 +271,7 @@ public sealed class ParticipantListsControllerTests
         db.AddRange(new Tenant { Id = tenantId, Name = "Tenant" }, list);
         await db.SaveChangesAsync();
 
-        var controller = new ParticipantListsController(db, new TestTenantContext(tenantId), new ParticipantListExcelService());
+        var controller = new ParticipantListsController(db, new TestTenantContext(tenantId), new ParticipantListExcelService(), new FederationNumberService(db), new PersonalBestNumberChanges(db, new PersonalBestContext(db)));
         Assert.IsType<NoContentResult>(await controller.Delete(list.Id, CancellationToken.None));
 
         Assert.False(await db.ParticipantLists.AnyAsync(item => item.Id == list.Id));
@@ -307,7 +307,7 @@ public sealed class ParticipantListsControllerTests
         db.AddRange(new Tenant { Id = tenantId, Name = "Tenant" }, list, match);
         await db.SaveChangesAsync();
 
-        var controller = new ParticipantListsController(db, new TestTenantContext(tenantId), new ParticipantListExcelService());
+        var controller = new ParticipantListsController(db, new TestTenantContext(tenantId), new ParticipantListExcelService(), new FederationNumberService(db), new PersonalBestNumberChanges(db, new PersonalBestContext(db)));
         var result = Assert.IsType<ConflictObjectResult>(await controller.Delete(list.Id, CancellationToken.None));
         Assert.Equal("PARTICIPANT_LIST_IN_USE", Assert.IsType<ApiError>(result.Value).Code);
 
@@ -338,7 +338,7 @@ public sealed class ParticipantListsControllerTests
         db.AddRange(new Tenant { Id = tenantId, Name = "Tenant" }, list, match);
         await db.SaveChangesAsync();
 
-        var controller = new ParticipantListsController(db, new TestTenantContext(tenantId), new ParticipantListExcelService());
+        var controller = new ParticipantListsController(db, new TestTenantContext(tenantId), new ParticipantListExcelService(), new FederationNumberService(db), new PersonalBestNumberChanges(db, new PersonalBestContext(db)));
         var conflict = Assert.IsType<ConflictObjectResult>(await controller.DeleteMember(list.Id, memberId, CancellationToken.None));
         Assert.Equal("PARTICIPANT_LIST_MEMBER_IN_USE", Assert.IsType<ApiError>(conflict.Value).Code);
         Assert.True(await db.ParticipantListMembers.AnyAsync(item => item.Id == memberId));
@@ -364,7 +364,7 @@ public sealed class ParticipantListsControllerTests
         db.AddRange(new Tenant { Id = tenantId, Name = "Tenant" }, list);
         await db.SaveChangesAsync();
 
-        var controller = new ParticipantListsController(db, new TestTenantContext(tenantId, canManage: false), new ParticipantListExcelService());
+        var controller = new ParticipantListsController(db, new TestTenantContext(tenantId, canManage: false), new ParticipantListExcelService(), new FederationNumberService(db), new PersonalBestNumberChanges(db, new PersonalBestContext(db)));
         Assert.IsType<ForbidResult>(await controller.Delete(list.Id, CancellationToken.None));
     }
 

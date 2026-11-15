@@ -156,3 +156,17 @@ export type PublishedCompetitionResults = { usesF1: boolean; isGrouped: boolean;
 // activeMatchCount: open matches behind these results - shown provisionally when includesActiveMatches, otherwise left out
 // (a still-active match published without active results has neither match nor competition).
 export type PublishedResults = { kind: 'match' | 'competition'; tenant: string; logo?: string | null; name: string; startDate: string; endDate: string; includesActiveMatches: boolean; activeMatchCount: number; match?: PublishedMatchResults | null; competition?: PublishedCompetitionResults | null }
+
+// Personal-best entries recorded under a participant list member's current federation number (sample of the most recent).
+export interface PersonalBestEntryPreview {
+  date: string
+  score: number
+  discipline: string
+  matchClassifier: string
+}
+
+export interface MemberPersonalBestEntries {
+  federationNumber: string | null
+  totalCount: number
+  recent: PersonalBestEntryPreview[]
+}

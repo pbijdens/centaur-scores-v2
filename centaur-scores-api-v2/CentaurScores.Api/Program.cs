@@ -33,6 +33,8 @@ builder.Services.AddScoped<IPersonalBestEngine, PersonalBestEngine>();
 builder.Services.AddScoped<IPersonalBestExcelService, PersonalBestExcelService>();
 builder.Services.AddScoped<IPersonalBestRegistrationService, PersonalBestRegistrationService>();
 builder.Services.AddScoped<IPersonalBestLiveLookup, PersonalBestLiveLookup>();
+builder.Services.AddScoped<IPersonalBestNumberChanges, PersonalBestNumberChanges>();
+builder.Services.AddScoped<IFederationNumberService, FederationNumberService>();
 builder.Services.AddScoped<IBackupService, BackupService>();
 builder.Services.AddScoped<IRestoreService, RestoreService>();
 builder.Services.AddScoped<ITenantDeletionService, TenantDeletionService>();

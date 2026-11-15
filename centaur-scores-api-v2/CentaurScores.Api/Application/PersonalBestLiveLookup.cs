@@ -68,7 +68,11 @@ public sealed class PersonalBestLiveLookup(ApplicationDbContext db, IPersonalBes
         var result = new Dictionary<Guid, PersonalBestSnapshot>();
         foreach (var participant in match.Participants)
         {
-            if (string.IsNullOrWhiteSpace(participant.FederationNumber)) continue;
+            // Same rule as registration: only list-linked participants, by the list member's own number - a free
+            // entry typing someone else's number must not show (or be compared against) that archer's personal best.
+            if (participant.ParticipantListMemberId is null) continue;
+            var federationNumber = participant.ParticipantListMember?.FederationNumber;
+            if (string.IsNullOrWhiteSpace(federationNumber)) continue;
             var matchedDisciplines = mappings
                 .Where(mapping => participant.Categories.TryGetValue(mapping.CategoryId, out var valueId) && valueId == mapping.ValueId)
                 .Select(mapping => mapping.Name)
@@ -76,7 +80,7 @@ public sealed class PersonalBestLiveLookup(ApplicationDbContext db, IPersonalBes
                 .ToList();
             if (matchedDisciplines.Count != 1) continue;
 
-            var best = await engine.GetCurrentBestAsync(owningTenantId.Value, participant.FederationNumber!, matchedDisciplines[0], match.PersonalBestClassifier!, cancellationToken);
+            var best = await engine.GetCurrentBestAsync(owningTenantId.Value, federationNumber, matchedDisciplines[0], match.PersonalBestClassifier!, cancellationToken);
             if (best is null) continue;
             result[participant.Id] = new PersonalBestSnapshot(best.Score, (double)best.Score / totalArrows);
         }

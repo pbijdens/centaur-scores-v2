@@ -1,4 +1,4 @@
-import type { Account, Category, Competition, CompetitionResultsDocument, CompetitionRound, CompetitionScoreRule, DefaultScopeSettings, Language, LiveScoringMatch, LiveScoringPage, Match, MatchListItem, MatchParticipant, MatchParticipantSignature, MatchTemplate, ParticipantList, ParticipantListSummary, PersonalBestAvailableValue, PersonalBestConflictResolution, PersonalBestDiscipline, PersonalBestDisciplineValueRef, PersonalBestExportConfig, PersonalBestExportField, PersonalBestExportMode, PersonalBestDateFormat, PersonalBestImportConfig, PersonalBestImportResult, PersonalBestLogRow, PersonalBestStatus, Profile, PublishedResults, RestoreBackupResult, ScopeConflict, ScoreDevice, Tenant } from './types'
+import type { Account, Category, Competition, CompetitionResultsDocument, CompetitionRound, CompetitionScoreRule, DefaultScopeSettings, Language, LiveScoringMatch, LiveScoringPage, Match, MatchListItem, MatchParticipant, MatchParticipantSignature, MatchTemplate, MemberPersonalBestEntries, ParticipantList, ParticipantListSummary, PersonalBestAvailableValue, PersonalBestConflictResolution, PersonalBestDiscipline, PersonalBestDisciplineValueRef, PersonalBestExportConfig, PersonalBestExportField, PersonalBestExportMode, PersonalBestDateFormat, PersonalBestImportConfig, PersonalBestImportResult, PersonalBestLogRow, PersonalBestStatus, Profile, PublishedResults, RestoreBackupResult, ScopeConflict, ScoreDevice, Tenant } from './types'
 import { filenameFromDisposition } from './contentDisposition'
 
 export const apiBase = import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:5080'
@@ -394,8 +394,19 @@ export class ApiClient {
     return this.request(`/api/participant-lists/${listId}/members`, { method: 'POST', body: JSON.stringify(body) })
   }
 
-  updateParticipantMember(listId: string, memberId: string, body: { lastName: string; fullName: string; federationNumber?: string | null; categories: Record<string, number>; isActive: boolean }) {
-    return this.request(`/api/participant-lists/${listId}/members/${memberId}`, { method: 'PUT', body: JSON.stringify(body) })
+  // updatePersonalBests: also move the personal-best entries from the member's current federation number to the new one.
+  updateParticipantMember(listId: string, memberId: string, body: { lastName: string; fullName: string; federationNumber?: string | null; categories: Record<string, number>; isActive: boolean }, updatePersonalBests = false) {
+    const query = updatePersonalBests ? '?updatePersonalBests=true' : ''
+    return this.request(`/api/participant-lists/${listId}/members/${memberId}${query}`, { method: 'PUT', body: JSON.stringify(body) })
+  }
+
+  fetchMemberPersonalBests(listId: string, memberId: string): Promise<MemberPersonalBestEntries> {
+    return this.request(`/api/participant-lists/${listId}/members/${memberId}/personal-bests`)
+  }
+
+  async generateFederationNumber(): Promise<string> {
+    const result: { federationNumber: string } = await this.request('/api/participant-lists/federation-numbers/generate', { method: 'POST' })
+    return result.federationNumber
   }
 
   deleteParticipantMember(listId: string, memberId: string) {
